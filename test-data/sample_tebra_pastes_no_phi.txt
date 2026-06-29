@@ -1,0 +1,52 @@
+# No-PHI Tebra-like parser test data
+
+This file contains fictional medication-order text for parser testing. Do not replace it with real patient data.
+
+--- Example 1: multiple medications ---
+
+metFORMIN 1,000 mg tablet, 1 tab(s) orally 2 times a day with meals
+1 refill
+Started on 02/04/2026 09:15 PM by Test Provider, MD
+Fictional Pharmacy 0001: 123 TEST STREET, MILWAUKEE 53211
+See All
+
+predniSONE 5 mg tablet, 1 tab(s) orally once a day with meals
+10 tablets, 0 refills
+Prescribed on 11/15/2025 12:38 PM by TEST PROVIDER
+Fictional Pharmacy 0001: 123 TEST STREET, MILWAUKEE 53211
+See All
+
+empagliflozin 10 mg tablet, Take one tablet by mouth every morning
+30 tablets, 0 refills
+Entered on 04/28/2025 05:35 PM by Test Manager
+
+Basaglar KwikPen U-100 Insulin 100 unit/mL (3 mL) subcutaneous, 20 unit(s) subcutaneously every evening
+10 (3 mL syringe. Total quantity: 30 mLs), 0 refills
+Prescribed on 01/18/2022 09:30 AM by Test Provider, MD
+Fictional Pharmacy 0001: 123 TEST STREET, MILWAUKEE 53211
+See All
+
+--- Example 2: minimal instructions and no blank between some meds ---
+
+TylenoL 325 mg capsule, Take 1
+30 capsules, 0 refills
+Prescribed on 09/11/2021 08:23 AM by TEST PROVIDER
+Fictional Pharmacy 0001: 123 TEST STREET, MILWAUKEE 53211
+ibuprofen 100 mg chewable tablet, Take 1 by mouth daily
+30 tablets, 0 refills
+Prescribed on 09/11/2021 08:20 AM by TEST PROVIDER
+Fictional Pharmacy 0001: 123 TEST STREET, MILWAUKEE 53211
+
+amLODIPine 10 mg tablet, 10 mg orally once a day at bedtime
+30 tablets, 0 refills
+Prescribed on 06/15/2021 09:25 AM by TEST PROVIDER
+
+amitriptyline 10 mg tablet, 1 tab(s) orally once a day as needed
+0 refills
+Prescribed on 05/08/2021 08:54 AM by TEST PROVIDER
+See All
+
+atorvastatin 40 mg tablet, Take one tablet by mouth once daily
+90 tablets, 0 refills
+Prescribed on 05/08/2021 08:54 AM by TEST PROVIDER
+See All

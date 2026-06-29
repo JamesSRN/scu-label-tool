@@ -1,0 +1,14 @@
+# VBA import into Excel is sensitive to line endings.
+*.bas text eol=crlf
+*.vbs text eol=crlf
+
+# Docs are normal text.
+*.md text eol=lf
+*.txt text eol=lf
+
+# Binary assets.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.pdf binary
