@@ -34,16 +34,16 @@ Also on the Desktop: the clinic's **old DYMO** templates (`dispensary label temp
 
 ---
 
-## 3. Workbook structure (6 tabs)
+## 3. Workbook structure (5 visible tabs + 1 hidden)
 
 - **Patient & Input** — patient name / DOB / Rx date, the paste box; buttons: `PARSE MEDICATIONS`, `Clear Paste Area`, `Reset Session`, **`Start NEW Patient`** (clears the current patient + med list but **keeps the Log** — for seeing patients back-to-back).
-- **Medications** — the parsed table. Columns A–N: `#`, Name, Strength, Dosage Form, SIG, Quantity, Refills, **Expiration**, **Lot**, Date of Rx, Confidence, Warnings, Raw Text, **Printed?**; then **column O = "Prints"** (how many times that label has printed, auto-increments) and **column P = "Print?"** (double-click toggles a ✓ to select for batch print). Buttons: `+ Add Medication`, `- Remove Selected`, `Review & Validate`, `Print Selected Label`, `Preview ALL Labels`, `Print Checked Labels`.
-- **Label Preview** — renders one label in the **Brother LANDSCAPE** layout (≈3.9″ × 2.4″); buttons `Update Label Preview`, `Print This Label`.
-- **All Labels** — auto-generated gallery: one card per medication, each with **Print this label / Edit this med / Remove this med** buttons. **Rebuilds itself every time you click onto the tab.**
+- **Medications** — the parsed table. Columns A–N: `#`, Name, Strength, Dosage Form, SIG, Quantity, Refills, **Expiration**, **Lot**, Date of Rx, Confidence, Warnings, Raw Text, **Printed?**; then **column O = "# of Prints"** (how many times that label has printed; auto-increments and is **protected from manual edits**) and **column P = "Print?"** (double-click toggles a ✓ to select for batch print). Buttons: `+ Add Medication`, `- Remove Selected`, `Review & Validate`, `Preview ALL Labels`, `Print Checked Labels`. (The old `Print Selected Label` button was removed — to print one med, check just that row's Print? box and click Print Checked Labels, or use a gallery card's Print button.) **`- Remove Selected` removes every checked (Print? ✓) row**, not just the clicked one.
+- **Label Previews** (formerly "All Labels") — auto-generated gallery: one card per medication, each with **Print this label / Edit this med / Remove this med** buttons. **Rebuilds itself every time you click onto the tab.** This is the only previews tab volunteers see.
 - **Log** — running dispense log.
 - **Setup & Help** — instructions.
+- **Label Preview** (HIDDEN) — the internal print surface: every label, single or batch, renders here in the Brother LANDSCAPE layout (≈3.9″ × 2.4″) and prints from here (`wsL.PrintOut`). Hidden so volunteers don't see it / can't break it. A dev can right-click any tab → Unhide to inspect it. **Do not delete it — printing depends on it.**
 
-Keyboard shortcuts: `Ctrl+Shift+P` parse, `Ctrl+Shift+R` reset, `Ctrl+Shift+L` update label preview.
+Keyboard shortcuts: `Ctrl+Shift+P` parse, `Ctrl+Shift+R` reset, `Ctrl+Shift+L` refresh Label Previews.
 
 ---
 
@@ -59,22 +59,25 @@ Keyboard shortcuts: `Ctrl+Shift+P` parse, `Ctrl+Shift+R` reset, `Ctrl+Shift+L` u
 
 ### Labels & printing
 - **Label Preview** = single label, **landscape** DK-1202 (final orientation choice).
-- **Print Selected Label** (Medications tab) prints the clicked row.
+- **Printing is driven by the Print? checkboxes** — check the rows you want and click **Print Checked Labels** (works for one med or many). A gallery card's **Print this label** also prints a single med.
 - **Preview ALL Labels** = gallery of every label with per-card **Print / Edit / Remove**; auto-refreshes on tab activate.
-- **Print? selection column (O)** — **double-click a cell to toggle a ✓**. **Print Checked Labels** prints every checked med in sequence (skips any checked row missing Exp/Lot), one confirmation up front.
+- **Print? selection column (P)** — **double-click a cell to toggle a ✓**. **Print Checked Labels** prints every checked med in sequence (skips any checked row missing Exp/Lot), one confirmation up front.
+- **Print confirmations list what's about to print** (via `MedConfirmBlock` / `MedConfirmLine`): the single-label confirm shows medication, directions, qty/refills, Exp/Lot; the batch confirm shows a numbered list of every checked med and flags any that will be skipped for missing Exp/Lot.
 - **Brother auto-select** (`SelectBrotherPrinter`): WMI finds the Brother QL-1100c and sets it active (tries name+port, then `Ne00:`–`Ne99:`, then common names); single-print confirms before committing a label; graceful "not found" fallback.
-- **Clinic logo** embedded **top-right of every printed label**; a clean full-width rule sits under the clinic name (replaced the old gappy line).
+- **Clinic logo** — **temporarily disabled.** The oversized 7096×5624 PNG made Excel's `Shapes.AddPicture` abort `SetupWorkbook` with *"unable to import file"* (also fails if the file is OneDrive cloud-only). The clean full-width rule under the clinic name remains. To re-enable: save a **small** (~300–500 px) copy locally and wrap `AddPicture` in `On Error Resume Next` so a bad logo can never break setup.
+- **Print scaling** uses **`Zoom = 100` with `FitToPagesWide/Tall = False`** (not fit-to-page) in `BuildLabelPreviewLayout`, `PrintLabel`, and `PrintCheckedLabels` — prints the label at true size instead of squishing it.
 - **Print count** — the `Prints` column auto-increments on every print (single, per-card, or batch).
 
 ### Dispense Log & multi-patient
 - **Every print is logged** to the Log sheet: timestamp, patient, DOB, medication, strength, SIG, quantity, refills, Exp, Lot, Rx date, **dosage form**, **print #**, and **volunteer initials**. *(Fixed a real bug where the medication details were never actually recorded; batch prints are now logged too; initials are asked once per batch.)*
 - **`Start NEW Patient`** clears the current patient + med list but **never touches the Log**, so the dispense record accumulates across patients all session.
+- **`Reset Session`** is the *full* reset (with confirmation): clears patient, medications, **and the entire Log**. Use `Start NEW Patient` for between-patient turnover; use `Reset Session` to wipe everything and start a brand-new day.
 
 ### Color scheme (latest design)
 - **Confidence cell only** is colored by the triad: High=green, Medium=yellow, Low=red, Manual/blank=gray.
-- **Row background = workflow STATE** (priority top→bottom): **Selected** (checked) = blue · **Printed** = lavender · **Validated** (no warnings) = green · **Non-validated** (has warnings) = gray. Updates in real time when you toggle a row's ✓ (via an injected `Worksheet_BeforeDoubleClick`).
+- **Row background = workflow STATE** (priority top→bottom): **Selected** (checked) = **green** (the same tint selected cards get on the Label Previews tab, for consistency) · **Validated** (no warnings) = **blue** · **Non-validated** (has warnings) = gray. Printing no longer changes the row color (it just returns to green/blue/gray); print status is still tracked by the **Printed?** and **# of Prints** columns. Updates in real time when you toggle a row's ✓ (via the preinstalled `Worksheet_BeforeDoubleClick`).
 - **Exp/Lot cells:** **red when missing**, otherwise **blend into the row color** (the old "orange when filled" was removed per request).
-- **All Labels gallery:** a **selected (checked) med's preview card fills light green** each time the gallery rebuilds (reads the live ✓ state).
+- **Label Previews gallery:** a **selected (checked) med's preview card fills light green** each time the gallery rebuilds (reads the live ✓ state) — the same green now used for selected rows on the Medications sheet.
 
 ---
 
@@ -96,7 +99,63 @@ Whenever `MedParser.bas` changes, re-sync the workbook. **Acceptance:** newest `
 
 **Manual:** Enable Content → **Alt+F11** → Project Explorer → Modules → right-click **MedParser → Remove → No** → **File ▸ Import File ▸ `MedParser.bas`** → **Debug ▸ Compile** → **Macros ▸ SetupWorkbook ▸ Run** → **Ctrl+S**.
 
-Running `SetupWorkbook` successfully *is* the compile check (VBA won't run a sub if the project has compile errors). `SetupWorkbook` also injects the two worksheet event handlers (`Worksheet_Activate` on All Labels; `Worksheet_BeforeDoubleClick` on Medications) — this needs "Trust access to the VBA project object model" (already on).
+Running `SetupWorkbook` successfully *is* the compile check (VBA won't run a sub if the project has compile errors).
+
+**One-time only — preinstall the two worksheet event handlers.** `SetupWorkbook` no longer modifies the VBProject at runtime (more robust; no "Trust access to the VBA project object model" needed). Paste these once and they live in the workbook permanently:
+
+- VBA editor → double-click **Sheet "Medications"** (under *Microsoft Excel Objects*) → paste (this is the full module — replace anything already there):
+```
+Private mP15Addr As String
+Private mP15Val As Variant
+
+Private Sub Worksheet_SelectionChange(ByVal Target As Range)
+    If Target.Cells.Count = 1 And Target.Column = 15 And Target.Row > 3 Then
+        mP15Addr = Target.Address
+        mP15Val = Target.Value
+    Else
+        mP15Addr = ""
+    End If
+End Sub
+
+Private Sub Worksheet_Change(ByVal Target As Range)
+    ' Protect the auto-managed "# of Prints" column from manual edits
+    If mP15Addr = "" Then Exit Sub
+    Dim c As Range
+    For Each c In Target.Cells
+        If c.Address = mP15Addr Then
+            Application.EnableEvents = False
+            c.Value = mP15Val
+            Application.EnableEvents = True
+            MsgBox "The '# of Prints' column updates automatically and cannot be edited by hand.", _
+                   vbInformation, "Protected column"
+            Exit Sub
+        End If
+    Next c
+End Sub
+
+Private Sub Worksheet_BeforeDoubleClick(ByVal Target As Range, Cancel As Boolean)
+    If Target.Column = 15 Then        ' # of Prints - read-only
+        Cancel = True
+        Exit Sub
+    End If
+    If Target.Column = 16 And Target.Row > 3 Then   ' Print? - toggle the check
+        If Trim(Me.Cells(Target.Row, 2).Value) <> "" Then
+            Cancel = True
+            ToggleRowSelect Target.Row
+        End If
+    End If
+End Sub
+```
+- Double-click the gallery sheet (shows as **"All Labels"** before first setup, **"Label Previews"** after) → paste:
+```
+Private Sub Worksheet_Activate()
+    On Error Resume Next
+    Application.EnableEvents = False
+    PreviewAllLabels
+    Application.EnableEvents = True
+End Sub
+```
+Then **Ctrl+S**. (`ToggleRowSelect` and `PreviewAllLabels` are `Public` in `MedParser`, so the sheets can call them.)
 
 > **Status line:** as of the last release build, `MedicationDispensing.xlsm` reflects `MedParser.bas`. If the Print?/colors changes aren't visible, `SetupWorkbook` hasn't been run against the latest import yet — do §6.
 
@@ -122,7 +181,10 @@ Running `SetupWorkbook` successfully *is* the compile check (VBA won't run a sub
 - **`PaperSize = xlPaperUser` threw run-time 1004** ("Unable to set the PaperSize property") on this Brother driver. **Fix:** removed all `.PaperSize = xlPaperUser` lines — the driver's DK-1202 default is already correct, so Excel just inherits it. (If you re-add paper handling, wrap it in `On Error Resume Next`.)
 - **Orientation flip-flop:** built portrait → switched to landscape → back to portrait → finally **landscape** (volunteers wanted the wider layout, matching the old DYMO). The layout now lives in code (`BuildLabelPreviewLayout`) so it's reproducible.
 - **OneDrive AutoSave** pops "Syncing workbook…" dialogs and can momentarily interfere; just let it finish or Cancel the dialog. Excel also **caches the printer list at launch**, so a newly installed printer needs an Excel restart to appear.
-- **Gallery vs. checkboxes:** the All Labels gallery auto-rebuilds (would wipe checkboxes), so selection lives on the **Medications** sheet instead.
+- **Gallery vs. checkboxes:** the Label Previews gallery auto-rebuilds (would wipe checkboxes), so selection lives on the **Medications** sheet instead.
+- **CRLF line endings are required.** Editing `MedParser.bas` on Linux/Mac (or any tool that writes Unix `\n`) makes the VBA importer reject it with *"Error/unable to import file."* Always save the `.bas` with **Windows CRLF** endings (and pure ASCII). This bit us mid-session and looked like a code problem when it was purely line endings.
+- **`Shapes.AddPicture` aborts on a bad image.** An oversized or OneDrive-cloud-only PNG made `SetupWorkbook` throw *"unable to import file"* at the logo step (it reads like a `.bas` import error but isn't). The logo block is currently disabled; re-enable only with a small local PNG wrapped in `On Error Resume Next`.
+- **Don't inject VBA at runtime in production.** The earlier `AddFromString` approach needed "Trust access to the VBA project object model" and was fragile. The two worksheet event handlers are now **preinstalled** in the sheet modules (§6) and `SetupWorkbook` no longer touches the VBProject.
 
 ---
 
@@ -139,18 +201,18 @@ Running `SetupWorkbook` successfully *is* the compile check (VBA won't run a sub
 
 | Routine | Purpose |
 |---|---|
-| `SetupWorkbook` | Run after every import: (re)creates all buttons, the Print? header, injects the two worksheet events, recolors rows, rebuilds the label layout. |
+| `SetupWorkbook` | Run after every import: (re)creates all buttons, the Print?/Prints headers, recolors rows, rebuilds the label layout. No longer touches the VBProject (event handlers are preinstalled — see §6). |
 | `ParseMedications` · `SplitMedBlocks` · `IsMedHeaderLine` · `ParseOneBlock` | Parse pasted text → one row per medication. |
 | `ValidateMedications` · `ReviewMedications` | Flag issues; summary. |
-| `AddMedicationRow` · `RemoveSelectedMedication` · `RenumberMeds` | Manual list editing. |
+| `AddMedicationRow` · `RemoveSelectedMedication` · `RenumberMeds` | Manual list editing. **Remove Selected now removes every checked (Print? ✓) row** — confirms with a list, deletes only the table cells (shift-up) so the side buttons don't move, then renumbers/revalidates. |
 | `ApplyRowState` · `ApplyAllRowStates` · `IsRowSelected` · `ToggleRowSelect` | **New color engine** — row background by state, confidence-cell triad, Exp/Lot highlight, selection ✓. |
-| `InstallMedSheetEvents` | Injects `Worksheet_BeforeDoubleClick` (toggle Print? ✓) into the Medications sheet module. |
+| `InstallMedSheetEvents` · `InstallAutoRefresh` | **No longer called** (kept for reference). The `Worksheet_BeforeDoubleClick` and `Worksheet_Activate` handlers are now preinstalled directly in the sheet modules — §6. |
 | `PrintCheckedLabels` | Batch-prints every checked (✓) medication in sequence. |
 | `UpdateLabelPreviewFromSelection` · `BuildLabelPreviewLayout` · `FmtLbl` | Single label preview + **landscape** layout (in code). |
 | `PrintLabel` · `SelectBrotherPrinter` · `MarkPrinted` | Auto-select Brother, confirm, print, mark printed + bump the `Prints` count. |
 | `LogPrint(medRow, vol)` · `AskInitials` | Write one full Log row per print (timestamp, patient, DOB, med, strength, SIG, qty, refills, Exp, Lot, Rx date, dosage form, print #, initials). Called by both single and batch printing; takes the med row explicitly so details are always captured. |
 | `StartNewPatient` | Clear current patient + med list (with confirm), reset Exp/Lot to text — **but leave the Log intact** for the next patient. |
-| `PreviewAllLabels` · `BuildAllLabelsPreview` · `EnsureAllLabelsSheet` · `InstallAutoRefresh` | All Labels gallery + injects `Worksheet_Activate` so it auto-rebuilds on tab click. |
+| `PreviewAllLabels` · `BuildAllLabelsPreview` · `EnsureAllLabelsSheet` | **Label Previews** gallery (auto-migrates the old "All Labels" tab name). The `Worksheet_Activate` auto-rebuild handler is **preinstalled** in the sheet module (§6), not injected. |
 | `RowPrint` · `RowEdit` · `RowRemove` · `CallerRow` | Per-card gallery handlers (`Application.Caller`). |
 | `ResetSession` · `ClearPasteArea` | Clear between patients. |
 
@@ -160,7 +222,7 @@ Running `SetupWorkbook` successfully *is* the compile check (VBA won't run a sub
 
 **Rule #1 — never commit PHI.** The `.xlsm`/`.xlsx` workbooks hold patient names, DOB, and meds. GitHub is **not** BAA-covered, so those files must **never** be pushed. A `.gitignore` is already in the folder excluding `*.xlsm`, `*.xlsx`, `*.xls`, `*.csv`, `~$*`, and `_backups/`. The repo holds **only**: `MedParser.bas`, `Build-Release.vbs`, `HANDOFF.md`, the logo PNG, and `.gitignore`.
 
-**Rule #2 — don't git-init inside OneDrive.** OneDrive and git fight over the `.git` folder (this was tried and failed). Put the repo **outside** the synced folder.
+**Rule #2 — only operate this repo from GitHub Desktop on native Windows.** GitHub Desktop handles the OneDrive-synced folder fine. But git run from automation (the Claude sandbox, WSL, etc.) **cannot** manage a `.git` directory on a OneDrive path — lock files fail with "Operation not permitted" and a stray `git init`/`git status` can blank out `.git/config` and leave an undeletable `config.lock`. If that happens: close GitHub Desktop, delete `.git\config.lock`, confirm `.git\config` has the correct `[remote "origin"] url`, reopen GitHub Desktop. Never point a non-Windows git at this folder.
 
 **Setup with GitHub Desktop (now installed):**
 1. **Delete the leftover broken `.git` folder** in `SCU Label Printing`: File Explorer → View → Show → **Hidden items**, then delete `.git` (or in a Command Prompt there: `rmdir /s /q .git`).
@@ -170,4 +232,18 @@ Running `SetupWorkbook` successfully *is* the compile check (VBA won't run a sub
 
 ---
 
-**Bottom line:** parsing, validation, editing, the landscape single label, the all-labels gallery, selection + per/batch printing, and the new color scheme are all built and (except the new selection/colors awaiting one `SetupWorkbook` run, and the physical print) verified. The driver is installed and macros run. The one true unknown left is **how a label physically prints on the Brother** — do §7 step 2.
+## 12. Session changelog — 2026-06-29
+
+- **Dispense Log fixed & enriched** — was silently not recording the medication (read the active sheet, which was the preview by print time). Now `LogPrint(medRow, vol)` logs every field + dosage form + print # for **both** single and batch prints; initials asked once per batch.
+- **`# of Prints` column** (renamed from "Prints") — auto-increments on every print; **protected** from manual edits via a self-reverting guard in the Medications sheet module.
+- **`Start NEW Patient`** keeps the Log; **`Reset Session`** is now a full wipe (patient + meds + Log) with a clear warning.
+- **Label Preview tab hidden** (kept as the internal print surface); **"All Labels" renamed → "Label Previews"** (auto-migrated by `SetupWorkbook`).
+- **Color scheme:** selected = green (matches the gallery tint), validated = blue; **lavender "printed" state removed**.
+- **Print confirmations** now list the medication details (single = full block; batch = numbered list flagging Exp/Lot-missing rows that will be skipped).
+- **`Print Selected Label` button removed** — printing is driven by the Print? checkboxes + `Print Checked Labels`.
+- **`Remove Selected` now removes every checked row** (check = the single meaning of "selected").
+- **Production hardening:** logo `AddPicture` disabled (was aborting setup); page scaling switched to `Zoom = 100` / no fit-to-page; runtime VBProject injection removed in favor of **preinstalled** sheet-module handlers.
+
+---
+
+**Bottom line:** parsing, validation, editing, the landscape label, the Label Previews gallery, checkbox-driven selection/printing/removal, the dispense log, and the consolidated color scheme are all built and working in the user's testing. Remaining: re-import + `SetupWorkbook` to apply the latest, publish the code-only git repo (§11), and the one true unknown — **how a label physically prints on the Brother** (§7).

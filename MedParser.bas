@@ -18,7 +18,7 @@ Private Const SH_INPUT  As String = "Patient & Input"
 Private Const SH_MEDS   As String = "Medications"
 Private Const SH_LABEL  As String = "Label Preview"
 Private Const SH_LOG    As String = "Log"
-Private Const SH_ALL    As String = "All Labels"
+Private Const SH_ALL    As String = "Label Previews"
 
 ' -- Medications sheet column indices ------------------------
 Private Const C_NUM     As Integer = 1
@@ -72,12 +72,13 @@ End Type
 Public Sub SetupWorkbook()
     Application.OnKey "^+P", "ParseMedications"
     Application.OnKey "^+R", "ResetSession"
-    Application.OnKey "^+L", "UpdateLabelPreviewFromSelection"
+    Application.OnKey "^+L", "PreviewAllLabels"
 
     Dim ws1 As Worksheet, ws2 As Worksheet, ws3 As Worksheet
     Set ws1 = ThisWorkbook.Sheets(SH_INPUT)
     Set ws2 = ThisWorkbook.Sheets(SH_MEDS)
     Set ws3 = ThisWorkbook.Sheets(SH_LABEL)
+    ws3.Visible = xlSheetVisible   ' show while we rebuild it; re-hidden at the end
 
     Call AddButtonToSheet(ws1, "btnParse",  "PARSE MEDICATIONS",  "ParseMedications",   48, 2, 240, 26, RGB(21, 101, 192))
     Call AddButtonToSheet(ws1, "btnClear",  "Clear Paste Area",    "ClearPasteArea",     50, 2, 150, 20, RGB(84, 110, 122))
@@ -89,11 +90,14 @@ Public Sub SetupWorkbook()
     Call AddButtonToSheet(ws2, "btnAddMed", "+ Add Medication",   "AddMedicationRow",         1, 17, 150, 22, RGB(46, 125, 50))
     Call AddButtonToSheet(ws2, "btnRemMed", "- Remove Selected",  "RemoveSelectedMedication", 3, 17, 150, 22, RGB(191, 54, 12))
     Call AddButtonToSheet(ws2, "btnRevMed", "Review & Validate",  "ReviewMedications",        5, 17, 150, 22, RGB(21, 101, 192))
-    Call AddButtonToSheet(ws2, "btnPrnMed", "Print Selected Label", "PrintLabel",            7, 17, 150, 22, RGB(123, 31, 162))
-    Call AddButtonToSheet(ws2, "btnPrvAll", "Preview ALL Labels",   "PreviewAllLabels",         9, 17, 150, 22, RGB(0, 121, 107))
-    Call AddButtonToSheet(ws2, "btnPrnChk", "Print Checked Labels", "PrintCheckedLabels",      11, 17, 150, 22, RGB(216, 67, 21))
+    Call AddButtonToSheet(ws2, "btnPrvAll", "Preview ALL Labels",   "PreviewAllLabels",         7, 17, 150, 22, RGB(0, 121, 107))
+    Call AddButtonToSheet(ws2, "btnPrnChk", "Print Checked Labels", "PrintCheckedLabels",       9, 17, 150, 22, RGB(216, 67, 21))
+    ' Removed the single "Print Selected Label" button - printing is now via Print Checked Labels
+    On Error Resume Next
+    ws2.Shapes("btnPrnMed").Delete
+    On Error GoTo 0
     ' Print Count + Print? selection column headers
-    ws2.Cells(2, C_CNT).Value = "Prints"
+    ws2.Cells(2, C_CNT).Value = "# of Prints"
     ws2.Cells(2, C_SEL).Value = "Print?"
     ws2.Cells(2, C_PRTD).Copy
     ws2.Cells(2, C_CNT).PasteSpecial xlPasteFormats
@@ -101,7 +105,10 @@ Public Sub SetupWorkbook()
     Application.CutCopyMode = False
     ws2.Columns(C_CNT).ColumnWidth = 7
     ws2.Columns(C_SEL).ColumnWidth = 8
-    Call InstallMedSheetEvents(ws2)
+    ' Worksheet event handlers are PREINSTALLED in the sheet code modules now
+    ' (no runtime VBProject modification - more robust for production).
+    ' One-time paste documented in HANDOFF section 6.
+    ' (was: Call InstallMedSheetEvents(ws2))
     Call ApplyAllRowStates(ws2)
 
     ' Extend the dispense Log header with Dosage Form + Print #
@@ -118,11 +125,19 @@ Public Sub SetupWorkbook()
         ws1.Range("C7").Value = Format(Now(), "MM/DD/YYYY")
     End If
 
+    ' Consolidate previews: migrate/rename the gallery and hide the internal print sheet
+    Dim wsGallery As Worksheet
+    Set wsGallery = EnsureAllLabelsSheet()
+    ws1.Activate
+    On Error Resume Next
+    ws3.Visible = xlSheetHidden
+    On Error GoTo 0
+
     MsgBox "Setup complete!" & vbCrLf & _
            "Keyboard shortcuts registered:" & vbCrLf & _
            "  Ctrl+Shift+P  =  Parse Medications" & vbCrLf & _
            "  Ctrl+Shift+R  =  Reset Session" & vbCrLf & _
-           "  Ctrl+Shift+L  =  Update Label Preview", _
+           "  Ctrl+Shift+L  =  Refresh Label Previews", _
            vbInformation, "Saturday Clinic - Setup Complete"
 End Sub
 
@@ -203,19 +218,14 @@ Private Sub BuildLabelPreviewLayout(ws As Worksheet)
         .Color = RGB(150, 150, 150)
     End With
 
-    ' Clinic logo - top-right of the label (embedded so it prints and travels with the file)
-    Dim logoPath As String
-    logoPath = ThisWorkbook.Path & "\Black SCU Logo + Transparent Background.png"
+    ' Clinic logo - TEMPORARILY DISABLED.
+    ' Shapes.AddPicture was aborting SetupWorkbook with "unable to import file"
+    ' when the PNG could not be read (OneDrive cloud-only file / oversized image).
+    ' To re-enable: use a small, locally-present PNG and wrap AddPicture in
+    ' On Error Resume Next so a bad logo never breaks setup. See HANDOFF section 4.
+    On Error Resume Next
     ws.Shapes("scuLogo").Delete
-    If Dir(logoPath) <> "" Then
-        Dim lh As Single, lw As Single, scuPic As Shape
-        lh = 34
-        lw = lh * 1.262
-        Set scuPic = ws.Shapes.AddPicture(logoPath, msoFalse, msoTrue, _
-            ws.Cells(1, 9).Left - lw - 3, ws.Rows(1).Top + 1, lw, lh)
-        scuPic.Name = "scuLogo"
-        scuPic.Placement = xlMove
-    End If
+    On Error GoTo 0
 
     With ws.PageSetup
         .PrintArea = ws.Range("A1:H10").Address
@@ -225,9 +235,9 @@ Private Sub BuildLabelPreviewLayout(ws As Worksheet)
         .BottomMargin = Application.InchesToPoints(0.04)
         .HeaderMargin = 0
         .FooterMargin = 0
-        .Zoom = False
-        .FitToPagesWide = 1
-        .FitToPagesTall = 1
+        .FitToPagesWide = False
+        .FitToPagesTall = False
+        .Zoom = 100
         .Orientation = xlLandscape
         .CenterHorizontally = True
         .CenterVertically = False
@@ -270,10 +280,18 @@ Private Function EnsureAllLabelsSheet() As Worksheet
     Set ws = ThisWorkbook.Sheets(SH_ALL)
     On Error GoTo 0
     If ws Is Nothing Then
-        Set ws = ThisWorkbook.Sheets.Add(After:=ThisWorkbook.Sheets(SH_LABEL))
-        ws.Name = SH_ALL
+        ' Migrate the old "All Labels" tab to the new name, or create it
+        On Error Resume Next
+        Set ws = ThisWorkbook.Sheets("All Labels")
+        On Error GoTo 0
+        If Not ws Is Nothing Then
+            ws.Name = SH_ALL
+        Else
+            Set ws = ThisWorkbook.Sheets.Add(After:=ThisWorkbook.Sheets(SH_LABEL))
+            ws.Name = SH_ALL
+        End If
     End If
-    Call InstallAutoRefresh(ws)
+    ' (was: Call InstallAutoRefresh(ws) - now a preinstalled Worksheet_Activate handler)
     Set EnsureAllLabelsSheet = ws
 End Function
 
@@ -670,8 +688,10 @@ Public Sub ClearPasteArea()
 End Sub
 
 Public Sub ResetSession()
-    If MsgBox("Clear ALL patient data, medications, and start fresh?" & vbCrLf & _
-              "(This cannot be undone.)", vbYesNo + vbExclamation, "Reset Session") = vbNo Then
+    If MsgBox("FULL RESET: clear ALL patient data, the medication list, AND the" & vbCrLf & _
+              "entire dispense Log, and start completely fresh?" & vbCrLf & vbCrLf & _
+              "(This cannot be undone. To keep the Log, use 'Start NEW Patient' instead.)", _
+              vbYesNo + vbExclamation, "Reset Session") = vbNo Then
         Exit Sub
     End If
 
@@ -700,6 +720,18 @@ Public Sub ResetSession()
         Next r
     End If
 
+    ' Clear the entire dispense Log (full reset only; Start NEW Patient keeps it)
+    Dim wsLog As Worksheet
+    Set wsLog = ThisWorkbook.Sheets(SH_LOG)
+    Dim lastLog As Long
+    lastLog = wsLog.Cells(wsLog.Rows.Count, 1).End(xlUp).Row
+    If lastLog > LOG_HDR_ROWS Then
+        With wsLog.Range(wsLog.Cells(LOG_HDR_ROWS + 1, 1), wsLog.Cells(lastLog, 14))
+            .ClearContents
+            .Interior.ColorIndex = xlNone
+        End With
+    End If
+
     ' Clear label preview dynamic cells
     Dim wsLbl As Worksheet
     Set wsLbl = ThisWorkbook.Sheets(SH_LABEL)
@@ -709,7 +741,8 @@ Public Sub ResetSession()
 
     wsIn.Activate
     wsIn.Range("C5").Select
-    MsgBox "Session reset. Ready for next patient.", vbInformation, "Reset Complete"
+    MsgBox "Full reset complete - patient, medications, and Log cleared." & vbCrLf & _
+           "Ready for a fresh session.", vbInformation, "Reset Complete"
 End Sub
 
 ' ============================================================
@@ -1659,13 +1692,11 @@ Private Sub ApplyRowState(ws As Worksheet, r As Long)
     warn = Trim(ws.Cells(r, C_WARN).Value)
     printed = LCase(Trim(ws.Cells(r, C_PRTD).Value))
 
-    ' Row background state - priority: Selected > Printed > Validated > Non-validated
+    ' Row background state - priority: Selected > Validated > Non-validated
     If IsRowSelected(ws, r) Then
-        bg = RGB(187, 222, 251)        ' Selected  - blue
-    ElseIf InStr(printed, "yes") > 0 Then
-        bg = RGB(225, 214, 245)        ' Printed    - lavender
+        bg = RGB(212, 237, 218)        ' Selected  - green (matches Label Previews tint)
     ElseIf UCase(warn) = "OK" Then
-        bg = RGB(223, 240, 216)        ' Validated  - green
+        bg = RGB(187, 222, 251)        ' Validated  - blue
     Else
         bg = RGB(239, 239, 239)        ' Non-validated - gray
     End If
@@ -1787,8 +1818,23 @@ Public Sub PrintCheckedLabels()
                vbExclamation, "Nothing Selected"
         Exit Sub
     End If
-    If MsgBox("Print " & cnt & " checked label(s) on the Brother QL-1100c?" & vbCrLf & _
-              "Make sure the DK-1202 (62 x 100 mm) roll is loaded.", _
+    Dim listMsg As String, idx As Integer
+    listMsg = ""
+    idx = 0
+    For r = MEDS_HDR_ROWS + 1 To lastRow
+        If Trim(ws.Cells(r, C_NAME).Value) <> "" And IsRowSelected(ws, r) Then
+            idx = idx + 1
+            listMsg = listMsg & "   " & idx & ".  " & MedConfirmLine(ws, r)
+            If Trim(ws.Cells(r, C_EXP).Value) = "" Or Trim(ws.Cells(r, C_LOT).Value) = "" Then
+                listMsg = listMsg & "   [SKIPPED - missing Exp/Lot]"
+            End If
+            listMsg = listMsg & vbCrLf
+        End If
+    Next r
+    If MsgBox("About to print these " & cnt & " label(s) on the Brother QL-1100c:" & vbCrLf & vbCrLf & _
+              listMsg & vbCrLf & _
+              "Make sure the DK-1202 (62 x 100 mm) roll is loaded." & vbCrLf & vbCrLf & _
+              "YES = print all       NO = cancel", _
               vbYesNo + vbQuestion, "Print Checked Labels") = vbNo Then Exit Sub
 
     Dim brother As String
@@ -1808,9 +1854,9 @@ Public Sub PrintCheckedLabels()
         .BottomMargin = Application.InchesToPoints(0.04)
         .HeaderMargin = 0
         .FooterMargin = 0
-        .Zoom = False
-        .FitToPagesWide = 1
-        .FitToPagesTall = 1
+        .FitToPagesWide = False
+        .FitToPagesTall = False
+        .Zoom = 100
         .Orientation = xlLandscape
         .CenterHorizontally = True
         .CenterVertically = False
@@ -2028,30 +2074,44 @@ End Sub
 Public Sub RemoveSelectedMedication()
     Dim ws As Worksheet
     Set ws = ThisWorkbook.Sheets(SH_MEDS)
-    If ActiveSheet.Name <> SH_MEDS Then
-        MsgBox "Go to the Medications tab and click the row you want to remove first.", _
-               vbExclamation, "Remove Medication"
+
+    Dim lastRow As Long, r As Long, cnt As Integer, names As String
+    lastRow = ws.Cells(ws.Rows.Count, C_NAME).End(xlUp).Row
+    cnt = 0
+    names = ""
+    For r = MEDS_HDR_ROWS + 1 To lastRow
+        If Trim(ws.Cells(r, C_NAME).Value) <> "" And IsRowSelected(ws, r) Then
+            cnt = cnt + 1
+            names = names & "   - " & Trim(ws.Cells(r, C_NAME).Value & " " & _
+                    ws.Cells(r, C_STR).Value) & vbCrLf
+        End If
+    Next r
+
+    If cnt = 0 Then
+        MsgBox "No rows are checked." & vbCrLf & _
+               "Check the 'Print?' box on each medication you want to remove, then try again.", _
+               vbExclamation, "Remove Selected"
         Exit Sub
     End If
-    Dim r As Long
-    r = ActiveCell.Row
-    If r <= MEDS_HDR_ROWS Then
-        MsgBox "Click a medication row (below the header) first.", _
-               vbExclamation, "Remove Medication"
-        Exit Sub
-    End If
-    If Trim(ws.Cells(r, C_NAME).Value) = "" Then
-        MsgBox "That row is empty - nothing to remove.", vbExclamation, "Remove Medication"
-        Exit Sub
-    End If
-    Dim nm As String
-    nm = Trim(ws.Cells(r, C_NAME).Value & " " & ws.Cells(r, C_STR).Value)
-    If MsgBox("Remove this medication?" & vbCrLf & vbCrLf & nm, _
-              vbYesNo + vbExclamation, "Remove Medication") = vbNo Then Exit Sub
-    ws.Rows(r).Delete
+
+    If MsgBox("Remove these " & cnt & " checked medication(s)?" & vbCrLf & vbCrLf & _
+              names & vbCrLf & "(This cannot be undone.)", _
+              vbYesNo + vbExclamation, "Remove Selected") = vbNo Then Exit Sub
+
+    ' Delete bottom-to-top so row indexes stay valid. Delete only the table
+    ' columns (1..C_SEL) and shift up, so the side buttons in col 17 do not move.
+    Application.EnableEvents = False
+    For r = lastRow To MEDS_HDR_ROWS + 1 Step -1
+        If Trim(ws.Cells(r, C_NAME).Value) <> "" And IsRowSelected(ws, r) Then
+            ws.Range(ws.Cells(r, 1), ws.Cells(r, C_SEL)).Delete Shift:=xlUp
+        End If
+    Next r
+    Application.EnableEvents = True
+
     Call RenumberMeds
     Call ValidateMedications(False)
-    MsgBox "Removed: " & nm, vbInformation, "Medication Removed"
+    Call ApplyAllRowStates(ws)
+    MsgBox "Removed " & cnt & " medication(s).", vbInformation, "Remove Selected"
 End Sub
 
 Private Sub RenumberMeds()
@@ -2157,14 +2217,31 @@ Public Sub UpdateLabelPreviewFromSelection()
     ' Row 9: Exp + Lot
     wsL.Cells(9, 1).Value = expLotLine
 
-    ' Activate label sheet
-    wsL.Activate
-    wsL.Cells(4, 1).Select
+    ' Label Preview sheet is hidden - it is only the internal print surface.
+    ' Do not activate it; the visible previews live on the "Label Previews" tab.
 End Sub
 
 ' ============================================================
 '  PRINT LABEL
 ' ============================================================
+Private Function MedConfirmBlock(ws As Worksheet, ByVal r As Long) As String
+    Dim s As String
+    s = "    Medication:  " & Trim(ws.Cells(r, C_NAME).Value & " " & _
+            ws.Cells(r, C_STR).Value & " " & ws.Cells(r, C_FORM).Value) & vbCrLf
+    s = s & "    Directions:  " & ws.Cells(r, C_SIG).Value & vbCrLf
+    s = s & "    Quantity:    " & ws.Cells(r, C_QTY).Value & _
+            "      Refills:  " & ws.Cells(r, C_REF).Value & vbCrLf
+    s = s & "    Expiration:  " & ws.Cells(r, C_EXP).Value & _
+            "      Lot:  " & ws.Cells(r, C_LOT).Value
+    MedConfirmBlock = s
+End Function
+
+Private Function MedConfirmLine(ws As Worksheet, ByVal r As Long) As String
+    MedConfirmLine = Trim(ws.Cells(r, C_NAME).Value & " " & ws.Cells(r, C_STR).Value) & _
+        "   (Qty " & ws.Cells(r, C_QTY).Value & ", Exp " & ws.Cells(r, C_EXP).Value & _
+        ", Lot " & ws.Cells(r, C_LOT).Value & ")"
+End Function
+
 Public Sub PrintLabel()
     ' Remember which medication row is selected BEFORE the preview steals focus
     Dim medRowToMark As Long
@@ -2190,9 +2267,9 @@ Public Sub PrintLabel()
         .BottomMargin    = Application.InchesToPoints(0.04)
         .HeaderMargin    = 0
         .FooterMargin    = 0
-        .Zoom            = False
-        .FitToPagesWide  = 1
-        .FitToPagesTall  = 1
+        .FitToPagesWide  = False
+        .FitToPagesTall  = False
+        .Zoom            = 100
         .Orientation     = xlLandscape
         .CenterHorizontally = True
         .CenterVertically   = False
@@ -2220,9 +2297,16 @@ Public Sub PrintLabel()
         Exit Sub
     End If
 
-    ' Confirm with the volunteer before committing a label
-    If MsgBox("Ready to print this label to:" & vbCrLf & vbCrLf & _
-        "      " & brotherName & vbCrLf & vbCrLf & _
+    ' Confirm with the volunteer before committing a label - show what will print
+    Dim detail As String
+    If medRowToMark > MEDS_HDR_ROWS Then
+        detail = MedConfirmBlock(ThisWorkbook.Sheets(SH_MEDS), medRowToMark)
+    Else
+        detail = "    (the label currently shown on the Label Preview tab)"
+    End If
+    If MsgBox("About to print this label:" & vbCrLf & vbCrLf & _
+        detail & vbCrLf & vbCrLf & _
+        "Printer:  " & brotherName & vbCrLf & _
         "Is the DK-1202 (62 x 100 mm) label roll loaded and ready?" & vbCrLf & vbCrLf & _
         "YES = print now       NO = cancel", _
         vbYesNo + vbQuestion, "Confirm Label Print") = vbNo Then Exit Sub
@@ -2248,7 +2332,9 @@ Private Sub MarkPrinted(ByVal medRow As Long)
         Dim ws As Worksheet
         Set ws = ThisWorkbook.Sheets(SH_MEDS)
         ws.Cells(medRow, C_PRTD).Value = "Yes"
+        Application.EnableEvents = False
         ws.Cells(medRow, C_CNT).Value = Val(ws.Cells(medRow, C_CNT).Value) + 1
+        Application.EnableEvents = True
         ws.Cells(medRow, C_CNT).HorizontalAlignment = xlCenter
     End If
 End Sub
