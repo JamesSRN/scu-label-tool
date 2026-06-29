@@ -3,7 +3,7 @@
 An Excel + VBA tool for the **Saturday Clinic for the Uninsured (SCU)** free
 pharmacy that turns a block of pasted prescription text into clean, validated
 medication labels printed on a **Brother QL-1100c** (DK-1202, 62 x 100 mm,
-landscape) — and keeps a running dispense log.
+landscape) - and keeps a running dispense log.
 
 It is built to be **robust for high-turnover volunteers**: the tool parses,
 checks, and flags entries so that someone using it for the first time is guided
@@ -14,13 +14,13 @@ toward correct labels and caught before mistakes reach a patient.
 1. **Paste** the prescription text for a patient into the *Patient & Input* tab
    and enter the patient name + DOB.
 2. **Parse** (one button / `Ctrl+Shift+P`): the text is split into one row per
-   medication on the *Medications* tab — name, strength, form, directions (SIG),
+   medication on the *Medications* tab - name, strength, form, directions (SIG),
    quantity, refills, expiration, and lot.
 3. **Review & fix**: every drug gets a **confidence** rating, and a validation
    pass flags anything missing or suspicious (no strength/SIG/quantity, bad
    expiration format, possible duplicates). Rows are color-coded and fully
    editable; volunteers can add or remove medications by hand.
-4. **Select what to print** with the *Print?* checkboxes — one med or many.
+4. **Select what to print** with the *Print?* checkboxes - one med or many.
    Selected rows turn green, matching the preview gallery.
 5. **Preview** every label on the *Label Previews* tab (auto-refreshes), then
    **Print Checked Labels**. A confirmation lists exactly what's about to print
@@ -50,12 +50,23 @@ toward correct labels and caught before mistakes reach a patient.
 - `HANDOFF.md` - full handoff: architecture, feature set, build steps, known issues, routine map.
 - `Black SCU Logo + Transparent Background.png` - clinic logo.
 
+## Folders on the clinic PC
+
+Two folders, one project:
+
+- **`Desktop\SCU Label Printing\`** - the **live working folder**. Holds the
+  actual Excel tool (`MedicationDispensing.xlsm`) and is where day-to-day work
+  happens. It is registered as an Excel Trusted Location, so **do not rename it**.
+- **`Documents\GitHub\GIT_VERSION_SCU Label Printing\`** - the **version-control
+  backup** (this repo's local clone, pushed to GitHub). Code and docs only, no
+  patient data. Update it by copying the changed files in, then commit and push.
+
 ## Applying code changes
 
 Close the workbook, then run `Build-Release.vbs` (requires Excel "Trust access to
 the VBA project object model"). Or in the VBA editor: remove the `MedParser`
 module, Import `MedParser.bas`, run `SetupWorkbook`, save. The two worksheet
-event handlers are pasted once into the sheet modules — see `HANDOFF.md` section 6.
+event handlers are pasted once into the sheet modules - see `HANDOFF.md` section 6.
 
 ---
 
