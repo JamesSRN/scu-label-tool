@@ -1,0 +1,11 @@
+# Patient data / PHI - never commit
+*.xlsm
+*.xlsx
+*.xls
+*.csv
+
+# Excel lock files
+~$*
+
+# Local backups
+_backups/
