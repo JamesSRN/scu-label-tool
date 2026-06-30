@@ -17,7 +17,7 @@
 ' ============================================================
 Option Explicit
 
-Dim fso, scriptDir, bootstrapPath, xlsmPath, basPath, xl, wb, proj
+Dim fso, scriptDir, bootstrapPath, xlsmPath, basPath, xl, wb, proj, macroName
 Set fso = CreateObject("Scripting.FileSystemObject")
 scriptDir = fso.GetParentFolderName(WScript.ScriptFullName)
 bootstrapPath = fso.BuildPath(scriptDir, "Broken_PrettyPrint_MedicationDispensing.xlsm")
@@ -40,11 +40,11 @@ End If
 Set xl = CreateObject("Excel.Application")
 xl.Visible = True
 xl.DisplayAlerts = False
-On Error Resume Next
 xl.AutomationSecurity = 1   ' msoAutomationSecurityLow - allow the workbook's macros to run
-On Error GoTo 0
+xl.EnableEvents = True
 
-Set wb = xl.Workbooks.Open(xlsmPath)
+Set wb = xl.Workbooks.Open(xlsmPath, 0, False)
+wb.Activate
 
 ' --- Verify programmatic access to the VBA project ---
 On Error Resume Next
@@ -68,11 +68,14 @@ On Error GoTo 0
 proj.VBComponents.Import basPath
 
 ' --- Run SetupWorkbook (forces a full compile of its call tree + builds buttons) ---
+macroName = "'" & wb.Name & "'!SetupWorkbook"
 On Error Resume Next
-xl.Run "SetupWorkbook"
+xl.Run macroName
 If Err.Number <> 0 Then
-    MsgBox "SetupWorkbook failed - this usually means a compile error in the module:" & _
-        vbCrLf & vbCrLf & Err.Description & vbCrLf & vbCrLf & _
+    MsgBox "SetupWorkbook failed." & vbCrLf & vbCrLf & _
+        Err.Description & vbCrLf & vbCrLf & _
+        "If this mentions macros not being available, open the VBA editor (Alt+F11)" & vbCrLf & _
+        "and check Debug > Compile VBAProject for the real compile error." & vbCrLf & vbCrLf & _
         "The workbook was left open and NOT saved so you can inspect it.", _
         vbCritical, "Build-Release"
     WScript.Quit 1

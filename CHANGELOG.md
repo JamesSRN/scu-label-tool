@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### Label layout & build (2026-06-30)
+
+- Tuned DK-1202 label content width (`LABEL_WIDTH_PT = 228`) so labels no longer bleed onto a second die-cut label.
+- Patient name typography now steps down from **17 pt** and stays **at least 1 pt larger than the medication line** (`PatientNameFontSize`).
+- Clinic header lines (rows 2–3) use **Helvetica** when available, with Arial fallback (`LabelHeaderFont`).
+- SC emblem sourced from a **manual crop** of the clinic logo: `cropped_Black SCU Logo + Transparent Background - Copy.png` → `scu_emblem.png` (via `tools/Build-ScuEmblem.ps1`). Logo aspect ratio `1.488`; inserted top-right at 28 pt height (`InsertLabelLogo`).
+- Fixed `SetupWorkbook` runtime 1004 on header `PasteSpecial` (`MatchHeaderFormat` helper).
+- Fixed `Build-Release.vbs` (VBScript syntax, qualified `'MedicationDispensing.xlsm'!SetupWorkbook` macro call).
+- Fixed `MedParser.bas` import/compile issues: restore `FONT_LABEL_HDR_FB`, no typed optional defaults in VBA, strip UTF-8 BOM, replace undefined `msoPictureCompressNone` with `0`.
+- `Build-Release.vbs` now opens `MedicationDispensing.xlsm` in place (bootstrap from `Broken_PrettyPrint_…` only if missing). Added `tools/Run-BuildRelease.ps1` for optional automation.
+
+### Docs & repo path
+
 - Relocated the repo off OneDrive to `C:\Users\ringo\Documents\GitHub\GIT_VERSION_SCU Label Printing` (Documents no longer synced to OneDrive). Updated `HANDOFF.md` and `README.md` to reflect the single-folder layout.
 
 Repository/documentation hardening:

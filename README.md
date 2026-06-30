@@ -46,9 +46,16 @@ toward correct labels and caught before mistakes reach a patient.
 ## Contents
 
 - `MedParser.bas` - the VBA source of truth (parser, validation, label layout, printing, logging).
+- `MedicationDispensing.xlsm` - clinic workbook (local, git-ignored; rebuilt by the script below).
 - `Build-Release.vbs` - one-click: imports `MedParser.bas`, runs `SetupWorkbook`, saves the `.xlsm`.
+- `scu_emblem.png` - SC emblem for the label header (from manual crop of the clinic logo).
+- `cropped_Black SCU Logo + Transparent Background - Copy.png` - source crop for the emblem.
+- `tools/Build-ScuEmblem.ps1` - copies the manual crop to `scu_emblem.png`.
 - `HANDOFF.md` - full handoff: architecture, feature set, build steps, known issues, routine map.
-- `Black SCU Logo + Transparent Background.png` - clinic logo.
+- `LABEL_REDESIGN.md` - printed label layout, typography, logo workflow, tuning notes.
+- `CHANGELOG.md` - release history (see Unreleased for 2026-06-30 label/build fixes).
+- `tools/BUILD_RELEASE_NOTES.md` - `Build-Release.vbs` prerequisites and steps.
+- `Black SCU Logo + Transparent Background.png` - full clinic logo source art.
 
 ## Folder on the clinic PC
 
@@ -65,10 +72,24 @@ local. Register this folder as an Excel Trusted Location so macros run.
 
 ## Applying code changes
 
-Close the workbook, then run `Build-Release.vbs` (requires Excel "Trust access to
-the VBA project object model"). Or in the VBA editor: remove the `MedParser`
-module, Import `MedParser.bas`, run `SetupWorkbook`, save. The two worksheet
-event handlers are pasted once into the sheet modules - see `HANDOFF.md` section 6.
+Close the workbook, then double-click **`Build-Release.vbs`** (requires Excel
+**Trust access to the VBA project object model** and this folder as a **Trusted
+Location**). Click OK on **Setup complete!** when prompted.
+
+Or in the VBA editor: remove the `MedParser` module, Import `MedParser.bas`, run
+`SetupWorkbook`, save.
+
+After updating the emblem crop, run `tools/Build-ScuEmblem.ps1` first, then
+`Build-Release.vbs`.
+
+The two worksheet event handlers are pasted once into the sheet modules - see
+`HANDOFF.md` section 5.
+
+## Known open items
+
+- **Logo sizing** — build compiles; emblem may still need tuning on physical Brother output (`InsertLabelLogo`, 28 pt height). See `LABEL_REDESIGN.md`.
+- **Trusted Location** — register the folder in Excel Trust Center so macros are not blocked.
+- **Physical test print** — confirm one label per DK-1202 die-cut after width tuning (`LABEL_WIDTH_PT = 228`).
 
 ---
 

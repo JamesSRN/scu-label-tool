@@ -45,9 +45,11 @@ try {
     [void]$wb.VBProject.VBComponents.Import($bas)
 
     try {
-        $xl.Run('SetupWorkbook')
+        $macro = "'$($wb.Name)'!SetupWorkbook"
+        $wb.Activate() | Out-Null
+        $xl.Run($macro)
     } catch {
-        throw "SetupWorkbook failed: $($_.Exception.Message)"
+        throw "SetupWorkbook failed: $($_.Exception.Message). Open VBA (Alt+F11) and use Debug > Compile VBAProject to see compile errors."
     }
 
     $wb.Save()
