@@ -150,85 +150,120 @@ Private Sub BuildLabelPreviewLayout(ws As Worksheet)
     Application.ScreenUpdating = False
 
     ws.Range("A1:H20").UnMerge
+    ws.Range("A1:H20").ClearContents
 
-    ' LANDSCAPE: content spans A:H (~3.8" wide), label is 100mm wide x 62mm tall
+    ' Column width preserved from the proven print geometry (8 cols ~ 3.86")
     ws.Columns("A:H").ColumnWidth = 5.8
 
-    ' Wide LANDSCAPE stack (points) - total ~2.42"
-    ws.Rows(1).RowHeight = 4
-    ws.Rows(2).RowHeight = 34
-    ws.Rows(3).RowHeight = 3
-    ws.Rows(4).RowHeight = 22
-    ws.Rows(5).RowHeight = 17
+    ' Vertical rhythm in points - total ~170pt (~2.36") to match DK-1202 height
+    ws.Rows(1).RowHeight = 3
+    ws.Rows(2).RowHeight = 14
+    ws.Rows(3).RowHeight = 11
+    ws.Rows(4).RowHeight = 3
+    ws.Rows(5).RowHeight = 10
     ws.Rows(6).RowHeight = 17
-    ws.Rows(7).RowHeight = 22
-    ws.Rows(8).RowHeight = 30
-    ws.Rows(9).RowHeight = 20
-    ws.Rows(10).RowHeight = 5
+    ws.Rows(7).RowHeight = 3
+    ws.Rows(8).RowHeight = 27
+    ws.Rows(9).RowHeight = 12
+    ws.Rows(10).RowHeight = 3
     ws.Rows(11).RowHeight = 10
-    ws.Rows(12).RowHeight = 30
-    ws.Rows(13).RowHeight = 8
+    ws.Rows(12).RowHeight = 36
+    ws.Rows(13).RowHeight = 3
     ws.Rows(14).RowHeight = 16
-    ws.Rows(15).RowHeight = 30
+    ws.Rows(15).RowHeight = 2
+    ws.Rows(16).RowHeight = 8
+    ws.Rows(17).RowHeight = 14
+    ws.Rows(18).RowHeight = 14
 
-    Dim r As Variant
-    For Each r In Array(2, 4, 5, 6, 7, 8, 9)
-        ws.Range(ws.Cells(r, 1), ws.Cells(r, 8)).Merge
-    Next r
-    ws.Range("A14:H14").Merge
-    ws.Range("A15:H15").Merge
+    ' Section merges
+    ws.Range("A2:H2").Merge          ' clinic identity (emblem floats top-right)
+    ws.Range("A3:H3").Merge          ' contact line
+    ws.Range("A5:E5").Merge          ' PATIENT mini label
+    ws.Range("F5:H5").Merge          ' DOB
+    ws.Range("A6:E6").Merge          ' patient name
+    ws.Range("F6:H6").Merge          ' Rx date
+    ws.Range("A8:H8").Merge          ' medication (hero)
+    ws.Range("A9:H9").Merge          ' dosage form / qty
+    ws.Range("A11:H11").Merge        ' DIRECTIONS mini label
+    ws.Range("A12:H12").Merge        ' SIG / directions
+    ws.Range("A14:D14").Merge        ' EXP footer
+    ws.Range("E14:H14").Merge        ' LOT footer
+    ws.Range("A17:H17").Merge        ' off-label helper
+    ws.Range("A18:H18").Merge        ' off-label helper
 
-    ws.Cells(2, 1).Value = "Saturday Clinic for the Uninsured" & Chr(10) & _
-                           "1121 E. North Ave, Milwaukee WI" & Chr(10) & "(414) 588-2865"
-    ws.Cells(4, 1).Formula = "=IF('Patient & Input'!C5<>"""",'Patient & Input'!C5,""[Patient Name]"")"
-    ws.Cells(5, 1).Formula = "=IF('Patient & Input'!C6<>"""",""DOB: ""&'Patient & Input'!C6,""DOB: [date]"")"
-    ws.Cells(6, 1).Formula = "=IF('Patient & Input'!C7<>"""",""Date of Rx: ""&TEXT('Patient & Input'!C7,""mm/dd/yyyy""),""Date of Rx: [date]"")"
-    If Trim(ws.Cells(7, 1).Value) = "" Then _
-        ws.Cells(7, 1).Value = "[Select a medication row, then click 'Update Label Preview']"
-    ws.Cells(14, 1).Value = "<- Select a medication row, then click 'Update Label Preview'"
-    ws.Cells(15, 1).Value = "Print: File > Print > Brother QL-1100c > Label: DK-1202 62 x 100 mm, Landscape"
+    ' Static identity + section labels
+    ws.Cells(2, 1).Value = "SATURDAY CLINIC FOR THE UNINSURED"
+    ws.Cells(3, 1).Value = "1121 E. North Ave, Milwaukee WI   " & Chr(183) & "   (414) 588-2865"
+    ws.Cells(5, 1).Value = "PATIENT"
+    ws.Cells(11, 1).Value = "DIRECTIONS"
 
-    Call FmtLbl(ws.Cells(2, 1), 8.5, True, "C", "C")
-    Call FmtLbl(ws.Cells(4, 1), 13, True, "L", "C")
-    Call FmtLbl(ws.Cells(5, 1), 10.5, False, "L", "C")
-    Call FmtLbl(ws.Cells(6, 1), 10.5, False, "L", "C")
-    Call FmtLbl(ws.Cells(7, 1), 11.5, True, "L", "C")
-    Call FmtLbl(ws.Cells(8, 1), 10.5, False, "L", "T")
-    Call FmtLbl(ws.Cells(9, 1), 10.5, True, "L", "C")
-    Call FmtLbl(ws.Cells(14, 1), 8.5, False, "C", "C")
-    Call FmtLbl(ws.Cells(15, 1), 8.5, False, "L", "C")
-    ws.Cells(14, 1).Font.Color = RGB(150, 150, 150)
+    ' Patient / DOB / Rx default to live formulas (replaced with the selected
+    ' med's values by UpdateLabelPreviewFromSelection at preview/print time)
+    ws.Cells(6, 1).Formula = "=IF('Patient & Input'!C5<>"""",'Patient & Input'!C5,""[Patient Name]"")"
+    ws.Cells(5, 6).Formula = "=IF('Patient & Input'!C6<>"""",""DOB   ""&'Patient & Input'!C6,""DOB   --"")"
+    ws.Cells(6, 6).Formula = "=IF('Patient & Input'!C7<>"""",""Rx   ""&TEXT('Patient & Input'!C7,""mm/dd/yyyy""),""Rx   --"")"
 
-    ' Clear any leftover inner borders, then draw a clean outer box
-    ws.Range(ws.Cells(1, 1), ws.Cells(16, 8)).Borders.LineStyle = xlNone
-    With ws.Range("A1:H10")
-        .Borders(xlEdgeLeft).LineStyle = xlContinuous
-        .Borders(xlEdgeRight).LineStyle = xlContinuous
-        .Borders(xlEdgeTop).LineStyle = xlContinuous
-        .Borders(xlEdgeBottom).LineStyle = xlContinuous
-        .Borders(xlEdgeLeft).Color = RGB(136, 136, 136)
-        .Borders(xlEdgeRight).Color = RGB(136, 136, 136)
-        .Borders(xlEdgeTop).Color = RGB(136, 136, 136)
-        .Borders(xlEdgeBottom).Color = RGB(136, 136, 136)
-    End With
-    ' Clean full-width rule under the clinic name (replaces the old gappy line)
-    With ws.Range(ws.Cells(3, 1), ws.Cells(3, 8)).Borders(xlEdgeBottom)
+    If Trim(ws.Cells(8, 1).Value) = "" Then _
+        ws.Cells(8, 1).Value = "[Select a medication row, then Update]"
+    Call SetMiniValue(ws.Cells(14, 1), "EXP", "--", 12, "L")
+    Call SetMiniValue(ws.Cells(14, 5), "LOT", "--", 12, "R")
+
+    ' Off-label helper text (rows 17-18, outside the A1:H15 print area)
+    ws.Cells(17, 1).Value = "Auto-fills from the Medications tab. Print via 'Print Checked Labels'."
+    ws.Cells(18, 1).Value = "Brother QL-1100c  " & Chr(183) & "  DK-1202 62 x 100 mm  " & Chr(183) & "  Landscape"
+
+    ' Typography hierarchy (Arial - the reliable Helvetica substitute on Windows)
+    Call FmtLbl(ws.Cells(2, 1), 9, True, "L", "C")       ' clinic identity
+    Call FmtLbl(ws.Cells(3, 1), 7.5, False, "L", "C")    ' contact
+    Call FmtLbl(ws.Cells(5, 1), 7, False, "L", "B")      ' PATIENT mini
+    Call FmtLbl(ws.Cells(6, 1), 13, True, "L", "C")      ' patient name
+    Call FmtLbl(ws.Cells(5, 6), 8.5, False, "R", "B")    ' DOB
+    Call FmtLbl(ws.Cells(6, 6), 8.5, False, "R", "C")    ' Rx
+    Call FmtLbl(ws.Cells(8, 1), 14, True, "L", "C")      ' medication (hero)
+    Call FmtLbl(ws.Cells(9, 1), 8.5, False, "L", "C")    ' form / qty
+    Call FmtLbl(ws.Cells(11, 1), 7, False, "L", "B")     ' DIRECTIONS mini
+    Call FmtLbl(ws.Cells(12, 1), 10.5, False, "L", "T")  ' SIG
+    Call FmtLbl(ws.Cells(17, 1), 8, False, "L", "C")
+    Call FmtLbl(ws.Cells(18, 1), 8, False, "L", "C")
+    ws.Cells(17, 1).Font.Color = RGB(150, 150, 150)
+    ws.Cells(18, 1).Font.Color = RGB(150, 150, 150)
+
+    ' Clean section rules only - no heavy box (modern, minimal)
+    ws.Range(ws.Cells(1, 1), ws.Cells(18, 8)).Borders.LineStyle = xlNone
+    With ws.Range("A3:H3").Borders(xlEdgeBottom)
         .LineStyle = xlContinuous
         .Weight = xlThin
         .Color = RGB(150, 150, 150)
     End With
+    With ws.Range("A13:H13").Borders(xlEdgeBottom)
+        .LineStyle = xlContinuous
+        .Weight = xlThin
+        .Color = RGB(120, 120, 120)
+    End With
 
-    ' Clinic logo - TEMPORARILY DISABLED.
-    ' Shapes.AddPicture was aborting SetupWorkbook with "unable to import file"
-    ' when the PNG could not be read (OneDrive cloud-only file / oversized image).
-    ' To re-enable: use a small, locally-present PNG and wrap AddPicture in
-    ' On Error Resume Next so a bad logo never breaks setup. See HANDOFF section 4.
+    ' Clinic emblem - small, top-right, monochrome. Wrapped so a missing or
+    ' unreadable logo never breaks setup or printing.
     On Error Resume Next
     ws.Shapes("scuLogo").Delete
     On Error GoTo 0
+    Dim logoPath As String
+    logoPath = ThisWorkbook.Path & "\scu_emblem.png"
+    If Dir(logoPath) <> "" Then
+        Dim lh As Single, lw As Single, pic As Shape
+        lh = 26
+        lw = lh * 1.425
+        On Error Resume Next
+        Set pic = ws.Shapes.AddPicture(logoPath, msoFalse, msoTrue, _
+            ws.Cells(1, 9).Left - lw - 2, ws.Rows(2).Top + 1, lw, lh)
+        If Not pic Is Nothing Then
+            pic.Name = "scuLogo"
+            pic.Placement = xlMove
+        End If
+        On Error GoTo 0
+    End If
 
     With ws.PageSetup
-        .PrintArea = ws.Range("A1:H10").Address
+        .PrintArea = ws.Range("A1:H15").Address
         .LeftMargin = Application.InchesToPoints(0.04)
         .RightMargin = Application.InchesToPoints(0.04)
         .TopMargin = Application.InchesToPoints(0.04)
@@ -266,6 +301,64 @@ Private Sub FmtLbl(rng As Range, sz As Single, bld As Boolean, h As String, v As
     End Select
     rng.WrapText = True
 End Sub
+
+Private Sub SetMiniValue(c As Range, miniText As String, valueText As String, vSize As Single, hAlign As String)
+    ' Footer field: small label + larger bold value in one cell (e.g. "EXP 05/2027")
+    Dim s As String
+    s = miniText & "  " & valueText
+    c.Value = s
+    c.WrapText = False
+    c.Font.Name = "Arial"
+    c.Font.Color = RGB(0, 0, 0)
+    On Error Resume Next
+    c.Characters(1, Len(miniText)).Font.Size = 7
+    c.Characters(1, Len(miniText)).Font.Bold = False
+    c.Characters(Len(miniText) + 1, Len(s) - Len(miniText)).Font.Size = vSize
+    c.Characters(Len(miniText) + 1, Len(s) - Len(miniText)).Font.Bold = True
+    On Error GoTo 0
+    Select Case hAlign
+        Case "R": c.HorizontalAlignment = xlRight
+        Case "C": c.HorizontalAlignment = xlCenter
+        Case Else: c.HorizontalAlignment = xlLeft
+    End Select
+    c.VerticalAlignment = xlCenter
+End Sub
+
+Private Function MedFontSize(ByVal s As String) As Single
+    ' Keep the hero medication line on one line by stepping the size down
+    Dim n As Long: n = Len(s)
+    If n <= 24 Then
+        MedFontSize = 14
+    ElseIf n <= 30 Then
+        MedFontSize = 12.5
+    ElseIf n <= 38 Then
+        MedFontSize = 11
+    Else
+        MedFontSize = 10
+    End If
+End Function
+
+Private Function NameFontSize(ByVal s As String) As Single
+    Dim n As Long: n = Len(s)
+    If n <= 22 Then
+        NameFontSize = 13
+    ElseIf n <= 30 Then
+        NameFontSize = 11
+    Else
+        NameFontSize = 9.5
+    End If
+End Function
+
+Private Function SigFontSize(ByVal s As String) As Single
+    Dim n As Long: n = Len(s)
+    If n <= 70 Then
+        SigFontSize = 10.5
+    ElseIf n <= 110 Then
+        SigFontSize = 9.5
+    Else
+        SigFontSize = 8.5
+    End If
+End Function
 
 ' ============================================================
 '  PREVIEW ALL LABELS  (generated gallery + per-label actions)
@@ -1847,7 +1940,7 @@ Public Sub PrintCheckedLabels()
     End If
 
     With wsL.PageSetup
-        .PrintArea = wsL.Range("A1:H10").Address
+        .PrintArea = wsL.Range("A1:H15").Address
         .LeftMargin = Application.InchesToPoints(0.04)
         .RightMargin = Application.InchesToPoints(0.04)
         .TopMargin = Application.InchesToPoints(0.04)
@@ -2145,7 +2238,6 @@ Public Sub UpdateLabelPreviewFromSelection()
     If ActiveSheet.Name = SH_MEDS Then
         selRow = ActiveCell.Row
     Else
-        ' Find first row with data
         selRow = MEDS_HDR_ROWS + 1
     End If
 
@@ -2155,32 +2247,31 @@ Public Sub UpdateLabelPreviewFromSelection()
         Exit Sub
     End If
 
-    ' Check if row has data
     If Trim(wsM.Cells(selRow, C_NAME).Value) = "" Then
         MsgBox "Selected row appears to be empty. Click on a medication name cell first.", _
                vbExclamation, "Empty Row"
         Exit Sub
     End If
 
-    ' Build label fields
+    ' Gather label fields
     Dim patName  As String : patName  = Trim(wsI.Range("C5").Value)
     Dim dob      As String : dob      = Trim(wsI.Range("C6").Value)
     Dim dateRx   As String : dateRx   = Trim(wsM.Cells(selRow, C_DATE).Value)
     Dim medName  As String : medName  = Trim(wsM.Cells(selRow, C_NAME).Value)
     Dim strength As String : strength = Trim(wsM.Cells(selRow, C_STR).Value)
+    Dim formTxt  As String : formTxt  = Trim(wsM.Cells(selRow, C_FORM).Value)
     Dim qty      As String : qty      = Trim(wsM.Cells(selRow, C_QTY).Value)
     Dim sig      As String : sig      = Trim(wsM.Cells(selRow, C_SIG).Value)
     Dim expDate  As String : expDate  = Trim(wsM.Cells(selRow, C_EXP).Value)
     Dim lotNum   As String : lotNum   = Trim(wsM.Cells(selRow, C_LOT).Value)
 
-    ' Validate required label fields
+    ' Warn on missing safety-critical fields
     Dim missing As String
     missing = ""
     If patName = "" Then missing = missing & "Patient Name  "
     If dob = "" Then missing = missing & "DOB  "
     If expDate = "" Then missing = missing & "Expiration  "
     If lotNum = "" Then missing = missing & "Lot Number  "
-
     If missing <> "" Then
         If MsgBox("The following fields are still empty:" & vbCrLf & missing & vbCrLf & vbCrLf & _
                   "Print anyway?", vbYesNo + vbExclamation, "Missing Label Fields") = vbNo Then
@@ -2188,37 +2279,44 @@ Public Sub UpdateLabelPreviewFromSelection()
         End If
     End If
 
-    ' Build med line:  Medication Strength (QTY: ##)
+    ' Hero line: medication + strength
     Dim medLine As String
-    If strength <> "" Then
-        medLine = medName & " " & strength
-    Else
-        medLine = medName
+    medLine = medName
+    If strength <> "" Then medLine = medLine & " " & strength
+
+    ' Dosage form + quantity
+    Dim fq As String
+    fq = formTxt
+    If qty <> "" Then
+        If fq <> "" Then
+            fq = fq & "   " & Chr(183) & "   Qty " & qty
+        Else
+            fq = "Qty " & qty
+        End If
     End If
-    If qty <> "" Then medLine = medLine & " (QTY: " & qty & ")"
 
-    ' Build Exp / Lot line
-    Dim expLotLine As String
-    expLotLine = "Exp: " & IIf(expDate <> "", expDate, "______") & _
-                 "     Lot: " & IIf(lotNum <> "", lotNum, "______")
+    ' Write the redesigned label
+    Dim pn As String : pn = IIf(patName <> "", patName, "[Patient Name]")
+    wsL.Cells(6, 1).Value = pn
+    wsL.Cells(6, 1).Font.Size = NameFontSize(pn)
+    wsL.Cells(5, 6).Value = "DOB   " & IIf(dob <> "", dob, "--")
+    wsL.Cells(6, 6).Value = "Rx   " & IIf(dateRx <> "", dateRx, "--")
 
-    ' Write to label preview sheet
-    ' Row 2: clinic header (static - already formatted)
-    ' Row 4: patient name
-    wsL.Cells(4, 1).Value = IIf(patName <> "", patName, "[Patient Name]")
-    ' Row 5: DOB
-    wsL.Cells(5, 1).Value = "DOB: " & IIf(dob <> "", dob, "00/00/0000")
-    ' Row 6: Date of Rx
-    wsL.Cells(6, 1).Value = "Date of Rx: " & IIf(dateRx <> "", dateRx, "00/00/0000")
-    ' Row 7: Medication + Qty
-    wsL.Cells(7, 1).Value = medLine
-    ' Row 8: SIG
-    wsL.Cells(8, 1).Value = IIf(sig <> "", sig, "[Instructions not found - enter manually]")
-    ' Row 9: Exp + Lot
-    wsL.Cells(9, 1).Value = expLotLine
+    wsL.Cells(8, 1).Value = medLine
+    wsL.Cells(8, 1).Font.Bold = True
+    wsL.Cells(8, 1).Font.Size = MedFontSize(medLine)
+
+    wsL.Cells(9, 1).Value = fq
+
+    Dim sigText As String
+    sigText = IIf(sig <> "", sig, "[Directions not found - enter manually]")
+    wsL.Cells(12, 1).Value = sigText
+    wsL.Cells(12, 1).Font.Size = SigFontSize(sigText)
+
+    Call SetMiniValue(wsL.Cells(14, 1), "EXP", IIf(expDate <> "", expDate, "--"), 12, "L")
+    Call SetMiniValue(wsL.Cells(14, 5), "LOT", IIf(lotNum <> "", lotNum, "--"), 12, "R")
 
     ' Label Preview sheet is hidden - it is only the internal print surface.
-    ' Do not activate it; the visible previews live on the "Label Previews" tab.
 End Sub
 
 ' ============================================================
@@ -2258,9 +2356,9 @@ Public Sub PrintLabel()
 
     ' Set up page for Brother QL-1100c  DK-1202  62mm x 100mm die-cut label
     ' LANDSCAPE: 100mm wide x 62mm tall  =  approx. 3.9" x 2.4"
-    ' The label content block (A1:H10) is proportioned to print at ~100% scale.
+    ' The label content block (A1:H15) is proportioned to print at ~100% scale.
     With wsL.PageSetup
-        .PrintArea       = wsL.Range("A1:H10").Address
+        .PrintArea       = wsL.Range("A1:H15").Address
         .LeftMargin      = Application.InchesToPoints(0.04)
         .RightMargin     = Application.InchesToPoints(0.04)
         .TopMargin       = Application.InchesToPoints(0.04)
