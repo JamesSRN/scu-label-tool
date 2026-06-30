@@ -30,6 +30,9 @@ If Not fso.FileExists(xlsmPath) Then
             xlsmPath & vbCrLf & bootstrapPath, vbCritical, "Build-Release"
         WScript.Quit 1
     End If
+    MsgBox "MedicationDispensing.xlsm was missing — copying from the bootstrap template." & vbCrLf & vbCrLf & _
+        "Patient data in a previous .xlsm is NOT restored. Check _backups\ if you have one.", _
+        vbExclamation, "Build-Release"
     fso.CopyFile bootstrapPath, xlsmPath, True
 End If
 If Not fso.FileExists(basPath) Then

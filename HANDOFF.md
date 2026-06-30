@@ -1,6 +1,6 @@
 # SCU Label Printing Tool - Handoff
 
-Last updated: 2026-06-30
+Last updated: 2026-06-30 (end of label/logo/print tuning session)
 
 An Excel + VBA tool for the **Saturday Clinic for the Uninsured (SCU)** free
 pharmacy. It turns pasted prescription text into a validated medication table and
@@ -118,8 +118,9 @@ Cell map (rows 16–18 hold off-label helper text that does not print):
 
 | Field | Cell(s) |
 |---|---|
-| Clinic identity | A2:H2 |
-| Contact line | A3:H3 |
+| Clinic name (bold, bottom-aligned) | **A2:F2** (merged) |
+| Contact line (top-aligned) | **A3:F3** (merged) |
+| Logo slot (no fill) | **G2:H3** (merged) |
 | Patient name | A5:E6 (merged) |
 | Rx date | F5:H5 (right) |
 | DOB | F6:H6 (right) |
@@ -142,37 +143,51 @@ medication name is the focal point; EXP/LOT are pinned in a footer.
 |---|---|
 | Patient name | `PatientNameFontSize()` — steps 17→8 pt, always **≥ med line + 1 pt** |
 | Medication / SIG | `NameFontSize()` / `SigFontSize()` — steps down for long text |
-| Header (rows 2–3) | Shrink-to-fit; Helvetica → Arial |
+| Clinic name | `FmtLblClinicName()` — **14 pt print / 12 pt gallery**, always **bold**, bottom-aligned in row 2 |
+| Clinic address | `FmtLblHeader()` — **7 pt print**, top-aligned in row 3; one line, `ShrinkToFit`, no wrap |
+| Header row heights | **20 pt** (row 2) + **10 pt** (row 3) — tight pairing with emblem band |
 
-**Print width:** `LABEL_WIDTH_PT = 228` scales columns A:H via
-`ApplyLabelContentWidth` so content fits **one** DK-1202 die-cut (fixes bleed
-onto a second label). Tune this constant if physical output is still too wide
-or narrow.
+**Print width:** `LABEL_WIDTH_PT = 242` scales columns A:H via
+`ApplyLabelContentWidth` so content uses more of the 100 mm die-cut. **228 pt** was
+the prior sweet spot (no bleed); **218 pt** was too narrow. Re-test on the clinic
+Brother after any width change.
 
 **Logo / emblem:**
 
 | Item | Detail |
 |---|---|
 | Manual source crop | `cropped_Black SCU Logo + Transparent Background - Copy.png` |
-| Workbook file | `scu_emblem.png` (copy via `tools/Build-ScuEmblem.ps1`) |
+| Workbook file | `scu_emblem.png` (built by `tools/Build-ScuEmblem.ps1`) |
+| Build script | Copies manual crop and forces every visible pixel to **solid black** (`#000000`) for crisp thermal output (gray snake anti-aliasing prints poorly) |
 | Aspect ratio | `LOGO_ASPECT = 1.488` (6150×4133 px) |
-| On-label height | **28 pt** in `InsertLabelLogo` (top-right anchor) |
-| Insertion | `AddPicture2` with compress=`0`; fallback `AddPicture` |
-| Resolution | `LogoFilePath()` prefers local `scu_emblem.png`; else embedded `LogoB64()` temp file |
+| Print height | **`LOGO_HEIGHT_PRINT = 30 pt`**, vertically centered in rows 2–3 |
+| Gallery height | **`LOGO_HEIGHT_GALLERY = 28 pt`**, column F slot |
+| Slot inset | **`LOGO_SLOT_INSET_PT = 4`** (print), **`LOGO_GALLERY_INSET_PT = 2`** (gallery) |
+| Right pad | **`LOGO_RIGHT_PAD_PT = 0`** — emblem flush to print-area right edge |
+| Insertion | `InsertLabelLogo` — insert at natural aspect (never `maxW × height` box); `LockAspectRatio`; `ZOrder msoBringToFront`; `xlFreeFloating`; centered vertically in band after final size |
+| Print refresh | `RefreshPrintLabelLogo` runs on every preview update and before each print (gallery rebuilds logos on tab activate; print sheet does not) |
+| Resolution | **`LogoFilePath()` uses only local `scu_emblem.png` beside the workbook** — embedded `LogoB64()` fallback **removed** (caused partial/weird logos after rebuild) |
 
 Do **not** re-enable automatic logo cropping without explicit approval — the
 manual crop is the source of truth.
 
-**Known issue:** build compiles and prints, but the emblem may still appear
-**too large or small** on the physical label. Next tuning: `InsertLabelLogo`
-height, anchor placement, `LOGO_ASPECT`, or Brother driver scale.
+**Logo gotcha (fixed):** merging A2:H2 hid the emblem under cell fill (only a
+sliver showed). Header merges now leave **G2:H3** open for the emblem; text uses
+**A2:F2** / **A3:F3**; logo shape is brought to front.
 
-**Print geometry:** `Zoom = 100`, no fit-to-page, **no `.PaperSize`** (Brother
-driver controls media), 0.04 in margins, landscape. Print areas in `PrintLabel`
-and batch print paths use `A1:H15`.
+**Print geometry:** `ApplyLabelPageSetup` sets `A1:H15`, `Zoom = 100`, no
+fit-to-page, **no `.PaperSize`** (Brother driver controls media), 0.04 in margins,
+landscape, no gridlines/headings.
+
+**Blank label after each print (fixed):** Excel was sometimes sending **page 2**
+(empty). `PrintLabelSurfaceSafe` now calls `PrepareLabelSheetForPrint` (only
+`scuLogo` may print as a shape; preview buttons excluded; `ResetAllPageBreaks`)
+and **`PrintOut From:=1, To:=1`**.
 
 **SetupWorkbook fix:** header `PasteSpecial` runtime 1004 resolved via
 `MatchHeaderFormat` (safe format copy for new Medications/Log columns).
+`SetupWorkbook` also calls **`PreviewAllLabels`** after layout rebuild so gallery
+and print sheet stay in sync.
 
 See also `LABEL_REDESIGN.md` and `CHANGELOG.md` (Unreleased).
 
@@ -187,7 +202,8 @@ for `.bas` / `.vbs`.)
 ### Quick path (recommended)
 
 1. Close `MedicationDispensing.xlsm`.
-2. (If emblem changed) run `tools/Build-ScuEmblem.ps1` → refreshes `scu_emblem.png`.
+2. Run `tools/Build-ScuEmblem.ps1` when the manual crop changes → rebuilds
+   `scu_emblem.png` (pure black for thermal). Re-run after any crop edit.
 3. Double-click **`Build-Release.vbs`** (needs **Trust access to the VBA project
    object model** + folder as **Trusted Location**).
 4. Click OK on **Setup complete!** and **Release build complete**.
@@ -196,6 +212,10 @@ for `.bas` / `.vbs`.)
 `Broken_PrettyPrint_MedicationDispensing.xlsm` only if missing), removes the old
 `MedParser` module, imports `MedParser.bas`, runs
 `'MedicationDispensing.xlsm'!SetupWorkbook`, saves.
+
+**Bootstrap warning:** if `MedicationDispensing.xlsm` is missing, the script copies
+from the bootstrap template and shows a **MsgBox** that patient data is **not**
+restored — check `_backups\` or Windows File History.
 
 Optional: `tools/Run-BuildRelease.ps1` — same via Excel COM with MsgBox auto-dismiss.
 
@@ -215,32 +235,59 @@ See `tools/BUILD_RELEASE_NOTES.md` for full detail.
    - **Label Previews** sheet module: `Worksheet_Activate` -> `PreviewAllLabels`.
 3. Keep `scu_emblem.png` beside the workbook so the logo embeds on SetupWorkbook.
 
-### Recent compile / build fixes (2026-06-30)
+### Problems solved (2026-06-30 session)
 
 | Issue | Fix |
 |---|---|
 | Runtime 1004 on header PasteSpecial | `MatchHeaderFormat` |
+| Labels bleed to 2nd die-cut | `LABEL_WIDTH_PT` tuning (228 safe; now 242 for wider template — re-verify) |
+| Blank label after each print | `PrintOut From:=1, To:=1`; `PrepareLabelSheetForPrint`; only `scuLogo` prints as shape |
+| Emblem sliver (merged cells hid logo) | Logo slot **G2:H3**; text **A2:F2** / **A3:F3**; `ZOrder msoBringToFront` |
+| Gallery OK, print sheet wrong logo | `RefreshPrintLabelLogo` on preview update + before each print |
+| Logo squished wide | `InsertLabelLogo` inserts at natural aspect, not `maxW × height` box |
+| Gray snake on thermal | `Build-ScuEmblem.ps1` forces solid black pixels |
+| Clinic name clipped top/bottom | `FmtLblHeader` (no wrap) + row heights 20 + 10 pt; bottom/top vertical align |
+| Clinic name too small | Wider text merge **A2:F2** (was A2:E2); `CLINIC_NAME_FONT_PRINT = 14` |
+| Clinic name not bold enough | `FmtLblClinicName` — always bold via `Font.Bold` only |
+| Compile: `xlBold` / `Font.Weight` | Removed — use **`Font.Bold = True`** only (Weight/xlBold break compile) |
+| Weird partial logos after rebuild | Removed embedded `LogoB64()` fallback from `LogoFilePath`; reduced inset; in-band vertical centering |
+| Build replaced workbook / lost data | Bootstrap only when `.xlsm` missing + warning MsgBox |
+| VBScript / VBA compile | See table below |
+
+### Compile / build fixes (2026-06-30)
+
+| Issue | Fix |
+|---|---|
 | VBScript "Expected end of statement" | No typed `Dim` in `Build-Release.vbs` |
 | VBA import / compile failures | Restore `FONT_LABEL_HDR_FB`; optional defaults must be literals; strip UTF-8 BOM; `msoPictureCompressNone` → `0` |
+| `xlBold` / `Font.Weight` in VBA | Do not use — `Font.Bold` only |
 
 ---
 
-## 6. TASKS STILL TO COMPLETE
+## 6. TASKS STILL TO COMPLETE / VERIFY
 
-1. **Logo sizing on physical label** — build compiles; emblem still not sized
-   appropriately on Brother output. Tune `InsertLabelLogo` (28 pt height), anchor,
-   `LOGO_ASPECT`, or driver scale after a test print.
-2. **Add the consolidated folder as an Excel Trusted Location** (section 1) so
+1. **Add the consolidated folder as an Excel Trusted Location** (section 1) so
    macros run without prompts. Without this, content is blocked.
-3. **Physical test print** on the Brother QL-1100C — confirm one label per
-   die-cut, landscape, readable, not clipped. Adjust `LABEL_WIDTH_PT` (228) or
-   margins in `BuildLabelPreviewLayout` if width is off.
-4. **(Optional) Desktop access:** make a Desktop shortcut to the folder; rename
+2. **(Optional) Desktop access:** make a Desktop shortcut to the folder; rename
    to drop `GIT_VERSION_` and re-point GitHub Desktop.
+3. **`LABEL_WIDTH_PT = 242`** — user wanted a wider template; confirm on the clinic
+   Brother that labels still fit **one** die-cut (228 pt was the prior no-bleed
+   sweet spot).
+4. **Bold clinic title on thermal** — bold may still look subtle on the Brother;
+   `ShrinkToFit` can limit apparent size on long clinic name text.
+5. **Physical print regression** — spot-check emblem size/position and header
+   after the latest logo/header changes (user confirmed screen + print path OK
+   at end of session).
+6. **Bootstrap / data loss** — if `MedicationDispensing.xlsm` was ever missing
+   during a build, the bootstrap copy overwrote it; recover from `_backups\` if
+   needed.
+7. **Dead code cleanup (optional):** `LogoB64()` remains in `MedParser.bas` but is
+   unused after fallback removal — safe to delete later to shrink the module.
 
-**Done since last handoff:** `Build-Release.vbs` runs successfully; label width
-tuning, header/patient typography, manual emblem workflow, and compile fixes are
-in `MedParser.bas` (see `CHANGELOG.md` Unreleased).
+**Done / verified (2026-06-30):** release build (`Build-Release.vbs`); label layout
+and typography; emblem (aspect, pure black, print + gallery sync); one label per
+print (no blank follow-on label); logo/header layout on screen and print path
+(user confirmed working at end of session).
 
 ---
 
@@ -250,8 +297,17 @@ in `MedParser.bas` (see `CHANGELOG.md` Unreleased).
   or BOM) makes the VBA importer reject the file. Always save CRLF + pure ASCII.
 - **`MatchHeaderFormat` for new columns.** Do not raw `PasteSpecial` header formats
   onto new Medications/Log columns — use the helper (fixes runtime 1004).
-- **`Shapes.AddPicture` / logo** — wrapped in error handling; prefer local
-  `scu_emblem.png`. Manual crop is authoritative; auto-crop scripts are disabled.
+- **`Shapes.AddPicture` / logo** — use local `scu_emblem.png` only; run
+  `Build-ScuEmblem.ps1` after crop edits. Never insert at `maxWidth × height`
+  (squashes aspect). Reserve **G2:H3** for the emblem; text in **A2:F2** /
+  **A3:F3**; bring shape to front. Do **not** re-enable `LogoB64()` fallback.
+- **Gallery vs print logo** — gallery rebuilds on tab activate; print sheet needs
+  `RefreshPrintLabelLogo` on every `UpdateLabelPreviewForMedRow` / print.
+- **Blank label between prints** — if it returns, check Excel print preview page
+  count; ensure `PrintOut From:=1, To:=1` and preview buttons have
+  `PrintObject = False`.
+- **`Font.Bold` only for bold headers.** Do not use `Font.Weight` or `xlBold` —
+  they caused compile errors in this project.
 - **No runtime VBProject injection.** Event handlers are preinstalled in the sheet
   modules; `SetupWorkbook` does not touch the VBProject (more robust, no trust
   setting needed for that).
@@ -273,17 +329,18 @@ in `MedParser.bas` (see `CHANGELOG.md` Unreleased).
 
 | Routine | Purpose |
 |---|---|
-| `SetupWorkbook` | Run after each import: rebuilds buttons, headers, colors, label layout. Uses `MatchHeaderFormat` for new columns. |
+| `SetupWorkbook` | Run after each import: rebuilds buttons, headers, colors, label layout; calls `PreviewAllLabels`. Uses `MatchHeaderFormat` for new columns. |
 | `ParseMedications` / `SplitMedBlocks` / `IsMedHeaderLine` / `ParseOneBlock` | Parse pasted text -> one row per med. |
 | `ValidateMedications` / `ReviewMedications` | Flag issues; summary. |
 | `AddMedicationRow` / `RemoveSelectedMedication` / `RenumberMeds` | List editing. Remove Selected removes all checked rows. |
 | `ApplyRowState` / `ApplyAllRowStates` / `IsRowSelected` / `ToggleRowSelect` | Row color by state; confidence triad; selection checkmark. |
 | `PrintCheckedLabels` | Batch-print every checked med; logs each. |
-| `BuildLabelPreviewLayout` / `ApplyLabelContentWidth` / `UpdateLabelPreviewFromSelection` / `FmtLbl` | Label layout, width scaling (`LABEL_WIDTH_PT`), value writing. |
-| `InsertLabelLogo` / `LogoFilePath` / `LogoB64` | Emblem insert (28 pt), local PNG or embedded fallback. |
+| `BuildLabelPreviewLayout` / `ApplyLabelContentWidth` / `ApplyLabelPageSetup` / `UpdateLabelPreviewForMedRow` / `FmtLbl` / `FmtLblHeader` / `FmtLblClinicName` | Label layout, width scaling (`LABEL_WIDTH_PT = 242`), page setup, value writing, bold clinic name. |
+| `InsertLabelLogo` / `RefreshPrintLabelLogo` / `EnsurePrintLabelHeaderLayout` / `LogoFilePath` | Emblem insert (30 pt print / 28 pt gallery), refresh before print, header merges A2:F2 / G2:H3. |
+| `PrepareLabelSheetForPrint` / `PrintLabelSurfaceSafe` | Suppress extra shapes; single-page `PrintOut From:=1, To:=1`. |
 | `LabelHeaderFont` / `SetMiniValue` / `MedFontSize` / `NameFontSize` / `PatientNameFontSize` / `SigFontSize` | Fonts and adaptive sizing. |
 | `MatchHeaderFormat` | Safe header format copy (PasteSpecial 1004 fix). |
-| `PrintLabel` / `SelectBrotherPrinter` / `MarkPrinted` | Auto-select Brother, confirm, print, bump # of Prints. |
+| `PrintLabel` / `PrintCheckedLabels` / `SelectBrotherPrinter` / `MarkPrinted` | Auto-select Brother, confirm, print, bump # of Prints. |
 | `LogPrint(medRow, vol)` / `AskInitials` | Full per-print Log row (single + batch). |
 | `StartNewPatient` | Clear patient + meds, keep the Log. |
 | `PreviewAllLabels` / `BuildAllLabelsPreview` / `EnsureAllLabelsSheet` | Label Previews gallery. |
@@ -301,8 +358,10 @@ BAA. The repo is code + docs + no-PHI samples only.
 ---
 
 **Bottom line:** parsing, validation, checkbox-driven selection/printing/removal,
-the dispense log, multi-patient flow, label width tuning, typography updates,
-and the **release build script** are in place and compile. Everything lives in
-one folder; code is backed up to GitHub. Remaining: **emblem sizing on physical
-print**, Trusted Location, and Brother test print (section 6). Detail:
-`LABEL_REDESIGN.md`, `CHANGELOG.md`, `tools/BUILD_RELEASE_NOTES.md`.
+the dispense log, multi-patient flow, and the **redesigned DK-1202 label** (emblem,
+header typography, width, single-page print) are built and **verified on screen
+and print path** at end of the 2026-06-30 session. Everything lives in one
+folder; code is backed up to GitHub. Remaining: **Trusted Location**, optional
+**242 pt width re-test** on physical Brother, and optional cleanup of unused
+`LogoB64()`. Detail: `LABEL_REDESIGN.md`, `CHANGELOG.md`,
+`tools/BUILD_RELEASE_NOTES.md`.

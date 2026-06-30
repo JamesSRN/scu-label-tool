@@ -50,7 +50,7 @@ toward correct labels and caught before mistakes reach a patient.
 - `Build-Release.vbs` - one-click: imports `MedParser.bas`, runs `SetupWorkbook`, saves the `.xlsm`.
 - `scu_emblem.png` - SC emblem for the label header (from manual crop of the clinic logo).
 - `cropped_Black SCU Logo + Transparent Background - Copy.png` - source crop for the emblem.
-- `tools/Build-ScuEmblem.ps1` - copies the manual crop to `scu_emblem.png`.
+- `tools/Build-ScuEmblem.ps1` - copies the manual crop to `scu_emblem.png` (pure black for thermal).
 - `HANDOFF.md` - full handoff: architecture, feature set, build steps, known issues, routine map.
 - `LABEL_REDESIGN.md` - printed label layout, typography, logo workflow, tuning notes.
 - `CHANGELOG.md` - release history (see Unreleased for 2026-06-30 label/build fixes).
@@ -87,9 +87,20 @@ The two worksheet event handlers are pasted once into the sheet modules - see
 
 ## Known open items
 
-- **Logo sizing** — build compiles; emblem may still need tuning on physical Brother output (`InsertLabelLogo`, 28 pt height). See `LABEL_REDESIGN.md`.
 - **Trusted Location** — register the folder in Excel Trust Center so macros are not blocked.
-- **Physical test print** — confirm one label per DK-1202 die-cut after width tuning (`LABEL_WIDTH_PT = 228`).
+- **Print width** — `LABEL_WIDTH_PT = 242` uses more of the 100 mm die-cut; re-test on the clinic Brother that labels still fit one die-cut (228 pt was the prior no-bleed value).
+- **Bold clinic title on thermal** — may still look subtle; `ShrinkToFit` can limit apparent size.
+- **Physical regression test** — spot-check emblem and header after the 2026-06-30 logo/header fixes (screen + print path verified; Brother thermal spot-check recommended).
+
+## Recently fixed (2026-06-30)
+
+Logo/header/print tuning session — full detail in `HANDOFF.md` and `CHANGELOG.md`:
+
+- Emblem sliver, squished aspect, gray thermal output, gallery vs print mismatch
+- Blank label after each print (`PrintOut From:=1, To:=1`)
+- Clinic name clipped / too small / bold (`FmtLblClinicName`, A2:F2 merge)
+- Embedded logo fallback removed (weird partial logos after rebuild)
+- Bootstrap warning when `MedicationDispensing.xlsm` is missing during build
 
 ---
 

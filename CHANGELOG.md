@@ -2,16 +2,37 @@
 
 ## Unreleased
 
-### Label layout & build (2026-06-30)
+### Label layout, logo, print (2026-06-30)
 
-- Tuned DK-1202 label content width (`LABEL_WIDTH_PT = 228`) so labels no longer bleed onto a second die-cut label.
-- Patient name typography now steps down from **17 pt** and stays **at least 1 pt larger than the medication line** (`PatientNameFontSize`).
-- Clinic header lines (rows 2–3) use **Helvetica** when available, with Arial fallback (`LabelHeaderFont`).
-- SC emblem sourced from a **manual crop** of the clinic logo: `cropped_Black SCU Logo + Transparent Background - Copy.png` → `scu_emblem.png` (via `tools/Build-ScuEmblem.ps1`). Logo aspect ratio `1.488`; inserted top-right at 28 pt height (`InsertLabelLogo`).
-- Fixed `SetupWorkbook` runtime 1004 on header `PasteSpecial` (`MatchHeaderFormat` helper).
+**Layout & typography**
+- Header cell map: clinic name **A2:F2** (bold, bottom-aligned), address **A3:F3** (top-aligned), emblem slot **G2:H3** (no fill).
+- Clinic name fonts: **14 pt print / 12 pt gallery** via `FmtLblClinicName` (always bold; `Font.Bold` only — no `Font.Weight` / `xlBold`).
+- Header row heights: **20 pt + 10 pt** (`LOGO_HDR_ROW1_PT`, `LOGO_HDR_ROW2_PT`).
+- Address line: **7 pt** (`CLINIC_ADDR_FONT_PRINT`); `FmtLblHeader` with `ShrinkToFit`, no wrap.
+- Patient name typography steps down from **17 pt** and stays **at least 1 pt larger than the medication line** (`PatientNameFontSize`).
+- Clinic header lines use **Helvetica** when available, with Arial fallback (`LabelHeaderFont`).
+
+**Print width**
+- `LABEL_WIDTH_PT` tuned: **228** stopped bleed onto a second die-cut; **242** uses more of the 100 mm width (re-verify on clinic Brother).
+
+**Logo / emblem**
+- Manual crop: `cropped_Black SCU Logo + Transparent Background - Copy.png` → `scu_emblem.png` via `tools/Build-ScuEmblem.ps1` (forces **pure black** pixels for thermal).
+- Aspect ratio `LOGO_ASPECT = 1.488`; print height **30 pt**, gallery **28 pt**.
+- `InsertLabelLogo`: natural aspect insert (not `maxW × height` box), `LockAspectRatio`, vertical centering in band, `ZOrder msoBringToFront`.
+- `RefreshPrintLabelLogo` on preview update and before each print (fixes gallery vs print mismatch).
+- `LogoFilePath()` uses **local `scu_emblem.png` only** — removed embedded `LogoB64()` fallback (caused partial/weird logos after rebuild).
+- Slot insets: **4 pt print**, **2 pt gallery**; right pad **0 pt**.
+
+**Print fixes**
+- Blank label after each print: `PrintOut From:=1, To:=1`; `PrepareLabelSheetForPrint`; only `scuLogo` prints as a shape.
+- `SetupWorkbook` calls `PreviewAllLabels` after layout rebuild.
+
+**Build & compile**
+- Fixed `SetupWorkbook` runtime 1004 on header `PasteSpecial` (`MatchHeaderFormat`).
 - Fixed `Build-Release.vbs` (VBScript syntax, qualified `'MedicationDispensing.xlsm'!SetupWorkbook` macro call).
+- Bootstrap warning MsgBox when `MedicationDispensing.xlsm` is missing (patient data not restored).
 - Fixed `MedParser.bas` import/compile issues: restore `FONT_LABEL_HDR_FB`, no typed optional defaults in VBA, strip UTF-8 BOM, replace undefined `msoPictureCompressNone` with `0`.
-- `Build-Release.vbs` now opens `MedicationDispensing.xlsm` in place (bootstrap from `Broken_PrettyPrint_…` only if missing). Added `tools/Run-BuildRelease.ps1` for optional automation.
+- `Build-Release.vbs` opens `MedicationDispensing.xlsm` in place (bootstrap from `Broken_PrettyPrint_…` only if missing). Added `tools/Run-BuildRelease.ps1` for optional automation.
 
 ### Docs & repo path
 

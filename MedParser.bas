@@ -50,8 +50,8 @@ Private Const CLR_WARN   As Long = 16775936   ' &HFFF800 warn yellow
 Private Const CLR_WHITE  As Long = 16777215
 
 ' DK-1202 die-cut label: 62 mm x 100 mm. Landscape print uses the 100 mm edge
-' as page width (~283 pt); keep content narrower so nothing bleeds to the next label.
-Private Const LABEL_WIDTH_PT As Double = 228
+' as page width (~283 pt). 228 = safe minimum; 242 uses more of the 100 mm die-cut.
+Private Const LABEL_WIDTH_PT As Double = 242
 
 Private Const FONT_LABEL_BODY As String = "Arial"
 Private Const FONT_LABEL_HDR As String = "Helvetica"
@@ -59,10 +59,16 @@ Private Const FONT_LABEL_HDR_FB As String = "Arial"   ' fallback when Helvetica 
 Private Const LOGO_ASPECT As Double = 1.488   ' manual crop width / height (6150 / 4133)
 Private Const LOGO_EMBLEM_FILE As String = "scu_emblem.png"
 Private Const LOGO_EMBLEM_SOURCE As String = "cropped_Black SCU Logo + Transparent Background - Copy.png"
-Private Const LOGO_HEIGHT_PRINT As Single = 32    ' emblem height on printed label (pt)
-Private Const LOGO_HEIGHT_GALLERY As Single = 30  ' emblem height in Label Previews gallery
-Private Const LOGO_HDR_ROW1_PT As Single = 22     ' header row 1 height (clinic name + logo band)
-Private Const LOGO_HDR_ROW2_PT As Single = 14     ' header row 2 height (address + logo band)
+Private Const LOGO_HEIGHT_PRINT As Single = 30    ' emblem height on printed label (pt)
+Private Const LOGO_HEIGHT_GALLERY As Single = 28  ' emblem height in Label Previews gallery
+Private Const LOGO_HDR_ROW1_PT As Single = 20     ' clinic name row (paired with row 3 for tight header)
+Private Const LOGO_HDR_ROW2_PT As Single = 10     ' address row
+Private Const LOGO_RIGHT_PAD_PT As Single = 0     ' flush emblem to right edge of print area
+Private Const LOGO_SLOT_INSET_PT As Single = 4    ' inset from slot left — keeps emblem right without over-shrinking
+Private Const LOGO_GALLERY_INSET_PT As Single = 2  ' single-column gallery slot
+Private Const CLINIC_NAME_FONT_PRINT As Single = 14
+Private Const CLINIC_NAME_FONT_GALLERY As Single = 12
+Private Const CLINIC_ADDR_FONT_PRINT As Single = 7
 
 ' ============================================================
 '  DATA TYPE
@@ -122,6 +128,7 @@ Public Sub SetupWorkbook()
     Call AddButtonToSheet(ws1, "btnReset",  "Reset Session",       "ResetSession",       50, 3, 150, 20, RGB(191, 54, 12))
     Call AddButtonToSheet(ws1, "btnNewPt",  "Start NEW Patient",   "StartNewPatient",    53, 2, 200, 24, RGB(0, 121, 107))
     Call BuildLabelPreviewLayout(ws3)
+    Call PreviewAllLabels
     Call AddButtonToSheet(ws3, "btnUpd",    "Update Label Preview", "UpdateLabelPreviewFromSelection", 20, 1, 220, 24, RGB(21, 101, 192))
     Call AddButtonToSheet(ws3, "btnPrint",  "Print This Label",    "PrintLabel",         23, 1, 220, 24, RGB(46, 125, 50))
     On Error Resume Next
@@ -363,45 +370,22 @@ Private Function LogoB64() As String
 End Function
 
 Private Function LogoFilePath() As String
-    ' Prefer the high-quality emblem PNG beside the workbook; fall back to embedded copy.
+    ' Use scu_emblem.png beside the workbook only (never the old embedded full-logo fallback).
     On Error GoTo Fail
     Dim folder As String, localPath As String
     folder = ThisWorkbook.Path
-    If folder <> "" Then
-        localPath = folder & Application.PathSeparator & LOGO_EMBLEM_FILE
-        If Len(Dir(localPath)) > 0 Then
-            LogoFilePath = localPath
-            Exit Function
-        End If
+    If folder = "" Then Exit Function
+    localPath = folder & Application.PathSeparator & LOGO_EMBLEM_FILE
+    If Len(Dir(localPath)) > 0 Then
+        LogoFilePath = localPath
+        Exit Function
     End If
-
-    Dim tmp As String
-    tmp = Environ$("TEMP")
-    If tmp = "" Then tmp = Environ$("TMP")
-    If tmp = "" Then Exit Function
-    tmp = tmp & "\scu_emblem_embedded.png"
-    Dim dom As Object, node As Object, stream As Object
-    On Error Resume Next
-    Set dom = CreateObject("MSXML2.DOMDocument.6.0")
-    If dom Is Nothing Then Set dom = CreateObject("MSXML2.DOMDocument")
-    On Error GoTo Fail
-    If dom Is Nothing Then Exit Function
-    Set node = dom.createElement("b64")
-    node.DataType = "bin.base64"
-    node.Text = LogoB64()
-    Set stream = CreateObject("ADODB.Stream")
-    stream.Type = 1
-    stream.Open
-    stream.Write node.nodeTypedValue
-    stream.SaveToFile tmp, 2
-    stream.Close
-    LogoFilePath = tmp
     Exit Function
 Fail:
     LogoFilePath = ""
 End Function
 
-Private Sub InsertLabelLogo(ws As Worksheet, ByVal shapeName As String, ByVal topPt As Single, ByVal rightPt As Single, ByVal heightPt As Single, Optional ByVal leftBoundPt As Single = 0)
+Private Sub InsertLabelLogo(ws As Worksheet, ByVal shapeName As String, ByVal rightPt As Single, ByVal heightPt As Single, Optional ByVal leftBoundPt As Single = 0, Optional ByVal bandFirstRow As Long = 0, Optional ByVal bandLastRow As Long = 0)
     On Error Resume Next
     ws.Shapes(shapeName).Delete
     On Error GoTo 0
@@ -414,8 +398,8 @@ Private Sub InsertLabelLogo(ws As Worksheet, ByVal shapeName As String, ByVal to
     Dim maxW As Single, targetH As Single, initW As Single
 
     targetH = heightPt
-    maxW = rightPt - 2
-    If leftBoundPt > 0 Then maxW = rightPt - leftBoundPt - 2
+    maxW = rightPt - LOGO_RIGHT_PAD_PT
+    If leftBoundPt > 0 Then maxW = rightPt - leftBoundPt - LOGO_RIGHT_PAD_PT
     If maxW <= 0 Then Exit Sub
     initW = targetH * LOGO_ASPECT
 
@@ -433,16 +417,25 @@ Private Sub InsertLabelLogo(ws As Worksheet, ByVal shapeName As String, ByVal to
     pic.LockAspectRatio = msoTrue
     pic.Height = targetH
     If pic.Width > maxW Then pic.Width = maxW
-    pic.Left = rightPt - pic.Width - 2
-    pic.Top = topPt
+    pic.Left = rightPt - pic.Width - LOGO_RIGHT_PAD_PT
+    If bandFirstRow > 0 And bandLastRow >= bandFirstRow Then
+        Dim bandTop As Single, bandH As Single, r As Long
+        bandTop = ws.Rows(bandFirstRow).Top
+        bandH = 0
+        For r = bandFirstRow To bandLastRow
+            bandH = bandH + ws.Rows(r).RowHeight
+        Next r
+        pic.Top = bandTop + (bandH - pic.Height) / 2
+        If pic.Top < bandTop Then pic.Top = bandTop
+    End If
     pic.ZOrder msoBringToFront
 End Sub
 
 Private Function LogoTopInBand(ws As Worksheet, ByVal firstRow As Long, ByVal lastRow As Long, ByVal logoH As Single) As Single
-    Dim bandTop As Single, bandH As Single
+    ' Legacy helper — InsertLabelLogo now centers in-band after sizing.
+    Dim bandTop As Single, bandH As Single, r As Long
     bandTop = ws.Rows(firstRow).Top
     bandH = 0
-    Dim r As Long
     For r = firstRow To lastRow
         bandH = bandH + ws.Rows(r).RowHeight
     Next r
@@ -457,11 +450,14 @@ Private Sub EnsurePrintLabelHeaderLayout(ws As Worksheet)
     ws.Range("A2:H2").UnMerge
     ws.Range("A3:H3").UnMerge
     ws.Range("F2:H3").UnMerge
+    ws.Range("G2:H3").UnMerge
+    ws.Range("H2:H3").UnMerge
     On Error GoTo 0
-    ws.Range("A2:E2").Merge
-    ws.Range("A3:E3").Merge
-    ws.Range("F2:H3").Merge
-    With ws.Range("F2:H3")
+    ' Text A:F; emblem G:H (2 cols).
+    ws.Range("A2:F2").Merge
+    ws.Range("A3:F3").Merge
+    ws.Range("G2:H3").Merge
+    With ws.Range("G2:H3")
         .Interior.Pattern = xlNone
     End With
     ws.Rows(2).RowHeight = LOGO_HDR_ROW1_PT
@@ -472,13 +468,13 @@ Private Sub EnsurePrintLabelHeaderLayout(ws As Worksheet)
     If Trim(ws.Cells(3, 1).Value) = "" Then
         ws.Cells(3, 1).Value = "1121 E. North Ave, Milwaukee WI    " & Chr(183) & "    (414) 588-2865"
     End If
-    Call FmtLblHeader(ws.Cells(2, 1), 9, True)
-    Call FmtLblHeader(ws.Cells(3, 1), 6.5, False)
+    Call FmtLblClinicName(ws.Cells(2, 1), CLINIC_NAME_FONT_PRINT)
+    Call FmtLblHeader(ws.Cells(3, 1), CLINIC_ADDR_FONT_PRINT, False, "T")
 End Sub
 
 Private Sub RefreshPrintLabelLogo(ws As Worksheet)
     Call EnsurePrintLabelHeaderLayout(ws)
-    Call InsertLabelLogo(ws, "scuLogo", LogoTopInBand(ws, 2, 3, LOGO_HEIGHT_PRINT), ws.Range("A1:H15").Left + ws.Range("A1:H15").Width, LOGO_HEIGHT_PRINT, ws.Range("F2").Left)
+    Call InsertLabelLogo(ws, "scuLogo", ws.Range("A1:H15").Left + ws.Range("A1:H15").Width, LOGO_HEIGHT_PRINT, ws.Range("G2").Left + LOGO_SLOT_INSET_PT, 2, 3)
 End Sub
 
 Private Sub BuildLabelPreviewLayout(ws As Worksheet)
@@ -512,9 +508,9 @@ Private Sub BuildLabelPreviewLayout(ws As Worksheet)
     ws.Rows(17).RowHeight = 14
     ws.Rows(18).RowHeight = 14
 
-    ws.Range("A2:E2").Merge
-    ws.Range("A3:E3").Merge
-    ws.Range("F2:H3").Merge
+    ws.Range("A2:F2").Merge
+    ws.Range("A3:F3").Merge
+    ws.Range("G2:H3").Merge
     ws.Range("A5:E6").Merge
     ws.Range("F5:H5").Merge
     ws.Range("F6:H6").Merge
@@ -530,7 +526,7 @@ Private Sub BuildLabelPreviewLayout(ws As Worksheet)
     ws.Cells(2, 1).Value = "SATURDAY CLINIC FOR THE UNINSURED"
     ws.Cells(3, 1).Value = "1121 E. North Ave, Milwaukee WI    " & Chr(183) & "    (414) 588-2865"
     ws.Cells(9, 1).Value = "DIRECTIONS"
-    With ws.Range("F2:H3")
+    With ws.Range("G2:H3")
         .Value = ""
         .Interior.Pattern = xlNone
     End With
@@ -547,8 +543,8 @@ Private Sub BuildLabelPreviewLayout(ws As Worksheet)
     ws.Cells(17, 1).Value = "Auto-fills from the Medications tab. Print via 'Print Checked Labels'."
     ws.Cells(18, 1).Value = "Brother QL-1100c  " & Chr(183) & "  DK-1202 62 x 100 mm  " & Chr(183) & "  Landscape"
 
-    Call FmtLblHeader(ws.Cells(2, 1), 9, True)
-    Call FmtLblHeader(ws.Cells(3, 1), 6.5, False)
+    Call FmtLblClinicName(ws.Cells(2, 1), CLINIC_NAME_FONT_PRINT)
+    Call FmtLblHeader(ws.Cells(3, 1), CLINIC_ADDR_FONT_PRINT, False, "T")
     Call FmtLbl(ws.Cells(5, 1), 17, True, "L", "C")
     Call FmtLbl(ws.Cells(5, 6), 7, False, "R", "B")
     Call FmtLbl(ws.Cells(6, 6), 11, True, "R", "T")
@@ -587,6 +583,23 @@ Private Sub BuildLabelPreviewLayout(ws As Worksheet)
     On Error GoTo 0
     Call RefreshPrintLabelLogo(ws)
 
+    Call ApplyLabelPageSetup(ws)
+
+    Application.ScreenUpdating = True
+    On Error GoTo 0
+End Sub
+
+Private Sub ApplyLabelContentWidth(ws As Worksheet)
+    Dim currentW As Double, sf As Double, col As Long
+    currentW = ws.Range("A1:H15").Width
+    If currentW <= 0 Then Exit Sub
+    sf = LABEL_WIDTH_PT / currentW
+    For col = 1 To 8
+        ws.Columns(col).ColumnWidth = ws.Columns(col).ColumnWidth * sf
+    Next col
+End Sub
+
+Private Sub ApplyLabelPageSetup(ws As Worksheet)
     With ws.PageSetup
         .PrintArea = ws.Range("A1:H15").Address
         .LeftMargin = Application.InchesToPoints(0.04)
@@ -601,20 +614,20 @@ Private Sub BuildLabelPreviewLayout(ws As Worksheet)
         .Orientation = xlLandscape
         .CenterHorizontally = True
         .CenterVertically = False
+        .PrintGridlines = False
+        .PrintHeadings = False
     End With
-
-    Application.ScreenUpdating = True
-    On Error GoTo 0
 End Sub
 
-Private Sub ApplyLabelContentWidth(ws As Worksheet)
-    Dim currentW As Double, sf As Double, col As Long
-    currentW = ws.Range("A1:H15").Width
-    If currentW <= 0 Then Exit Sub
-    sf = LABEL_WIDTH_PT / currentW
-    For col = 1 To 8
-        ws.Columns(col).ColumnWidth = ws.Columns(col).ColumnWidth * sf
-    Next col
+' Only the emblem may print as a shape; buttons must not add a second (blank) page.
+Private Sub PrepareLabelSheetForPrint(ws As Worksheet)
+    Dim shp As Shape
+    On Error Resume Next
+    ws.ResetAllPageBreaks
+    For Each shp In ws.Shapes
+        shp.PrintObject = (shp.Name = "scuLogo")
+    Next shp
+    On Error GoTo 0
 End Sub
 
 Private Function LabelHeaderFont() As String
@@ -656,17 +669,29 @@ Private Sub FmtLbl(rng As Range, sz As Single, bld As Boolean, h As String, v As
 End Sub
 
 ' Clinic header lines: one row each, shrink horizontally, never wrap (wrap clips on print).
-Private Sub FmtLblHeader(rng As Range, sz As Single, bld As Boolean)
+Private Sub FmtLblHeader(rng As Range, sz As Single, bld As Boolean, Optional vAlign As String = "C")
     With rng
         .Font.Name = LabelHeaderFont()
         .Font.Size = sz
-        .Font.Bold = bld
         .Font.Color = RGB(0, 0, 0)
         .HorizontalAlignment = xlLeft
-        .VerticalAlignment = xlCenter
         .WrapText = False
         .ShrinkToFit = True
+        If bld Then
+            .Font.Bold = True
+        Else
+            .Font.Bold = False
+        End If
     End With
+    Select Case vAlign
+        Case "T": rng.VerticalAlignment = xlTop
+        Case "B": rng.VerticalAlignment = xlBottom
+        Case Else: rng.VerticalAlignment = xlCenter
+    End Select
+End Sub
+
+Private Sub FmtLblClinicName(rng As Range, sz As Single)
+    Call FmtLblHeader(rng, sz, True, "B")
 End Sub
 
 Private Sub SetMiniValue(c As Range, miniText As String, valueText As String, vSize As Single, hAlign As String)
@@ -807,7 +832,7 @@ Private Sub BuildAllLabelsPreview()
     ws.Cells.Interior.Pattern = xlNone
     ws.Rows.RowHeight = 14
 
-    ws.Columns("A:F").ColumnWidth = 9
+    ws.Columns("A:F").ColumnWidth = 10
     ws.Columns("G").ColumnWidth = 2
     ws.Columns("H:J").ColumnWidth = 16
 
@@ -862,10 +887,10 @@ Private Sub BuildAllLabelsPreview()
 
         ws.Range(ws.Cells(base, 1), ws.Cells(base, 5)).Merge
         ws.Cells(base, 1).Value = "SATURDAY CLINIC FOR THE UNINSURED"
-        Call FmtLblHeader(ws.Cells(base, 1), 8.5, True)
+        Call FmtLblClinicName(ws.Cells(base, 1), CLINIC_NAME_FONT_GALLERY)
         ws.Range(ws.Cells(base + 1, 1), ws.Cells(base + 1, 5)).Merge
         ws.Cells(base + 1, 1).Value = "1121 E. North Ave, Milwaukee WI   " & Chr(183) & "   (414) 588-2865"
-        Call FmtLblHeader(ws.Cells(base + 1, 1), 6, False)
+        Call FmtLblHeader(ws.Cells(base + 1, 1), CLINIC_ADDR_FONT_PRINT, False, "T")
         With ws.Range(ws.Cells(base, 6), ws.Cells(base + 1, 6))
             .Merge
             .Value = ""
@@ -943,7 +968,7 @@ Private Sub BuildAllLabelsPreview()
         End If
 
         If logoOK Then
-            Call InsertLabelLogo(ws, "al_logo_" & r, LogoTopInBand(ws, base, base + 1, LOGO_HEIGHT_GALLERY), ws.Cells(base, 6).Left + ws.Cells(base, 6).Width, LOGO_HEIGHT_GALLERY, ws.Cells(base, 6).Left)
+            Call InsertLabelLogo(ws, "al_logo_" & r, ws.Cells(base, 6).Left + ws.Cells(base, 6).Width, LOGO_HEIGHT_GALLERY, ws.Cells(base, 6).Left + LOGO_GALLERY_INSET_PT, base, base + 1)
         End If
 
         If warn <> "" And UCase(warn) <> "OK" Then
@@ -2377,22 +2402,7 @@ Public Sub PrintCheckedLabels()
     End If
 
     Call ApplyLabelContentWidth(wsL)
-
-    With wsL.PageSetup
-        .PrintArea = wsL.Range("A1:H15").Address
-        .LeftMargin = Application.InchesToPoints(0.04)
-        .RightMargin = Application.InchesToPoints(0.04)
-        .TopMargin = Application.InchesToPoints(0.04)
-        .BottomMargin = Application.InchesToPoints(0.04)
-        .HeaderMargin = 0
-        .FooterMargin = 0
-        .FitToPagesWide = False
-        .FitToPagesTall = False
-        .Zoom = 100
-        .Orientation = xlLandscape
-        .CenterHorizontally = True
-        .CenterVertically = False
-    End With
+    Call ApplyLabelPageSetup(wsL)
 
     Dim batchVol As String
     batchVol = AskInitials()
@@ -2787,9 +2797,11 @@ Private Function PrintLabelSurfaceSafe(Optional ByVal copies As Long = 1) As Boo
     Dim ws As Worksheet
     On Error GoTo Fail
     Set ws = ThisWorkbook.Sheets(SH_LABEL)
+    Call PrepareLabelSheetForPrint(ws)
     ws.Visible = xlSheetVisible
     ws.Activate
-    ws.PrintOut Copies:=copies, Collate:=True
+    ' From/To 1: Brother QL treats each Excel page as one die-cut; avoid a blank 2nd page.
+    ws.PrintOut From:=1, To:=1, Copies:=copies, Collate:=True
     PrintLabelSurfaceSafe = True
 CleanExit:
     On Error Resume Next
@@ -2818,25 +2830,7 @@ Public Sub PrintLabel()
 
     Call ApplyLabelContentWidth(wsL)
     Call RefreshPrintLabelLogo(wsL)
-
-    ' Set up page for Brother QL-1100c  DK-1202  62mm x 100mm die-cut label
-    ' LANDSCAPE: 100mm wide x 62mm tall  =  approx. 3.9" x 2.4"
-    ' The label content block (A1:H15) is proportioned to print at ~100% scale.
-    With wsL.PageSetup
-        .PrintArea       = wsL.Range("A1:H15").Address
-        .LeftMargin      = Application.InchesToPoints(0.04)
-        .RightMargin     = Application.InchesToPoints(0.04)
-        .TopMargin       = Application.InchesToPoints(0.04)
-        .BottomMargin    = Application.InchesToPoints(0.04)
-        .HeaderMargin    = 0
-        .FooterMargin    = 0
-        .FitToPagesWide  = False
-        .FitToPagesTall  = False
-        .Zoom            = 100
-        .Orientation     = xlLandscape
-        .CenterHorizontally = True
-        .CenterVertically   = False
-    End With
+    Call ApplyLabelPageSetup(wsL)
 
     ' Auto-select the Brother QL-1100c label printer
     Dim brotherName As String
