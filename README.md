@@ -50,16 +50,18 @@ toward correct labels and caught before mistakes reach a patient.
 - `HANDOFF.md` - full handoff: architecture, feature set, build steps, known issues, routine map.
 - `Black SCU Logo + Transparent Background.png` - clinic logo.
 
-## Folders on the clinic PC
+## Folder on the clinic PC
 
-Two folders, one project:
+Everything lives in **one folder** (outside OneDrive):
 
-- **`Desktop\SCU Label Printing\`** - the **live working folder**. Holds the
-  actual Excel tool (`MedicationDispensing.xlsm`) and is where day-to-day work
-  happens. It is registered as an Excel Trusted Location, so **do not rename it**.
-- **`Documents\GitHub\GIT_VERSION_SCU Label Printing\`** - the **version-control
-  backup** (this repo's local clone, pushed to GitHub). Code and docs only, no
-  patient data. Update it by copying the changed files in, then commit and push.
+```
+C:\Users\ringo\Documents\GitHub\GIT_VERSION_SCU Label Printing
+```
+
+This folder holds the Git repo (pushed to GitHub), the VBA source, docs, and
+the live workbook (`MedicationDispensing.xlsm`). Code and docs are version-
+controlled; the `.xlsm` and `_backups\` are git-ignored so patient data stays
+local. Register this folder as an Excel Trusted Location so macros run.
 
 ## Applying code changes
 

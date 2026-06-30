@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Relocated the repo off OneDrive to `C:\Users\ringo\Documents\GitHub\GIT_VERSION_SCU Label Printing` (Documents no longer synced to OneDrive). Updated `HANDOFF.md` and `README.md` to reflect the single-folder layout.
+
 Repository/documentation hardening:
 
 - Clarified that the GitHub repo is code-only and must not contain live workbooks or PHI.

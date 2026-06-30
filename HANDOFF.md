@@ -12,27 +12,26 @@ volunteers.
 
 ## 1. Where everything lives (IMPORTANT - read first)
 
-Everything was consolidated into **one folder**:
+Everything is in **one folder** (code, docs, workbook, backups, and Git):
 
 ```
-C:\Users\ringo\OneDrive\Documents\GitHub\GIT_VERSION_SCU Label Printing
+C:\Users\ringo\Documents\GitHub\GIT_VERSION_SCU Label Printing
 ```
 
-This single folder contains the code, docs, the SC emblem, the workbook
+This folder is **outside OneDrive** (Documents was moved off OneDrive sync in
+June 2026). It contains the code, docs, the SC emblem, the workbook
 (`MedicationDispensing.xlsm`), and `_backups\`. It is also the local Git repo
 (remote: `JamesSRN/scu-label-tool`). The `.xlsm` and `_backups\` are git-ignored,
 so patient data can never be committed.
 
-**Two open setup items because of the consolidation:**
+**Two open setup items:**
 
 1. **Trusted Location.** The old `Desktop\SCU Label Printing` folder (the prior
    Excel Trusted Location) was removed. The new folder is **not trusted yet**, so
    macros will be blocked until you add it:
    `Excel > File > Options > Trust Center > Trust Center Settings > Trusted
    Locations > Add new location > browse to the folder above > OK`.
-2. **Location.** It sits in `Documents\GitHub` rather than the Desktop because
-   OneDrive refuses to move a folder that contains a `.git` directory (error
-   0x80004005). For easy access: right-click the folder > Send to > Desktop
+2. **Easy access (optional).** Right-click the folder > Send to > Desktop
    (create shortcut). It can be renamed in place to drop the `GIT_VERSION_`
    prefix (then re-point GitHub Desktop with Locate).
 
@@ -191,7 +190,6 @@ to the VBA project object model" and the workbook closed).
 4. **Physical test print** on the Brother QL-1100C - the one thing never verified.
    Confirm the label fills DK-1202, landscape, readable, not clipped or squished.
    If off, adjust margins/centering in `BuildLabelPreviewLayout` + the print subs.
-5. **Commit this updated HANDOFF.md** to git (and the workbook stays git-ignored).
 
 ---
 
