@@ -1,4 +1,5 @@
-# Use the manually cropped clinic emblem (Copy file) as scu_emblem.png.
+# Copy manual crop -> scu_emblem.png and force all visible pixels to pure black
+# (thermal labels print gray anti-aliasing poorly; snake/mark need to be solid black).
 $ErrorActionPreference = 'Stop'
 
 $repo = 'C:\Users\ringo\Documents\GitHub\GIT_VERSION_SCU Label Printing'
@@ -9,9 +10,47 @@ if (-not (Test-Path -LiteralPath $source)) {
     throw "Missing manual crop: $source"
 }
 
-Copy-Item -LiteralPath $source -Destination $out -Force
+Add-Type -AssemblyName System.Drawing
 
-$raw = [IO.File]::ReadAllBytes($out)
-$w = ($raw[16] -shl 24) -bor ($raw[17] -shl 16) -bor ($raw[18] -shl 8) -bor $raw[19]
-$h = ($raw[20] -shl 24) -bor ($raw[21] -shl 16) -bor ($raw[22] -shl 8) -bor $raw[23]
-Write-Host "Copied manual crop to scu_emblem.png (${w}x${h}, aspect $([Math]::Round($w / [double]$h, 3)))"
+$src = [System.Drawing.Bitmap]::FromFile($source)
+$bmp = New-Object System.Drawing.Bitmap $src.Width, $src.Height, ([System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+$bmp.SetResolution($src.HorizontalResolution, $src.VerticalResolution)
+
+$rect = New-Object System.Drawing.Rectangle 0, 0, $src.Width, $src.Height
+$srcData = $src.LockBits($rect, [System.Drawing.Imaging.ImageLockMode]::ReadOnly, $src.PixelFormat)
+$dstData = $bmp.LockBits($rect, [System.Drawing.Imaging.ImageLockMode]::WriteOnly, $bmp.PixelFormat)
+
+try {
+    $stride = [Math]::Abs($srcData.Stride)
+    $h = $src.Height
+    $bytes = $stride * $h
+    $srcBuf = New-Object byte[] $bytes
+    $dstBuf = New-Object byte[] $bytes
+    [Runtime.InteropServices.Marshal]::Copy($srcData.Scan0, $srcBuf, 0, $bytes)
+    for ($i = 0; $i -lt $bytes; $i += 4) {
+        $a = $srcBuf[$i + 3]
+        if ($a -gt 32) {
+            $dstBuf[$i] = 0
+            $dstBuf[$i + 1] = 0
+            $dstBuf[$i + 2] = 0
+            $dstBuf[$i + 3] = 255
+        } else {
+            $dstBuf[$i] = 0
+            $dstBuf[$i + 1] = 0
+            $dstBuf[$i + 2] = 0
+            $dstBuf[$i + 3] = 0
+        }
+    }
+    [Runtime.InteropServices.Marshal]::Copy($dstBuf, 0, $dstData.Scan0, $bytes)
+} finally {
+    $src.UnlockBits($srcData)
+    $bmp.UnlockBits($dstData)
+}
+
+$src.Dispose()
+$bmp.Save($out, [System.Drawing.Imaging.ImageFormat]::Png)
+$bmp.Dispose()
+
+$check = [System.Drawing.Image]::FromFile($out)
+Write-Host "Wrote scu_emblem.png ($($check.Width)x$($check.Height), aspect $([Math]::Round($check.Width / [double]$check.Height, 3)), pure black)"
+$check.Dispose()
