@@ -1,4 +1,4 @@
-Attribute VB_Name = "MedParser"
+﻿Attribute VB_Name = "MedParser"
 ' ============================================================
 '  Saturday Clinic for the Uninsured
 '  Medication Parser  -  MedParser.bas  -  Version 1.0
@@ -48,6 +48,15 @@ Private Const CLR_LOW    As Long = 16764106   ' &HFFCDD2 pastel red
 Private Const CLR_MANUAL As Long = 16773600   ' &HFFF3E0 orange-tint
 Private Const CLR_WARN   As Long = 16775936   ' &HFFF800 warn yellow
 Private Const CLR_WHITE  As Long = 16777215
+
+' DK-1202 die-cut label: 62 mm x 100 mm. Landscape print uses the 100 mm edge
+' as page width (~283 pt); keep content narrower so nothing bleeds to the next label.
+Private Const LABEL_WIDTH_PT As Double = 228
+
+Private Const FONT_LABEL_BODY As String = "Arial"
+Private Const FONT_LABEL_HDR As String = "Helvetica"
+Private Const LOGO_ASPECT As Double = 1.422   ' scu_emblem.png width / height (256 / 180, 1024 / 720)
+Private Const LOGO_EMBLEM_FILE As String = "scu_emblem.png"
 
 ' ============================================================
 '  DATA TYPE
@@ -170,31 +179,227 @@ End Sub
 ' ============================================================
 Private Function LogoB64() As String
     Dim b As String
-    b = b & "iVBORw0KGgoAAAANSUhEUgAAAQAAAAC0CAYAAAB7XvKxAAAJ7UlEQVR4nO2d25LjNgxE6a38/y9PHhLP2rIskRIv3cA5VVuZh4yHBBpNkJKlR4Fo/Az+/Mfgz4eJkEw/Rhf4XdCUESRLF/VCbwGdiUJidIhU8DWgPQFIwjqyFfwZaHEBBH0uFH0d6HISBHo8akV/lnO3"
-    b = b & "8cINCO4YZhbR6hxmmms4CGg/RhaCY564H8EAgniPUSKPmhfiJQaBu0ZvIWfNA3FcDAFro5dgifs+xHcyBKqOHsIk1m0Q8wkQoGPuipD49oE8DILA7HNHcMR0LOSmIwTkHcTlA7nqAIH4j6tiIn7rwQhukD0AFH4syGcjaSderoklc7ycILeVZJw04sgDuT4h02QRQ17I"
-    b = b & "/RdSTLK0CyBSXLiG/pfMOtgl+gSzO3/Pe+2jxCW7Jt74s3oAA7ni9mETDb9cybPaQ1K6EVXwLQmLGoNS6uIQef41pNZKtAmxx3tnG4/o871KWt2EmUhJ7uTQhXQaCjGJkjBxHeFQ7J1UWnKfQKpkdYBHctWTQlu2Ay9JEtSB2SfYkWIdXmOWgy71iXGdXw9WX7qKFPuw"
-    b = b & "erMbcAmcjE6sLvwtUfIQUndWgy1Bk9AJtcLfEiEn4fRnM9ASMPgdUS/+V9zzE0qHFoMs3NF2hFPxP4mQqxCadPguQIhAD8Kx+EvxHfcrNZqTn6dy4YRqtQagKq5nPrIYt/U8VTsAiv8Y9eLf/vwN1Xm0YD1PRQOg+I+RFdMOtcXhNKc9bE1A0QBqoPjj4T43SxNQMwDr"
-    b = b & "/RTcFrhcgTRiZwJKxUTxH7PizbmrxOqeZxstq3QANgEz5sqjsFbFXGqVvIBNJ6BQVBR/HT3fenP2WdvfoRO4hry2V3cA8gESYWbx134OnCPfCaw0AIp/LL1jRy6uIW0CqwyA4veEnFxD1gRWGADFP56R8Zv1/oRoGpCcz+ozgD0kAwUfPMo4M4iqgbN5Te8C/pn891pP"
-    b = b & "n8GDK3n7poXoGniU4zr4KRNjMNMAKH54JXO+ZUxg1hZA4qYHACOm1IzKGUDm1QByIqH5GQZA6w+wz/JDwdEGQPEDHLPUBFZuASh+gP9YVgsjDYCDv3UQ+1gMy+coA6D17wvxis+SrcAIA6D4NaAL8GN6bahcBgSAc7qbem8DYPUfR8/bbUGXqVuBmR0Axe8BeVrPtBz0"
-    b = b & "NABWm/HQBUApHXPaywBo/QH6MmUrMGMLQPH3hXjmYXiuexgALaY2GEZcbtfe6A4A8Y2BuOZhaK7vGgCr/zowASjlZg2O7AAQ6HiIcQ6G5fmOARw5D8KcB7HOwVGeL3cB3AocgxEm8PPyD4Jy1QBY/fUYGXdMQIPuXQAdQCwwAWjiigGw+muDCcSmaxdABxCTka/vwgQC"
-    b = b & "0WoArP5eYAIx6dYFzH412EruiBZz+2TqK6w6cNe0nOZaTcuk3Fb/kauU4nxrqf3mZoS3OI/SgMq8b9dkxA5gRnv6+jdUxLACxS5gZv7V5t5MJANYtS8NI4aLqJjAivzb5772EFC9/Vc4lOKuuTUoxH3VGG4fBka4DLg6+VvUxjOD1d2XCmrjOaXGAJRXf9WAK6xKkVGO"
-    b = b & "7+xx3eoCnDsAVQG84jDGV1Ybeg0OMXUYYynlngGsFItNgIvXWNVxiuXMsV6uxTMDUAy44piOcFhVezA6L255L0VjzIdjcN4COJCl+EejUEhXkR77VQNYJeyewXzs/IO/qMRjRgGNzv+sOTRzdCOQtHNdoCZAe//P1TioFJAzIzR4lJee+d/7nJUL5+7fdroTcNWXeV5/"
-    b = b & "t3YMFL8WPfIfbUEspVzbAriJu+d4a1pFt/io0qvgeuWjx+eMNpHmMX4zgChuN6oYKfKx9NDfiH393c+Uu3TOVYDr7IkhkjE4LwKj89D6+bKHzK0GIDmJxTw2/4V7uDy4o/ZQebYumv7e3iGgs/OvguLXQCEPCmP4xsfVgOhbAMzsk28CvXK1o+ZzI/PY/GwXg+gGUAom"
-    b = b & "UMPd4u+F43MbLQv/SYsB2E6yYAJH9Cj+1dpY/ffVqI7H1gAiFwrvuvtEZeWHebzl2elOwJ5sxZ5xBelV/L1i59p9WONkAI8ybpXKZgis/FBKqTeA6AWxJYshuFxzh3aqFkynDmAlEd8DQPHD2yGgQyuoILoIB4nu43+ioAdHfvPv2AGMPAtowbErUPuGHSzG9UYgNQEq"
-    b = b & "GNIZFD98UGMAqglXG5fy1oDiz8lpvlw7gCeKglQzAdXv1oMATwNQE20LisJUiWev4od4/JTi3wE8UVyhVEzgDmoxhc5EMYAnao/4dv1mXSk6MYSBOF4GrCX001xPULi3Hww46wAiiGF1VzDbgDIVf0Zzb+Uwp5E7gD22wUBAf3ErfuhANgPYMssQZr0Vhq/UQhPZDWCL"
-    b = b & "c4dA8UMzf4qXyGejdEVhBEpzuzoW9Hudn2iXAUcR0Qi2DwWhkBKCAbShagKtxRvtiUAR5rAEDKAdVROoRbn478R21VysuydnA7AO/CKUi98dSz26GsDPl5+hjqgxU7jpysoIXA1gi03AF+Kydbk7zllaOPs7Fu+hODIAVcF8C+isYKslVG08CoyOSevnyxqBWwdQE0TJ"
-    b = b & "QEMTPRafWe+QmPW7d/gaTzcDqGWU43K33Tx6mUAvHfT4LDkdON0KfCX4vZ7cq9xVqDwlWZlnfK5oIPTzFF0MoEcSWt/2Q1Gtp7e57X2W8/c/buNgAIp7uRYknd+I0R3ODB3IaiDqGQC0IyvSoj22M6TH7mAA0gE8wXnsajjGUn7MDgZQikEgd5g5Zsf4XMFpnhZjdTGA"
-    b = b & "UkwC+j9OY3XDIbZqY/x6znFkAIqnoWqB3WPVGB1i0wvl5zOojmsXpw7gCcmHJ2rxVhvPKY4G8ETNCBTGojCG2SjoQGEMl3C4D+CM1S8AUUt81jsDV+hALffNRDCAJ7MfdmGf/KDMMIIwuY9kAK+MuL3TKemruyIFemvAKf/VRDWALSGTV8HV7cCsF5nMJNp8uuB8CAh1"
-    b = b & "7Am/phgydw9ZePwpOGMGeOkG7EIHAGdgAoHBAKAGTCAoGADUggl4cpi3MwMg6QCBoQMASAwGAC3QEQbjaQBcCoRX0EN8HqXQAQCkBgMASEyNAbDvA/DktHbpAAASgwEAJObVADj5BcjBb63TAcAenPskodYAEASUQpfoRFXN0gFAKfOfpwgibA0Ah4dvoI0YvOUxyzMB"
-    b = b & "YZ8RD08FI1q2AIgjFi3Fz+rvRXWt0gHAmVgo/sDsdQAkPA8Ufy4+8tnaAUR8XnxGKPy4NG3VuQyYD4offuEMIBcc9MEbR0lHLLH4lk9yGYfmmqUDyAuFDxhAIih4+ODoEPDq9gC8IJcxuLRl5ypAbij+5GAAeaH44dQA2AYA6HP5ih0dAEBiagyA02MAXW7dr3O3A2Ab"
-    b = b & "AGAMq3teXs0bHSSFMwCAxGAAAInBAPJC2w/lX9NdqLHOD3euAAAAAElFTkSuQmCC"
+    b = "iVBORw0KGgoAAAANSUhEUgAABAAAAALQCAYAAAAO8wKWAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAA"
+    b = b & "DsMAAA7DAcdvqGQAADkUSURBVHhe7d1p121ldS7q+0dspbLAWlEURYkkIrpFZVsRTdSoAStUNBqUqLFCrGMVBKylrtmrrsk5"
+    b = b & "384/O61njRkXnbHq+c45x5jX1drdsCWw1hzPM770Pp4iAWDK3pHkaJJdSf6v7FiOJfloH3wAAABYpa8PBWovWmV5qfH9SB94"
+    b = b & "AAAAWLX7kxwYKVxlOXk6yf/pgw4AAACrdnWSw7YC7Fg0AAAAANgYtwyFai9e5fxT5yzUeQsAAACwEe5JcmikgJVzT62qqDH9"
+    b = b & "2z7YAAAAsC6vSrJnSC9k5dyyaAC8pQ82AAAArNM/uBVgqdmdZH+S1/eBBgAAgHW7fWgCPDVS0MrZpRoAe5O8pg8yAAAAbIL7"
+    b = b & "XA24lGgAAAAAsNHekOSg8wDOO9UAqH++qA8wAAAAbIp/cjXgeUcDAAAAgEm4w3kA55VqADyR5JI+sAAAALBp7h22A/TiVk6f"
+    b = b & "2kLxaB9QAAAA2ESXD4VsHWbXC1w5dTQAAAAAmJQPDFsBdo0UuXLyVNOkVlAAAADAZHzFoYBnnX1J/tQHEgAAADbdL5MccSjg"
+    b = b & "GacaAH/sgwgAAACb7qIkDzoU8IxzIMmv+yACAADAFFwx7G13KODpowEAAADApL0nyVGHAp42tVLiZ33wAAAAYEo+51DA0+ZQ"
+    b = b & "kjv6wAEAAMDUfE8T4JSpBsAP+6ABAADAFN3lZoCTpsblW33AAAAAYIouOeFmAE2AZ6bOSfh6HzAAAACYqlcPBwLWvfe9CN7m"
+    b = b & "VAPgtj5YAAAAMGVvHfa87xkphLc1tQXg832gAAAAYOo+MHz13j1SDG9jNAAAAACYrU8NNwPUloBeEG9bqgHwyT5AAAAAMBe3"
+    b = b & "uh7wv1MNgA/3wQEAAIA5+Z4mwH83AD7SBwYAAADm5udJjm3x9YDVAHhvHxQAAACYo98MBwNuYxOgGgDv6gPC5L00yV+SXNP/"
+    b = b & "HwAAANvsuUn+lOTwFjYBqgFwXR8QJu8Fw/tcja2vJ7mg/wsAAADb6nlJHkhyaMuaANUA+Js+GEzeK5PsTbJn2OLykJUeAAAA"
+    b = b & "f/WyJA8nObhFTYD6QqwBMD+vS7L/hKsu63/XXH8nyfP7vwwAALCNqgnw6BY1AWrFwxv6IDB5r20NgEr971oNUO+3gx8BAACG"
+    b = b & "4qmK/wMzbwJUQVjLxC/rA8DkXT7SAFhk37AaoK7BvLD/hwAAANvmii1oAiwaAK/uD8/kXTW8u2MNgMXcVxOgtrw4BBIAANh6"
+    b = b & "r595E2B3kieTvLg/OJP31mF7x8kaAIsszgb4t/4HAAAAbJs5NwHqhPgnkrywPzSTd80ZNgAq9e88neQvSd7c/yAAAIBtUk2A"
+    b = b & "KpTm1gSoBsDjToWfpbecRQNgkXq/6/DLm/sfBgAAsE0WKwHmdDtA7f9/sD8os1D7+qsB0Of8dKltIbUa4NfDjRgAAABbqQ7L"
+    b = b & "e2RGTQANgPl6f5IjI3N+pjk8vOOuCwQAALbWy4cmwKJA6oXTlFINgPv6AzIL59sAWLwfdUDg1/sfDgAAsC1emuTeocCachOg"
+    b = b & "7oP/U384ZqG+3J9vA6BSZwgcS/L7JJf1vwQAAGAb1MF5f1xSkbWuaADM14eGwr3P+bmmzhOo8wFu6H8RAADANnhukruGZdK9"
+    b = b & "YJpC6tT3O/tDMQv/PBzm1+f8fFJbAqqpcFv/ywAAALbFz3ag2FpFqgHwq/4wzMInduidrC0B9efeneQl/S8FAADYBt8bCqOz"
+    b = b & "uXd93akGwM/7gzALH9+hBsAidQjm40ne1v9iAACAbXDrUHTVXuleMG1ial/37f0hmIVP7XADoA6/rDMkqhFwU//LAQAAtkEV"
+    b = b & "XnUmwJ6RomnTUg2A7/cHYBa+tKKzKarZVY2GWgEDAACwdT6Y5GCS/Rt+TWB9vf33/uOZhS+uqAGwSDUBfudcAAAAYBtdO5wH"
+    b = b & "UI2ATW0C1BWGtW2B+bllxQ2AescX5wJc3X8MAADA3F2e5MGhMNrEJkA1AL7afzSz8JVhfvuc72TqHa+DJSu1CgYAAGCrPD/J"
+    b = b & "PcP96b1gWnfqN32+/2Bm4VtD46nP+SpS51/Uu1WrEAAAALbOHRt4TWD9ns/2H8osfHONDYBKvecOBwQAALZWncxeX0Y35YaA"
+    b = b & "KtA+3X8ks7DuBsAi9b7fmeSi/gMBAADmrvZG1x7pTbghoA6J+8f+A5mF7w7XPPY5X0fqLIJ7k7yi/0gAAIC5e3OSxzbgC201"
+    b = b & "AD7cfxyz8NPhBoo+5+tINbqqGfFEkjf1HwoAADB3lya5e83nAtSX2ff1H8YsbFIDoLK4IWBfknf0HwsAALANvj00AXaPFE07"
+    b = b & "nVqBcF3/QczCjzesAVCpJkA1AGo1wA39BwMAAGyDfx6KtVWfC1ANgHf2H8Ms/GL44t7nfBNSh2DW9pN67wEAALbOW5I8OizL"
+    b = b & "7wXTTqS2HdSX2Kv7D2EWfjs0lPq8b0pqxUvdEPD5/sMBAAC2wQuT/HpF5wLUn1+rDq7qP4JZ2PQGQKWaAPWu/0v/8QAAANvi"
+    b = b & "K8MS6dov3YumZWXRALiy/+XMwj0TaABU6j38ryRf7w8AAACwLa4/4fq0XjQtI1V41R5xd7PP0+8n0gCo1LtYKwE0AQAAgK31"
+    b = b & "0h28KnCxAkADYJ7+vMMrSHYi9Z7XrRgAAABb6193YEtA7b+uJsCL+1/GLPxlye/LqlLbAX7QHwYAAGCbvCvJE0u8JaCuYns8"
+    b = b & "yfP6X8QsTLUBUKmVAN/vDwQAALBN6paAnw/Xp9UX/F44nU0WDYDn97+EWbhvwg2AioMBAQAAknxqOOCt9vD3wulMszfJg0me"
+    b = b & "0/9wJu+iJI8MTZ4+71NKrQS4rT8cAADAtqnr+/5wHgcEVgPg/v6HMgtzaQAsrgj8Wn9AAACAbVQHBB4ervTrBdSpUg2AWibO"
+    b = b & "/Fw4kwZApZoAteXlC/0hAQAAttG1SR4YCqUzXQ1QWwjqrnjm55Ikj86kAVBZrAS4qT8oAADAtqr90me6GkADYL5eOhwSeb4H"
+    b = b & "RW5S6lmqwfUP/WEBAAC21duHvf2nOxugmgR39f+YWZhjA6BSKxqqwfXO/sAAAADbqk72/2qSQ6e4KaD+77/q/yGz8JKZNgAq"
+    b = b & "dbVhrV75m/7QAAAA2+zNw00BtXS67wfXAJivlw3zPccGQKUaAE8meWV/cAAAgG33mROWTy+2BdTqgB/2f5FZeN0wv6faAjLl"
+    b = b & "PDU8X211ubg/PAAAwLarr6U/SXJ0+IJaBdTt/V9iFubeAKhUE+CIcywAAABO7t1J7kvy/2kAzNY2NAAWqcMuvccAAACn8C9D"
+    b = b & "mJ8rtqgBUKkmwBf6IAAAAMDcvXU476EXynNNNTrqoMv394EAAACAOdu2BkClDrk8kOTKPhgAAAAwV9vYAKhUA+CRJM/rAwIA"
+    b = b & "AABzdO2WNgAWNwP8ug8IAAAAzNH7hkK4F8jbkjoU8Kt9UAAAAGBuPrDlDYDFoYA1DgAAADBb294AqOwdcnkfHAAAAJgLDYDj"
+    b = b & "OZjkL31wAAAAYC4+keToSEG8balDAWsrwLf7AAEAAMAc3KQB8IzUoYAf7IMEAAAAU3ejBsAzUmcB7ElyWR8oAAAAmDINgGem"
+    b = b & "tgIcSvLbPlAAAAAwZV8c9r73QnjbU1sBvtwHCwAAAKbqKxoAo9k93I7wd33AAAAAYIrqK7cGwHj2J3mgDxgAAABMkQbAybO4"
+    b = b & "GvBbfdAAAABgar6Z5PBI8SvHs2s4JPF/94EDAACAKfm2BsBpU1sBHu4DBwAAAFNSy9s1AE6f2gpQqyUAAABgkjQAziy1FaBu"
+    b = b & "BXhrH0AAAACYgh8lOTRS8MqzcyDJfX0AAQAAYAp+muTgSLEr43k6yS19EAEAAGDTaQCcXXYPKwFe0wcSAAAANpkGwNmnzkz4"
+    b = b & "VR9IAAAA2GR3Dl+0e5Erp05tBXhvH0wAAADYVPcM99z3AldOnX1JHu6DCQAAAJtKA+Dc8tSwCuCLfUABAABgE92lAXDOqQMB"
+    b = b & "9yZ5eR9UAAAA2DR/GZaz9+JWzixHkvywDyoAAABsmgeHr9i9sJUzy66hCXB1H1gAAADYJA9oAJx3Dg23KQAAAMDG0gBYTo4l"
+    b = b & "ub4PLgAAAGyKR5LsGSlo5exyIMmf++ACAADAJrg4yaMaAEtLXQv4oT7IAAAAsG4XaQAsNXWbwv19kAEAAGDdLtQAWHpqFcDH"
+    b = b & "+0ADAADAOl2a5EkNgKWmVgHU1YoAAACwMV6RZPeQXsjKuccqAAAAADbKy5Ps0gBYemoVQF2vCAAAABvhZRoAO5ZjbgQAAABg"
+    b = b & "U1yeZK8GwI5kf5I/9gEHAACAdXhjkoPDKoBewMr5p1YBvLsPOgAAAKzalUkOaADsWKq5cmcfdAAAAFi1N2gA7HgOJ3lzH3gA"
+    b = b & "AABYpauHAlUDYOdS43tHH3gAAABYpbcN+9R70SrLSx2wWNcC1pWLAAAAsBbXagCsJDXGX+qDDwAAAKuiAbCa1FWLD/fBBwAA"
+    b = b & "gFV5lwbAyvJ0khv6BAAAAMAq/H2SoyPFqiw/dduCKwEBAABYi/oirQGwmtRNCweTvK5PAgAAAOy0D2gArDS13eJf+yQAAADA"
+    b = b & "TvuIBsBKU4cBPtQnAQAAAHbaJzUAVp5aBXB9nwgAAADYSTdpAKw8h5L8uE8EAAAA7KQbNQBWnt3DgYCX9skAAACAnXJzkiMj"
+    b = b & "RarsbJ5O8tE+GQAAALBT6kR6DYDVp64D/HWfDAAAANgpX9EAWEtqC0DdCPCyPiEAAACwE76sAbC21G0AH+sTAgAAADvhNg2A"
+    b = b & "tcU2AAAAAFbme0kOjxSnsvOp2wBqG8DL+6QAAADAsn1XA2CtcRsAAAAAK/EdDYC1prYB/KxPCgAAACzbHUkOjRSmsprsSfJk"
+    b = b & "kkv6xAAAAMAy1dfn+grdC1NZXY4meXefGAAAAFgmDYD1p25h+GafGAAAAFgmDYD1Z1+Se/vEAAAAwDL9QgNg7dk1zMEVfXIA"
+    b = b & "AABgWe5Jsn+kKJXV5liSG/vkAAAAwLJoAGxG6iaGn/bJAQAAgGW5WwNgI1LXAT6a5Dl9ggAAAGAZfqcBsBGpcwAOJ7m6TxAA"
+    b = b & "AAAsw/1J9o4UpLL61DkAn+4TBAAAAMugAbA5cQ4AAAAAO+Y+DYCNSc3Dg32CAAAAYBmq4NQA2IzUOQAHk1zRJwkAAADOx0VD"
+    b = b & "4bl7pBiV9aTOAfhwnygAAAA4HxoAm5cjSb7ZJwoAAADOx4VD0akBsDmpKxnv6RMFAAAA5+OSYd+5BsDmZE+SJ5I8r08WAAAA"
+    b = b & "nKuXDQcAagBsVg4neXOfLAAAADgfdyc5MFKEyvpyNMnH+kQBAADA+fjH4eT5XoTK+lIHAX6jTxQAAACcj4uTPDnsPe+FqKwn"
+    b = b & "tSLjzj5RAAAAcL6+O+w774WorCd1LsMjfZIAAADgfL1t2HfeC1FZT+pQxmoCvLpPFAAAAJyvB4aisxejsp5UQ+YdfZIAAADg"
+    b = b & "fN1mFcBGpebixj5JAAAAcL7+bjh9vheisp7UmQz/3icJAAAAluH+JPtGilFZfQ4m+UWfIAAAAFiG2gZgFcBmpBox9/YJAgAA"
+    b = b & "gGW41jkAG5O6CaD+eUmfJAAAAFiGun/ebQDrz64k+5Nc0ScIAAAAluGO4QC6XpDKalMNgNqOcV2fIAAAAFiGDyY5NlKQyurz"
+    b = b & "dJKP9gkCAACAZXhZkj0n7EGX9aXOY7ilTxAAAAAsy2+H/ee9IJXVprZifKdPDgAAACzLrW4D2IgcTPKrPjkAAACwLHXwXB1A"
+    b = b & "1wtSWW1qFcbv++QAAADAsrxoOIXeOQDrTV3HeF+fHAAAAFim3zkHYO2pwxgfT/K8PjkAAACwLN+wDWDtqVUY+4abGQAAAGBH"
+    b = b & "fGi4h74XpbK6VAPgUJLX98kBAACAZbkyyYGhCO2FqawmiwbANX1yAAAAYFkuSPLYsA+9F6ayuhxOcn2fHAAAAFimu4ZVAL0o"
+    b = b & "ldXl6LAdAwAAAHbMd4Yv0L0oldXlWJKP94kBAACAZfrU8AW6F6WyutRBjDf3iQEAAIBlevfwBboXpbK61Ph/qU8MAAAALFPd"
+    b = b & "BHDQTQBrzZEkt/WJAQAAgGV6aZKnkuweKUxlNdEAAAAAYCUecRXgWnMoye19UgAAAGDZ/pxk30hhKqtJNQDu6JMCAAAAy3Zn"
+    b = b & "kgMjhamsJhoAAAAArMRPh4MAe2Eqq0k1AL7fJwUAAACWTQNgvamxrzkAAACAHfWdJIdHClNZTWr7xa/7pAAAAMCyaQCsN9UA"
+    b = b & "+FWfFAAAAFi2n9gCsNZYAQAAAMBK/FwDYK2psf+PPikAAACwbH9Ism+kMJXVxC0AAAAArMTDSfaMFKaymlQD4I4+KQAAALBM"
+    b = b & "L03yVJLdI4WprCYaAAAAAOy4q4cbAHaNFKaymmgAAAAAsOM+nOTYSFEqq8uRJF/vEwMAAADL9G9DAdqLUlldavxv6xMDAAAA"
+    b = b & "y3TncA99L0pldTma5Mt9YgAAAGBZLkryhBsA1p6nk9zcJwcAAACW5RoHAG5E6gyGm/rkAAAAwLJ8zgGAG5HaAlCHMQIAAMCO"
+    b = b & "+LX9/xuRWoXxnj45AAAAsAzPT/KU/f8bkWoAvL1PEAAAACzD9cPS816MympT5y8cSnJVnyAAAABYhm8PX557QSqrTTUADia5"
+    b = b & "rE8QAAAALMNDSfaOFKSy2uwemgAv6hMEAAAA5+tay/83JnUGw8NJLuiTBAAAAOfrm0mOjBSjsvrsS/LnPkEAAACwDPXF2fL/"
+    b = b & "zUhdw3h3nyAAAAA4X9dZ/r9RqRsAftonCQAAAM7X7U7/36jUXNSWDAAAAFiai5M8ORw81wtRWU+OJflcnygAAAA4Hx8dCs5e"
+    b = b & "hMr68nSSD/WJAgAAgPNx13DoXC9CZT3ZNZwB8NY+UQAAAHCurhyKzSo6eyEq68nu4TaGV/XJAgAAgHNVB80dGSlCZX2psxge"
+    b = b & "S/LcPlkAAABwLi5K8oTD/zYu+5Pc0ycLAAAAztXHh8PmegEq601dAfiDPlkAAABwrv40fG3uBaisN0eT3NInCwAAAM7FdUOh"
+    b = b & "2YtPWX/qSsb39AkDAACAc/HL4fT/XnzKelO3MdSqjCv6hAEAAMDZcvXf5qYOZHzUDQAAAAAsw+3DQXO9+JT150CSO/uEAQAA"
+    b = b & "wNl65bDE3Nf/zUydy/C1PmkAAABwtv7d4X8bnZqbG/qkAQAAwNl48bDHfPdI4SnrT63KqC0Ar+0TBwAAAGfjq77+b3T2Jrm/"
+    b = b & "TxoAAACcjUuHL/++/m9u6maGH/aJAwAAgLNxm6//G59jST7RJw4AAADO1CuGk/99/d/c1P7/WgFwZZ88AAAAOFO1rPzwSNEp"
+    b = b & "m5Pa//9QnzgAAAA4U9dZ+j+JVIPm+33yAAAA4EzVV+V9IwWnbFZq//+H+uQBAADAmfj6UFj2YlM2K7X/v5o0dVYDAAAAnJVr"
+    b = b & "kxwZistecMpm5UCS3/YJBAAAgDPx4HDyfy82ZfNSZzTc0icQAAAATuc7w9L/p0aKTdmsLK7/e1OfRAAAADiV9w/Fv6X/00jt"
+    b = b & "/b+3TyIAAACcykuHorLulO+Fpmxmavn/bX0iAQAA4FTuHu6T70WmbG7qoMZr+kQCAADAyfyrK/8mF8v/AQAAOCvXD0vJ7fuf"
+    b = b & "VmrObu2TCQAAAGNeMRT+9v1PKzVntV3D6f8AAACckT8M18i58m9a2Z/k930yAQAAYMz37fufbJ5O8sk+oQAAANB9eigie2Ep"
+    b = b & "m5/dQ17SJxUAAABO9K7h+rgqIntxKZuf2rLx4z6pAAAAcKLXJtnj0L9Jp7ZtvLNPLAAAACxckuShJAdGikqZRvYlub9PLAAA"
+    b = b & "AJzormHpvxP/p5v6+v/ZPrEAAACw8AMn/k8+izMbXtgnFwAAAMpXnPg/i9Tqje/0yQUAAIBy4/Dlf9dIQSnTSc1fnf5/ZZ9g"
+    b = b & "AAAAeF+So677m0Wq+P9ln2AAAAC4diga68q/XkzK9FKrOK7rkwwAAMB2e9Pw1b+ujOuFpEwvdW3j7/skAwAAsN0uG675q6LR"
+    b = b & "dX/zSB3geEOfaAAAALbXS5M8pvifVfYn+UufaAAAALZX3Q1//7DvX/E/n9TX/w/2yQYAAGA7vSDJfUkOK/5nFV//AQAA+B/P"
+    b = b & "HQ6IO6L4n13q5H9f/wEAAPjv4v+3iv9Zxtd/AAAA/ttzhuL/qOJ/lqmv/x/okw4AAMB2WXz5V/zPM3WLw+/6pAMAALBdLlb8"
+    b = b & "zzq7hq//7+gTDwAAwPZYnPZvz/98U9c4/qJPPAAAANvj0iT3uupv1qmv/9UAeEOffAAAALbDK5M8NBSHiv/5ppb+f6tPPgAA"
+    b = b & "ANvhdUkeVfzPPnuGf76wvwAAAADM31VDUVinwiv+552nk3yyvwAAAADMX50CvzfJfsX/7FMNnj/3FwAAAID5+8Cw5H/fSLEo"
+    b = b & "80od/FdXOl7bXwIAAADm7cahIFzsCZd5p+b6jv4SAAAAMG9fHvaC7x4pFGV+qS0e9U8H/wEAAGyR7w3Ffy0J74WizDM13//U"
+    b = b & "XwQAAADm6cIkvx7ugO8Fosw3dcbDb/rLAAAAwDy9Yjj9/chIgSjzTW3xqNsdXtNfCAAAAObn6iRPDF+CXfO3Xaml/zf3FwIA"
+    b = b & "AID5uSHJweErsOJ/u1INn9/1FwIAAID5uWXY7++av+1LLf0/kOSK/lIAAAAwL0763+7U3H+6vxQAAADMR93zfs9QAPaiULYj"
+    b = b & "Tv0HAACYuTcmeSTJYfv9tzZ7h+X/L+8vBwAAAPPw3iT7hn3fiv/tTa38+FB/OQAAAJiHuubt6PD1txeEsh2ppk8d+HhHfzkA"
+    b = b & "AACYh8Vhf7XsuxeFsj2plR8PJnluf0EAAACYthckudthfzI0f+rgvzf3lwQAAIBpuzLJw8Nhf70YlO1LNYE+2V8SAAAApu09"
+    b = b & "w15/h/1JzX+d/fDT/pIAAAAwbZ9NcsRhfzKkmkC1EuTC/qIAAAAwXd912J+ckD1JDia5qr8oAAAATNPzkvxmuOKtF4Gyvalm"
+    b = b & "0D/1lwUAAIBpet1wtVst++8FoGxvqhn0rf6yAAAAME3vPmGZt8P+pFLvQd388Nv+sgAAADBNNw6FXh32p/iXRfYneTzJi/oL"
+    b = b & "AwAAwPT8m8P+ZCSL1SBX9xcGAACAaXlukp8Pxf+ukQJQtjf1PtS+/3/oLw0AAADT8ookf05ydKT4E6mm0Jf7SwMAAMC01JLu"
+    b = b & "J5IcGin8ZLtT5z/Ul/8f9ZcGAACAaflAkgPD4W4O+5MTszjx/3f9pQEAAGBaPjss+a+T/nvxJ9udKv7rwL+Hk7ygvzgAAABM"
+    b = b & "x7876V9OkX3DwX+X9xcHAACAaXhOkl8MxX8v+kQqdd1fnQdxbX95AAAAmIaXJPmTk/7lFKkVIfV+1NkQAAAATNCVSR4dvuw6"
+    b = b & "7E/GUkv+68T/G/vLAwAAwDS8Y1jWXaf9K/5lLFX817aQL/WXBwAAgGn4yHCVWx3qpviXk6WK/2/2lwcAAIBp+MJQ2NXX/17w"
+    b = b & "iSxS78gP+ssDAADANHxrKOxqaXcv+EQWqT3/P+kvDwAAANPwH675k9OktoPUaf939pcHAACAzXdJknuGr7q94BNZpIr/I0l+"
+    b = b & "018gAAAANt8rktw/FHa94BNZZFH8/66/QAAAAGy+K5M8nuSQk/7lFFkU/39O8rz+EgEAALDZ3j6c8n9A8S+nSL0bdR2k4h8A"
+    b = b & "AGCC3pfkYJJ9in85RRbF/5+GcyIAAACYkI8Py7n3jhR8IifGsn8AAICJ+txw0n8t/e/Fnsgiiz3/v1X8AwAATM9XkzydZNdI"
+    b = b & "wSdyYo4muau/QAAAAGy+byv+5QxTK0R+018gAAAANt+PhuK/F3oiPfWe/Ky/QAAAAGy+Xw1fdHuhJ9JT70k1iwAAAJiQC4Y9"
+    b = b & "3LWXuxd6IiemtoXUl//aJgIAAMCEXJTk98MX3TrNvRd8IovsHor/W/tLBAAAwGa7NMm9SQ6PFHsiJ6aK/2oS3dxfIgAAADbb"
+    b = b & "i5PcPxT/vvzLqbI3yZEkH+0vEQAAAJvtNUkeSXJI8S+nSL0b+5McSPKe/hIBAACw2S5L8rjiX06TejcODv/7b/tLBAAAwGar"
+    b = b & "L/9V/Fdhp/iXk6Xejdoa8tDwzgAAADAhr0vymOJfziB12N/vkrywv0QAAABstjcN97fXXm7Fv5ws9Y7UNX8/7S8QAAAAm++q"
+    b = b & "obCrw9wU/3Ky1DV/Vfzf1l8gAAAANt/iy7/iX06Vuuav9vzf1F8gAAAANp/iX06Xei9qW8ieJNf3FwgAAIDNd7k9/3IGqa/+"
+    b = b & "Dye5sr9AAAAAbL7LhtP+Ff9yqtRJ/79J8vz+AgEAALD5FsW/q/7kZFkc9vfd/vIAAAAwDa9Q/Mtpsi/JkSSf7i8PAAAA0/CC"
+    b = b & "JPcnOaT4l5HUO1GNoToX4p395QEAAGAanpfkvuFAN8W/jOVoknuTvLq/PAAAAEzDc5P8YVjWrfiXnsV+/58kuaC/PAAAAEzH"
+    b = b & "PYp/GUm9D3uHd+OW/tIAAAAwLT8frnLrxZ9InQVR+/2v7y8NAAAA0/KDYWl3L/xEqin0p+FKSAAAACbsG4p/Gcliv//t/YUB"
+    b = b & "AABgev5F8S8ttd9//3DN3439hQEAAGB6bhqK/9rb3YtA2d7UQX+PJLmmvzAAAABMzw3DXe61zLsXgLKdqUZQNYR+meQF/YUB"
+    b = b & "AABgeq4dTnXfM1IEyvallvzvG778f6m/LAAAAEzTFUPhXwVfLwRlO3M4yZNJ3tlfFgAAAKbpxUkeS3Jg+OrbC0HZriyW/N+d"
+    b = b & "5KX9ZQEAAGCanjPc5V5fexX/snc4A+LW/qIAAAAwbb8YCr5eCMr2pc5/qK//7+svCQAAANP2zWGpdy8EZbuyWPL/2ySv6i8J"
+    b = b & "AAAA0/YZxb8MS/6PJflGf0EAAACYvvcMy/53jxSEsh2p8x4ODg2AD/UXBAAAgOl7Y5L9Q+HXi0LZnlQD6L4kr+8vCAAAANN3"
+    b = b & "6QnX/fWCULYji/3+P05yQX9BAAAAmId7XPe31alVH0eSfLG/GAAAAMzHd4fD3hT/25ea81r1sS/J+/uLAQAAwHx8yon/W51a"
+    b = b & "9fFIkjf1FwMAAID5ePuw7NuJ/9uZWvVxV5IX9BcDAACA+Xj5sPy7ln73wlDmnWr41KqP2voBAADAzP0hySH7/rcqNdd12F9d"
+    b = b & "8/fZ/kIAAAAwP4tD/3qBKPPN4rC/PUne218IAAAA5ufjDv3bytRhf48mubK/EAAAAMzPVUkODl+Be4Eo802t9vhtkkv7CwEA"
+    b = b & "AMD8XJjk4WEZeC8QZZ7ZNaz2+EF/GQAAAJivHw+Hvzn0bztSqzzqy/+X+osAAADAfH3Svv+tSTV49g83PPxDfxEAAACYrzcP"
+    b = b & "xWDd/d6LRZlXqvivMx7qn2/tLwIAAADz9dwkD9n3vzU5kuS+JK/qLwIAAADzdod9/1uT2u//n0ku7i8BAAAA8/Zh+/63IouT"
+    b = b & "/r/TXwAAAADmr5aA7x1Ogu8Fo8wni5P+v9BfAAAAALbD3cPBf71glHmktnTsG+b4Q33yAQAA2A6ft/R/1lmc9F9L/530DwAA"
+    b = b & "sKX+xpV/s0+d9P9gksv75AMAALA9/jJ8He5Fo8wjtd//niTP7xMPAADA9rh1KBB70SjTz+Kk/x/1SQcAAGC7vGVYGl6FYi8e"
+    b = b & "Zdqp7RxV/N/WJx0AAIDtc1+SAyPFo0w7dZVjNXY+3SccAACA7fNlp/7PLotr/qqp84E+4QAAAGyfK536P7uceM3fNX3CAQAA"
+    b = b & "2E6/d+r/rFLF/+EkDyd5bZ9sAAAAttMnLf2fXY4m+WOSS/tkAwAAsJ1eOiz73zNSRMo0U82cXyZ5Tp9sAAAAttdPh9PhexEp"
+    b = b & "00vt9a/i/3t9kgEAANhu70pybKSQlOmlVnFU8f+vfZIBAADg/iT7R4pJmVZq+0Y1cm7qEwwAAABfcPDfLLJvuL7x7/sEAwAA"
+    b = b & "QB38V1+NHfw33dQ1f7V6oxoA7+gTDAAAAOUHDv6bdKr4P5jkySRv6pMLAAAA5W+H4r9OjO+FpWx+qvivJf8PJbmsTy4AAAAs"
+    b = b & "3D18Pe6FpUwj1bz5c5JL+8QCAADAwvsd/Dfp1En/v0lyYZ9YAAAAOJFr/6abatz8rE8oAAAAdDf6+j/Z1Lx9r08oAAAAdBck"
+    b = b & "eTTJ3pHiUjY3dVDjfyW5rU8oAAAAjLnZ1//JZfcwZ7f0yQQAAIAxlyR5wtf/SWVPkqNJPtUnEwAAAE7mX4bT43uRKZuZKv7r"
+    b = b & "qr+P9okEAACAk3lBkqeGorIXmrJ5qVUah5O8r08kAAAAnMoX7P2fTPYNVzS+q08iAAAAnEqd/P+Yr/8bn1qhUYV/5a19EgEA"
+    b = b & "AOB0PuPr/8aniv8Dw/9+c59AAAAAOBMPOfl/o7Mo/uufV/bJAwAAgDPxYSf/b3Sq6D+Y5JEkr+mTBwAAAGfqj8Oe8l54yvpT"
+    b = b & "xf+h4XyGV/WJAwAAgDN1na//G5tF8V/bM17RJw4AAADOxs+HIrMXn7LeVPF/OMm9SS7tkwYAAABn43XD3vJdIwWorC+L4v++"
+    b = b & "JC/skwYAAABn69+SHB0pQGV9ObH4f0GfMAAAADhbFyR5PMmekSJU1pNF8X+/L/8AAAAsyz8meXqkCJX15MQv//b8AwAAsDS/"
+    b = b & "SXJgpBCV1ceXfwAAAHbEFcPJ/w7/W38c+AcAAMCO+YrD/zYiVfxXI6a+/Fv2DwAAwNI9kGTfSEEqq8uJy/4V/wAAACzd//b1"
+    b = b & "f+058cu/Zf8AAADsiO8kOTJSlMpqUsX/weEKxpf1yQEAAIBluGAoPPeMFKay86niv25eeCzJq/vkAAAAwLJcb/n/2rIo/ut/"
+    b = b & "v6ZPDAAAACzT7cPBc704lZ3P/uHaxav6pAAAAMCyPWr5/1qyd/j6/5Y+IQAAALBsb3f431pSxX+tunhHnxAAAADYCbfZ/7/y"
+    b = b & "7B6aLjf0yQAAAICdcm+SfSNFquxMar//sSQf6xMBAAAAO+WK4e75Kkp7oSrLT43z00k+3ycCAAAAdtJNw9foXqjKzqSK/6/3"
+    b = b & "SQAAAICd9h/DCoBeqMpy89TQaPlRnwAAAADYaRcmedz1fzueKv7rwL+7+wQAAADAKlzj+r8dTxX/h5Lcn+SiPgEAAACwCl90"
+    b = b & "/d+OZ3+SJ5O8og8+AAAArMqdSQ6MFK2ynNTWijpf4e/6wAMAAMCqXJLkCfv/dyx13V8d+vf3feABAABglez/39nUdX+1xQIA"
+    b = b & "AADW6jP2/+9IXPcHAADARvnxcDp9L2Dl/FJj+qc+2AAAALAuDyTZO1LAyrln3/DPl/fBBgAAgHV49VCs1kF1vYiVc8vu4UyF"
+    b = b & "d/TBBgAAgHV5z7BPvRexcu6pQ/8+1wcaAAAA1qlOp3cA4HJSh/7Vl/+f9UEGAACAdfuPJAdHilk5++xP8kiSi/sgAwAAwLrd"
+    b = b & "6wDApaT2/R9O8pY+wAAAALBuLxuKfwcAnn9q339tpwAAAICN87bhq7UGwPnlUJLf9sEFAACATfEJNwCcd/YMqyjqOkUAAADY"
+    b = b & "SF8fTq3vRa2ceWrp/019YAEAAGCT/CrJgZGiVs4stfT/nj6oAAAAsGnuS7JvpLCV06dO/a/rE1/fBxUAAAA2yYuSPDUUsr24"
+    b = b & "ldOnzk74ah9UAAAA2DRvGJaw98JWTp869O+xJBf0QQUAAIBN824HAJ5z6uC/ukEBAAAANl4VsEdHils5derMhHv7YAIAAMCm"
+    b = b & "qv3rGgBnn/r6/+E+mAAAALCp7nAGwFmn9v4/1AcSAAAANtmvkxwYKXLl5KmT/7/QBxIAAAA22V+G/ey9yJXx1HWJNV4v7wMJ"
+    b = b & "AAAAm+o5SR5Nsmek0JXx1HaJn/WBBAAAgE32kiRPaQCcVWr5//v7QAIAAMAme+2wnL2WtfdCV56dapQ8nuSCPpAAAACwyf42"
+    b = b & "yeEku0aKXXl2aqzq1gQAAACYlOuGJe290JXx1Fj9fR9EAAAA2HQ3aACccWqbROXFfRABAABg030iydGRYleenQNJ7uwDCAAA"
+    b = b & "AFPwaQ2AM06N05f6AAIAAMAUfCXJkZFiV56dGqd39AEEAACAKbhVA+CMstj//6I+gAAAADAF3x6utusFrzwz+5L8oQ8eAAAA"
+    b = b & "TEXdaa8BcPrUGN3eBw8AAACm4vsaAGeUOgDwU33wAAAAYCqsADizHEtyXR88AAAAmIqfJzk4UvDKX7NrOAPg8j54AAAAMBUa"
+    b = b & "AKfPniSPJbmgDx4AAABMhQbA6VNf///cBw4AAACmRAPg9Knx+Y8+cAAAADAlv9AAOG3qkMRv9YEDAACAKflhkkMjRa/8NXUD"
+    b = b & "wJf7wAEAAMCU3O4awNPmaJKb+sABAADAlNyhAXDaHEnywT5wAAAAMCXf0wA4bWp83tUHDgAAAKbk1uELdy965a+pBsA1feAA"
+    b = b & "AABgSjQATp1dwyGJb+oDBwAAAFPy2eGQu174yvEsGgCX94EDAACAKflnDYBTZtEAeG0fOAAAAJiSOt2+7rnvha8cjwYAAAAA"
+    b = b & "s/BuDYBTRgMAAACAWXiLQwBPGQ0AAAAAZuH1SfYPhW4vfkUDAAAAgJl42VDk7h4pfsUtAAAAAMzERUkeT7JnpPiV4zmc5Ko+"
+    b = b & "cAAAADA19yfZO1L4yvFUA+CaPmgAAAAwNXcN5wD0wleOpxoA1/VBAwAAgKn54bDPvRe+cjx1S8INfdAAAABgam5LcnSk8JXj"
+    b = b & "qbH5WB80AAAAmJpPaQCcMseSfL4PGgAAAEzNe4Zl7r3wleOp5kitkgAAAIBJe9Nw0F0vfOV46nyE7/dBAwAAgKl5yVDo7h4p"
+    b = b & "fiU5kOQ/+6ABAADAFD2QZO9I8SvJviT39QEDAACAKbpz+NLdi19J9iR5LMlFfdAAAABgar7lHICTprZGVBPgsj5oAAAAMDV1"
+    b = b & "FeDTI8WvHE/dBPCWPmgAAAAwNdcNKwB2jRS/khxL8qE+aAAAADA1rxwOu9MAGM+RJF/qgwYAAABT9KCbAE6aQ0l+2AcMAAAA"
+    b = b & "puiXSQ6OFL+S7E/y+z5gAAAAMEW3Dkvde/Erx28CeDLJxX3QAAAAYGpuGA6768WvHD8boVZHvKkPGgAAAEzNa4el7g4CHE9d"
+    b = b & "k/jBPmgAAAAwRQ85CPCkqe0RtU0CAAAAJu9nw4n3vfiV5ECSO/uAAQAAwBR9LsnRkeJXkj1JHk1yYR80AAAAmJq3ugngpKmz"
+    b = b & "EWp1hIMAAQAAmLznJXliuPauF8By/JaEf+6DBgAAAFNU+9xrv3svfiU5nOSOPmAAAAAwRbc4B+CkqRsSHugDBgAAAFP0NucA"
+    b = b & "nDR1DsDBJG/sgwYAAABTc/FwDkCdet8LYDm+OuIf+6ABAADAFP18+NLdi185vjriI33AAAAAYIpuGk6878WvHG8AfLgPGAAA"
+    b = b & "AEzRFcMKgNrz3gvgbY8GAAAAALPy5yT7RgrgbY8tAAAAAMzK19wGMJoak/f1wQIAAICpunY48d42gGemGgDv7IMFAAAAU/Zw"
+    b = b & "kr0jRfA2pxoA7+oDBQAAAFP23SSHR4rgbY4GAAAAALPz7mEbQC+CtzkaAAAAAMzOc5I8lmTPSCG8rdEAAAAAYJa+5TaAZ0QD"
+    b = b & "AAAAgFl6u20Az4gGAAAAALP1gNsA/icaAAAAAMzWV6wC+J9UA+Bv+wABAADAHFyR5FCSXSMF8balGgBv6gMEAAAAc3FXkgMj"
+    b = b & "BfG2pRoAV/XBAQAAgLn4cJKnRwribYsGAAAAALN2UZInkuwZKYq3KRoAAAAAzN43HQaoAQAAAMD8XekwQA0AAAAAtsN/Jjk4"
+    b = b & "UhhvSzQAAAAA2ArvSXJspDDelmgAAAAAsDXuS7JvpDiee2rrw/4kr+0DAgAAAHN005ZeCVgNgL1JLusDAgAAAHN04XAlYBXD"
+    b = b & "vUiecxYNgFf3AQEAAIC5+uIWngWgAQAAAMDWeeFQEO8eKZTnGg0AAAAAttJXt2wVgAYAAAAAW+lFwwqAPSPF8hyjAQAAAMDW"
+    b = b & "2qZVABoAAAAAbK3FKoBtOAvANYAAAABstX/dklUAtdWhrj+8tA8AAAAAbINLkjy1BWcBLBoAdQMCAAAAbKWbkzw9UjTPKRoA"
+    b = b & "AAAAkOShJPtGCue5RAMAAAAAktww81UAGgAAAAAwuDvJwZHieQ7RAAAAAIDB1UmODFfm9QJ66tEAAAAAgBN8J8nR4WaAXkRP"
+    b = b & "ORoAAAAAcILnD8X/3pEiesqpBsDjSV7QHxgAAAC21cdmeCBgNTQe7A8KAAAA264OBDw0UkhPNRoAAAAAMOL1QwNg90gxPcVo"
+    b = b & "AAAAAMBJ3DKjrQAaAAAAAHAKf0lycKSgnlo0AAAAAOAU3jiTrQAaAAAAAHAaX5jBVgANAAAAADgDv534rQAaAAAAAHAGXj0U"
+    b = b & "0XtGiusppH77A/2hAAAAgGf78IS3AuxL8qf+QAAAAMC47yc5luSpkSJ7k6MBAAAAAGfhOUnuS3JgpMje5GgAAAAAwFl6/dAA"
+    b = b & "mNJ5ABoAAAAAcA4W5wHsGim2NzEaAAAAAHCOvjGhQwE1AAAAAOA83JXk8EjBvWnRAAAAAIDz8Pwkj0zgUMBqAPy5/3gAAADg"
+    b = b & "zL0hyf4ke0cK701JNQB+3384AAAAcHbek+Rokt0jxfcmpFYo/LL/aAAAAODs3bjBNwNUA+BX/QcDAAAA5+arG3ozgAYAAAAA"
+    b = b & "LNkdSY6NFOHrjAYAAAAA7IBfDE2Ap0aK8XVEAwAAAAB2yN3DwYCb0ATQAAAAAIAdcmGSPyY5sgFNAA0AAAAA2EEXbUgTQAMA"
+    b = b & "AAAAdtjFG9AEOJjkZ/2HAQAAAMu17ibAoSS39x8FAAAALN9iO8A6DgbUAAAAAIAVqpUAvxmuCOxF+k5GAwAAAADW4JcrbgJo"
+    b = b & "AAAAAMCa/CDJ00l2jRTsy44GAAAAAKzR14YmwO6Ron2Z0QAAAACANfvUcDDg3pHCfVnRAAAAAIAN8J4k+5Mc2KEbAqoB8P3+"
+    b = b & "lwIAAACrd1WSR5McHingzzf1Z36r/4XsqLr28ZX9/wgAAADlRUnu3oHDAY8kubX/Zeyo1w+rOj7T/x8AAACwUF/rqwmwZ6SY"
+    b = b & "P5dUA+Cr/S9hR706ycEk/0+SPyW5pv8LAAAAUD42FJDLOBdAA2D1qgFQBzvWSo6aw9qG8Y0kF/R/EQAAAP4myYPDLQG9qD+b"
+    b = b & "aACs3okNgJqD+uexJA8leXf/lwEAAODCJD86zy0BGgCr1xsAi9S5ANXQ+Wb/DwAAAKB8Yigea1tAL/BPFw2A1TtZA6CyWA1w"
+    b = b & "X5Kr+38IAAAAdbL8H4bVALtHCsuTRQNg9U7VAKjUuQ51NsChJDf3/xgAAABKXelXh8pVAdkLy7FUA+Br/Q9hR52uAbBINXKq"
+    b = b & "ofOLJC/ofwgAAABcm+T+YSn56YrM+ne+2P8AdtSZNgAWqSbNo0ne0v8gAAAAeM7wZb9WA5zqbID6wvyZ/h+zo862AVBbAuqM"
+    b = b & "h9oScGP/wwAAAKD8XZI/Dl/6x24KqAbAZ/t/xI462wbAIostAd/pfyAAAAAs1GFyVXTWigANgPU61wbAItXMuSfJC/sfDAAA"
+    b = b & "AOWyJD8dCshaUq4BsB7n2wCoVCPn4SRX9D8cAAAAFq4f7pmv4v//1QBYuWU0AOpcgDrbobYFvK3/BQAAAHCiTw9NgC/3/wc7"
+    b = b & "ahkNgEUTYN9wOOAN/S8BAACAE70qydX9/8iOWlYDYJH6s+qqwI/3vwgAAABYn2U3ACp1w0Ot5qhVHQAAAMAG2IkGQKXOAzia"
+    b = b & "5Jb+FwIAAACrt1MNgEr9mf/lXAcAAABYv51sAFTqz63tAJ/pfzEAAACwOjvdAKjUn30sySf7Xw4AAACsxioaAJU6E6BWAny4"
+    b = b & "/wAAAABg562qAVCp2wHqisB39R8BAAAA7KxVNgAq9XftT3JV/yEAAADAzll1A6BSDYAnkrys/xgAAABgZ6yjAfBUkkNJ/tR/"
+    b = b & "DAAAALAz1tEAqFQT4GiSn/QfBAAAACzfuhoAi9TNAF/oPwoAAABYrnU3AOp6wFoJcH3/YQAAAMDyrLsBUNk3/NOhgAAAALBD"
+    b = b & "NqEBsDgU8J7+4wAAAIDl2IQGwCJ1HsCX+w8EAAAAzt8mNQDqPIAjSd7afyQAAABwfjapAVDZn+ThJBf0HwoAAACcu01rANR5"
+    b = b & "AMeSfLv/UAAAAODcbVoDoFK/pa4GfEf/sQAAAMC52cQGQKW2AjzUfywAAABwbja1AVCpWwG+2n8wAAAAcPY2uQFQv+lQktf3"
+    b = b & "Hw0AAACcnU1uAFSqAXBn/9EAAADA2dn0BkCltgLc0H84AAAAcOam0ADY50BAAAAAOD9TaABUahXAzf3HAwAAAGdmKg2APUme"
+    b = b & "SvK8/gAAAADA6U2lAVA55lpAAAAAODdTagDsHn7rS/pDAAAAAKc2pQZApVYB3NYfAgAAADi1qTUAahVAxSoAAAAAOAtTawBU"
+    b = b & "ahXAl/uDAAAAACc3xQZA3QjwZJKL+8MAAAAA46bYAKg8neTT/WEAAACAcVNtAOxLcn9/GAAAAGDcVBsAlVoF8N7+QAAAAMCz"
+    b = b & "TbkBcCjJr/sDAQAAAM825QZA/eaDSV7XHwoAAAB4pik3ACpHk9zaHwoAAAB4pqk3AOq3P9wfCgAAAHimqTcAKseSvLs/GAAA"
+    b = b & "APBXc2gAHE7yw/5gAAAAwF/NoQGwO8lTSZ7XHw4AAAA4bg4NgEptA7ihPxwAAABw3FwaAIeS/Lg/HAAAAHDcXBoAtQ3gSdsA"
+    b = b & "AAAAYNxcGgCV2gbw/v6AAAAAwLwaAHUbwO39AQEAAIB5NQDqOR7uDwgAAADMqwFQqVUAV/eHBAAAgG03twbA0SSf7w8JAAAA"
+    b = b & "2+61SQ7OqAFwIMmd/SEBAABg212c5NEk+0eK6SmmrgN8Iskl/UEBAABg27112DtfxXMvqKeWWslwJMnb+kMCAAAAyZeSHBsp"
+    b = b & "qKeYOgfgi/0BAQAAgON+P5wH0AvqqaWe4Vf94QAAAIDjrpzJgYB7kjyW5IL+gAAAAMBxt81gK0A1MKqR8cb+cAAAAMBxFw5f"
+    b = b & "z/eOFNZTSjUxPtofDgAAAPirf0ry9EhRPaXUTQDf6A8GAAAAPNNfkuwfKaynkvrtd/WHAgAAAJ7pQxM/C6C2MDyS5Ln9wQAA"
+    b = b & "AIBnui/JvpHiegqpgwAPJLm8PxQAAADwTJ+Y+CqAo0ne3R8KAAAAeKYLkjyeZM9IcT2FVAPg0/2hAAAAgGf72lBI9+J6Cqmb"
+    b = b & "AL7VHwgAAAB4tiuSHBz21PcCe9NTZwD8qj8QAAAAMK6u06tiuhfYm566CeCB/jAAAADAuDoM8OmRAnvTU2cXPJnkhf2BAAAA"
+    b = b & "gGd7+fA1ffdIkb3JqW0L+4dtDAAAAMAZuHOi2wDqGsO394cBAAAAxt080dsAqgHwD/1hAAAAgHFXJTk0UmBveqpp8Zn+MAAA"
+    b = b & "AMDJPTycBdCL7E3OkSRf7w8CAAAAnNxPkxwcKbI3OYeT/LA/CAAAAHByUzwHoBoWv+gPAgAAAJzcO4Yl9b3I3uTUNYD39AcB"
+    b = b & "AAAATu4VwxkAu0cK7U3NviT39gcBAAAATu3BiR0EWL+1Di/8X/1BAAAAgJO7K8mBkUJ7U1OrFZ5KcnF/EAAAAODk7khyaKTQ"
+    b = b & "3tRUA6Dywv4gAAAAwMl9ZWIHAe4atgFc1h8EAAAAOLlPJnl6pNDe1CwaAK/qDwIAAACc3AeTHBsptDc11QCoqwBf3x8EAAAA"
+    b = b & "OLn3TnALwMEkb+4PAgAAAJzc24ZDAKuw7sX2JmbRAPib/iAAAADAyb1FAwAAAADm7xoNAAAAAJg/KwAAAABgC7wzyeGRQntT"
+    b = b & "owEAAAAA5+D9E70FQAMAAAAAzsJHkjw9UmhvalwDCAAAAOfgsxNsAOxL8tr+IAAAAMDJ3TbBLQB7k7yqPwgAAABwcj8ZltT3"
+    b = b & "QntTowEAwHn7/wGefi6xPnp3wAAAAABJRU5ErkJggg=="
     LogoB64 = b
 End Function
 
 Private Function LogoFilePath() As String
-    ' Writes the embedded SCU emblem to a local temp PNG and returns its path.
-    ' Path-independent: works wherever the workbook lives. Empty string on failure.
+    ' Prefer the high-quality emblem PNG beside the workbook; fall back to embedded copy.
     On Error GoTo Fail
+    Dim folder As String, localPath As String
+    folder = ThisWorkbook.Path
+    If folder <> "" Then
+        localPath = folder & Application.PathSeparator & LOGO_EMBLEM_FILE
+        If Len(Dir(localPath)) > 0 Then
+            LogoFilePath = localPath
+            Exit Function
+        End If
+    End If
+
     Dim tmp As String
     tmp = Environ$("TEMP")
     If tmp = "" Then tmp = Environ$("TMP")
@@ -221,6 +426,33 @@ Fail:
     LogoFilePath = ""
 End Function
 
+Private Sub InsertLabelLogo(ws As Worksheet, ByVal shapeName As String, ByVal topPt As Single, ByVal rightPt As Single, ByVal heightPt As Single)
+    On Error Resume Next
+    ws.Shapes(shapeName).Delete
+    On Error GoTo 0
+
+    Dim logoPath As String
+    logoPath = LogoFilePath()
+    If logoPath = "" Then Exit Sub
+
+    Dim lh As Single, lw As Single, leftPt As Single, pic As Shape
+    lh = heightPt
+    lw = lh * LOGO_ASPECT
+    leftPt = rightPt - lw - 2
+
+    On Error Resume Next
+    Set pic = ws.Shapes.AddPicture2(logoPath, msoFalse, msoTrue, leftPt, topPt, lw, lh, msoPictureCompressNone)
+    If pic Is Nothing Then
+        Set pic = ws.Shapes.AddPicture(logoPath, msoFalse, msoTrue, leftPt, topPt, lw, lh)
+    End If
+    If Not pic Is Nothing Then
+        pic.name = shapeName
+        pic.Placement = xlMove
+        pic.LockAspectRatio = msoTrue
+    End If
+    On Error GoTo 0
+End Sub
+
 Private Sub BuildLabelPreviewLayout(ws As Worksheet)
     On Error Resume Next
     Application.ScreenUpdating = False
@@ -229,17 +461,9 @@ Private Sub BuildLabelPreviewLayout(ws As Worksheet)
     ws.Range("A1:H22").ClearContents
     ws.Range("A1:H22").Interior.Pattern = xlNone
 
-    ' Width: start proven, then narrow so the page break sits to the RIGHT of H
+    ' Width: scale A:H to LABEL_WIDTH_PT so content stays inside one DK-1202 label.
     ws.Columns("A:H").ColumnWidth = 5.8
-    Dim targetW As Double, currentW As Double, sf As Double, col As Long
-    targetW = 250
-    currentW = ws.Range("A1:H15").Width
-    If currentW > targetW Then
-        sf = targetW / currentW
-        For col = 1 To 8
-            ws.Columns(col).ColumnWidth = ws.Columns(col).ColumnWidth * sf
-        Next col
-    End If
+    Call ApplyLabelContentWidth(ws)
 
     ws.Rows(1).RowHeight = 2
     ws.Rows(2).RowHeight = 15
@@ -290,9 +514,9 @@ Private Sub BuildLabelPreviewLayout(ws As Worksheet)
     ws.Cells(17, 1).Value = "Auto-fills from the Medications tab. Print via 'Print Checked Labels'."
     ws.Cells(18, 1).Value = "Brother QL-1100c  " & Chr(183) & "  DK-1202 62 x 100 mm  " & Chr(183) & "  Landscape"
 
-    Call FmtLbl(ws.Cells(2, 1), 9, True, "L", "C")
-    Call FmtLbl(ws.Cells(3, 1), 6.5, False, "L", "C")
-    Call FmtLbl(ws.Cells(5, 1), 14, True, "L", "C")
+    Call FmtLbl(ws.Cells(2, 1), 9, True, "L", "C", LabelHeaderFont())
+    Call FmtLbl(ws.Cells(3, 1), 6.5, False, "L", "C", LabelHeaderFont())
+    Call FmtLbl(ws.Cells(5, 1), 17, True, "L", "C")
     Call FmtLbl(ws.Cells(5, 6), 7, False, "R", "B")
     Call FmtLbl(ws.Cells(6, 6), 11, True, "R", "T")
     Call FmtLbl(ws.Cells(7, 1), 14, True, "L", "C")
@@ -328,21 +552,7 @@ Private Sub BuildLabelPreviewLayout(ws As Worksheet)
     On Error Resume Next
     ws.Shapes("scuLogo").Delete
     On Error GoTo 0
-    Dim logoPath As String
-    logoPath = LogoFilePath()
-    If logoPath <> "" Then
-        Dim lh As Single, lw As Single, pic As Shape
-        lh = 28
-        lw = lh * 1.425
-        On Error Resume Next
-        Set pic = ws.Shapes.AddPicture(logoPath, msoFalse, msoTrue, _
-            ws.Cells(1, 9).Left - lw - 2, ws.Rows(2).Top + 1, lw, lh)
-        If Not pic Is Nothing Then
-            pic.name = "scuLogo"
-            pic.Placement = xlMove
-        End If
-        On Error GoTo 0
-    End If
+    Call InsertLabelLogo(ws, "scuLogo", ws.Rows(2).Top + 1, ws.Range("A1:H15").Left + ws.Range("A1:H15").Width, 28)
 
     With ws.PageSetup
         .PrintArea = ws.Range("A1:H15").Address
@@ -364,9 +574,37 @@ Private Sub BuildLabelPreviewLayout(ws As Worksheet)
     On Error GoTo 0
 End Sub
 
-Private Sub FmtLbl(rng As Range, sz As Single, bld As Boolean, h As String, v As String)
+Private Sub ApplyLabelContentWidth(ws As Worksheet)
+    Dim currentW As Double, sf As Double, col As Long
+    currentW = ws.Range("A1:H15").Width
+    If currentW <= 0 Then Exit Sub
+    sf = LABEL_WIDTH_PT / currentW
+    For col = 1 To 8
+        ws.Columns(col).ColumnWidth = ws.Columns(col).ColumnWidth * sf
+    Next col
+End Sub
+
+Private Function LabelHeaderFont() As String
+    ' Helvetica on the clinic header; Arial if Excel cannot resolve Helvetica on this PC.
+    On Error Resume Next
+    ThisWorkbook.Styles("SCUFontProbeHdr").Delete
+    Err.Clear
+    Dim probe As Style
+    Set probe = ThisWorkbook.Styles.Add("SCUFontProbeHdr")
+    probe.Font.Name = FONT_LABEL_HDR
+    If Err.Number = 0 And StrComp(probe.Font.Name, FONT_LABEL_HDR, vbTextCompare) = 0 Then
+        LabelHeaderFont = FONT_LABEL_HDR
+    Else
+        LabelHeaderFont = FONT_LABEL_HDR_FB
+    End If
+    ThisWorkbook.Styles("SCUFontProbeHdr").Delete
+    Err.Clear
+    On Error GoTo 0
+End Function
+
+Private Sub FmtLbl(rng As Range, sz As Single, bld As Boolean, h As String, v As String, Optional fontName As String = FONT_LABEL_BODY)
     With rng.Font
-        .Name = "Arial"
+        .Name = fontName
         .Size = sz
         .Bold = bld
         .Color = RGB(0, 0, 0)
@@ -422,13 +660,25 @@ End Function
 
 Private Function NameFontSize(ByVal s As String) As Single
     Dim n As Long: n = Len(s)
-    If n <= 22 Then
+    If n <= 20 Then
+        NameFontSize = 17
+    ElseIf n <= 28 Then
+        NameFontSize = 15
+    ElseIf n <= 36 Then
         NameFontSize = 13
-    ElseIf n <= 30 Then
-        NameFontSize = 11
+    ElseIf n <= 44 Then
+        NameFontSize = 11.5
     Else
-        NameFontSize = 9.5
+        NameFontSize = 10
     End If
+End Function
+
+Private Function PatientNameFontSize(ByVal patientName As String, ByVal medLine As String) As Single
+    ' Keep the patient name larger than the medication line, stepping both down for long text.
+    Dim sz As Single
+    sz = NameFontSize(patientName)
+    If sz <= MedFontSize(medLine) Then sz = MedFontSize(medLine) + 1
+    PatientNameFontSize = sz
 End Function
 
 Private Function SigFontSize(ByVal s As String) As Single
@@ -565,15 +815,15 @@ Private Sub BuildAllLabelsPreview()
 
         ws.Range(ws.Cells(base, 1), ws.Cells(base, 6)).Merge
         ws.Cells(base, 1).Value = "SATURDAY CLINIC FOR THE UNINSURED"
-        Call FmtLbl(ws.Cells(base, 1), 8.5, True, "L", "C")
+        Call FmtLbl(ws.Cells(base, 1), 8.5, True, "L", "C", LabelHeaderFont())
         ws.Range(ws.Cells(base + 1, 1), ws.Cells(base + 1, 6)).Merge
         ws.Cells(base + 1, 1).Value = "1121 E. North Ave, Milwaukee WI   " & Chr(183) & "   (414) 588-2865"
-        Call FmtLbl(ws.Cells(base + 1, 1), 6, False, "L", "C")
+        Call FmtLbl(ws.Cells(base + 1, 1), 6, False, "L", "C", LabelHeaderFont())
 
         ws.Range(ws.Cells(base + 2, 1), ws.Cells(base + 2, 4)).Merge
         ws.Cells(base + 2, 1).Value = IIf(patName <> "", patName, "[Patient Name]")
         Call FmtLbl(ws.Cells(base + 2, 1), 11, True, "L", "C")
-        ws.Cells(base + 2, 1).Font.Size = NameFontSize(IIf(patName <> "", patName, "[Patient Name]"))
+        ws.Cells(base + 2, 1).Font.Size = PatientNameFontSize(IIf(patName <> "", patName, "[Patient Name]"), medLine)
         ws.Range(ws.Cells(base + 2, 5), ws.Cells(base + 2, 6)).Merge
         ws.Cells(base + 2, 5).Value = "Rx " & IIf(dateRx <> "", dateRx, "--") & "   DOB " & IIf(dob <> "", dob, "--")
         Call FmtLbl(ws.Cells(base + 2, 5), 7, True, "R", "C")
@@ -641,17 +891,7 @@ Private Sub BuildAllLabelsPreview()
         End If
 
         If logoOK Then
-            On Error Resume Next
-            Dim lh As Single, lw As Single, pic As Shape
-            lh = 22
-            lw = lh * 1.425
-            Set pic = ws.Shapes.AddPicture(logoPath, msoFalse, msoTrue, _
-                ws.Cells(base, 7).Left - lw - 2, ws.Rows(base).Top + 1, lw, lh)
-            If Not pic Is Nothing Then
-                pic.name = "al_logo_" & r
-                pic.Placement = xlMove
-            End If
-            On Error GoTo 0
+            Call InsertLabelLogo(ws, "al_logo_" & r, ws.Rows(base).Top + 1, ws.Cells(base, 7).Left, 24)
         End If
 
         If warn <> "" And UCase(warn) <> "OK" Then
@@ -2084,6 +2324,8 @@ Public Sub PrintCheckedLabels()
         Exit Sub
     End If
 
+    Call ApplyLabelContentWidth(wsL)
+
     With wsL.PageSetup
         .PrintArea = wsL.Range("A1:H15").Address
         .LeftMargin = Application.InchesToPoints(0.04)
@@ -2403,7 +2645,7 @@ Public Sub UpdateLabelPreviewForMedRow(ByVal medRow As Long)
 
     Dim pn As String: pn = IIf(patName <> "", patName, "[Patient Name]")
     wsL.Cells(5, 1).Value = pn
-    wsL.Cells(5, 1).Font.Size = NameFontSize(pn)
+    wsL.Cells(5, 1).Font.Size = PatientNameFontSize(pn, medLine)
     wsL.Cells(5, 6).Value = "Rx  " & IIf(dateRx <> "", dateRx, "--")
     wsL.Cells(6, 6).Value = "DOB  " & IIf(dob <> "", dob, "--")
 
@@ -2518,6 +2760,8 @@ Public Sub PrintLabel()
 
     Dim wsL As Worksheet
     Set wsL = ThisWorkbook.Sheets(SH_LABEL)
+
+    Call ApplyLabelContentWidth(wsL)
 
     ' Set up page for Brother QL-1100c  DK-1202  62mm x 100mm die-cut label
     ' LANDSCAPE: 100mm wide x 62mm tall  =  approx. 3.9" x 2.4"
