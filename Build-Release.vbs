@@ -1,13 +1,14 @@
 ' ============================================================
 '  Build-Release.vbs
-'  Produces the definitive MedicationDispensing.xlsm from the live workbook:
-'    1. opens Broken_PrettyPrint_MedicationDispensing.xlsm (the clinic workbook)
+'  Produces the definitive MedicationDispensing.xlsm:
+'    1. opens MedicationDispensing.xlsm (or bootstraps from
+'       Broken_PrettyPrint_MedicationDispensing.xlsm if missing)
 '    2. imports the newest MedParser.bas
 '    3. runs SetupWorkbook (this compiles the project + builds buttons)
-'    4. saves the result as MedicationDispensing.xlsm
+'    4. saves the workbook as .xlsm
 '
 '  HOW TO RUN:
-'    a) Close both .xlsm files in Excel first (so they aren't locked).
+'    a) Close MedicationDispensing.xlsm in Excel first (so it isn't locked).
 '    b) One-time: in Excel, File > Options > Trust Center > Trust Center
 '       Settings > Macro Settings > check "Trust access to the VBA project
 '       object model" > OK.  (Required for any script to import VBA code.)
@@ -16,18 +17,20 @@
 ' ============================================================
 Option Explicit
 
-Dim fso, scriptDir, sourcePath, xlsmPath, basPath, xl, wb, proj
+Dim fso, scriptDir, bootstrapPath, xlsmPath, basPath, xl, wb, proj
 Set fso = CreateObject("Scripting.FileSystemObject")
 scriptDir = fso.GetParentFolderName(WScript.ScriptFullName)
-sourcePath = fso.BuildPath(scriptDir, "Broken_PrettyPrint_MedicationDispensing.xlsm")
+bootstrapPath = fso.BuildPath(scriptDir, "Broken_PrettyPrint_MedicationDispensing.xlsm")
 xlsmPath  = fso.BuildPath(scriptDir, "MedicationDispensing.xlsm")
 basPath   = fso.BuildPath(scriptDir, "MedParser.bas")
 
-If Not fso.FileExists(sourcePath) Then
-    MsgBox "Cannot find the live workbook:" & vbCrLf & sourcePath & vbCrLf & vbCrLf & _
-        "Build-Release expects Broken_PrettyPrint_MedicationDispensing.xlsm in this folder.", _
-        vbCritical, "Build-Release"
-    WScript.Quit 1
+If Not fso.FileExists(xlsmPath) Then
+    If Not fso.FileExists(bootstrapPath) Then
+        MsgBox "Cannot find MedicationDispensing.xlsm or bootstrap workbook:" & vbCrLf & _
+            xlsmPath & vbCrLf & bootstrapPath, vbCritical, "Build-Release"
+        WScript.Quit 1
+    End If
+    fso.CopyFile bootstrapPath, xlsmPath, True
 End If
 If Not fso.FileExists(basPath) Then
     MsgBox "Cannot find:" & vbCrLf & basPath, vbCritical, "Build-Release"
@@ -41,7 +44,7 @@ On Error Resume Next
 xl.AutomationSecurity = 1   ' msoAutomationSecurityLow - allow the workbook's macros to run
 On Error GoTo 0
 
-Set wb = xl.Workbooks.Open(sourcePath)
+Set wb = xl.Workbooks.Open(xlsmPath)
 
 ' --- Verify programmatic access to the VBA project ---
 On Error Resume Next
@@ -76,14 +79,12 @@ If Err.Number <> 0 Then
 End If
 On Error GoTo 0
 
-' --- Save as the canonical release workbook (.xlsm) ---
-' Keep Broken_PrettyPrint_MedicationDispensing.xlsm unchanged on disk; write output here.
-wb.SaveAs xlsmPath, 52   ' xlOpenXMLWorkbookMacroEnabled
+' --- Save as macro-enabled workbook (.xlsm) ---
+wb.Save
 
 MsgBox "Release build complete." & vbCrLf & vbCrLf & _
-    "- Source: Broken_PrettyPrint_MedicationDispensing.xlsm" & vbCrLf & _
     "- MedParser.bas imported" & vbCrLf & _
     "- SetupWorkbook ran successfully (project compiles)" & vbCrLf & _
     "- MedicationDispensing.xlsm saved" & vbCrLf & vbCrLf & _
-    "Your live workbook file was not overwritten. You can close Excel.", _
+    "Use MedicationDispensing.xlsm as your clinic workbook. You can close Excel.", _
     vbInformation, "Build-Release - Done"

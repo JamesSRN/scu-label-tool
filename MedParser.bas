@@ -69,6 +69,28 @@ End Type
 ' ============================================================
 '  WORKBOOK SETUP  (run once after importing this module)
 ' ============================================================
+Private Sub MatchHeaderFormat(ByVal src As Range, ByVal dest As Range)
+    ' Copy header styling without fragile multi-cell PasteSpecial calls.
+    On Error Resume Next
+    src.Copy
+    dest.PasteSpecial xlPasteFormats
+    Application.CutCopyMode = False
+    If Err.Number <> 0 Then
+        Err.Clear
+        With dest
+            .Font.Name = src.Font.Name
+            .Font.Size = src.Font.Size
+            .Font.Bold = src.Font.Bold
+            .Font.Color = src.Font.Color
+            .Interior.Color = src.Interior.Color
+            .HorizontalAlignment = src.HorizontalAlignment
+            .VerticalAlignment = src.VerticalAlignment
+            .WrapText = src.WrapText
+        End With
+    End If
+    On Error GoTo 0
+End Sub
+
 Public Sub SetupWorkbook()
     Application.OnKey "^+P", "ParseMedications"
     Application.OnKey "^+R", "ResetSession"
@@ -103,10 +125,8 @@ Public Sub SetupWorkbook()
     ' Print Count + Print? selection column headers
     ws2.Cells(2, C_CNT).Value = "# of Prints"
     ws2.Cells(2, C_SEL).Value = "Print?"
-    ws2.Cells(2, C_PRTD).Copy
-    ws2.Cells(2, C_CNT).PasteSpecial xlPasteFormats
-    ws2.Cells(2, C_SEL).PasteSpecial xlPasteFormats
-    Application.CutCopyMode = False
+    Call MatchHeaderFormat(ws2.Cells(2, C_PRTD), ws2.Cells(2, C_CNT))
+    Call MatchHeaderFormat(ws2.Cells(2, C_PRTD), ws2.Cells(2, C_SEL))
     ws2.Columns(C_CNT).ColumnWidth = 7
     ws2.Columns(C_SEL).ColumnWidth = 8
     ' Worksheet event handlers are PREINSTALLED in the sheet code modules now
@@ -120,9 +140,8 @@ Public Sub SetupWorkbook()
     Set wsLog = ThisWorkbook.Sheets(SH_LOG)
     wsLog.Cells(2, 13).Value = "Dosage Form"
     wsLog.Cells(2, 14).Value = "Print #"
-    wsLog.Cells(2, 12).Copy
-    wsLog.Range(wsLog.Cells(2, 13), wsLog.Cells(2, 14)).PasteSpecial xlPasteFormats
-    Application.CutCopyMode = False
+    Call MatchHeaderFormat(wsLog.Cells(2, 12), wsLog.Cells(2, 13))
+    Call MatchHeaderFormat(wsLog.Cells(2, 12), wsLog.Cells(2, 14))
 
     ' Default Date of Rx to today
     If Trim(ws1.Range("C7").Value) = "" Then
