@@ -942,13 +942,19 @@ Private Sub BuildAllLabelsPreview()
             End If
         End If
 
-        ws.Range(ws.Cells(base, 1), ws.Cells(base, 5)).Merge
-        ws.Cells(base, 1).Value = "SATURDAY CLINIC FOR THE UNINSURED"
+        ws.Range(ws.Cells(base, 1), ws.Cells(base, 2)).Merge
+        ws.Cells(base, 1).Value = "SATURDAY CLINIC"
         Call FmtLblClinicName(ws.Cells(base, 1), CLINIC_NAME_FONT_GALLERY)
-        ws.Range(ws.Cells(base + 1, 1), ws.Cells(base + 1, 5)).Merge
-        ws.Cells(base + 1, 1).Value = "1121 E. North Ave, Milwaukee WI   " & Chr(183) & "   (414) 588-2865"
-        Call FmtLblHeader(ws.Cells(base + 1, 1), CLINIC_ADDR_FONT_PRINT, False, "T")
-        With ws.Range(ws.Cells(base, 6), ws.Cells(base + 1, 6))
+        ws.Range(ws.Cells(base + 1, 1), ws.Cells(base + 1, 2)).Merge
+        ws.Cells(base + 1, 1).Value = "FOR THE UNINSURED"
+        Call FmtLblNameSub(ws.Cells(base + 1, 1), CLINIC_NAMESUB_FONT_PRINT)
+        ws.Range(ws.Cells(base, 5), ws.Cells(base, 6)).Merge
+        ws.Cells(base, 5).Value = "(414) 588-2865"
+        Call FmtLblContactRight(ws.Cells(base, 5), CLINIC_PHONE_FONT_PRINT, True, "B")
+        ws.Range(ws.Cells(base + 1, 5), ws.Cells(base + 1, 6)).Merge
+        ws.Cells(base + 1, 5).Value = "1121 E. North Ave, Milwaukee WI"
+        Call FmtLblContactRight(ws.Cells(base + 1, 5), CLINIC_ADDR_FONT_PRINT, False, "T")
+        With ws.Range(ws.Cells(base, 3), ws.Cells(base + 1, 4))
             .Merge
             .Value = ""
             .Interior.Pattern = xlNone
@@ -1025,7 +1031,7 @@ Private Sub BuildAllLabelsPreview()
         End If
 
         If logoOK Then
-            Call InsertLabelLogo(ws, "al_logo_" & r, ws.Cells(base, 6).Left + ws.Cells(base, 6).Width, LOGO_HEIGHT_GALLERY, ws.Cells(base, 6).Left + LOGO_GALLERY_INSET_PT, base, base + 1)
+            Call InsertLabelLogo(ws, "al_logo_" & r, ws.Cells(base, 5).Left, LOGO_HEIGHT_GALLERY, ws.Cells(base, 3).Left, base, base + 1, True)
         End If
 
         If warn <> "" And UCase(warn) <> "OK" Then
