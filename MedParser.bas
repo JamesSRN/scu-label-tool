@@ -874,9 +874,10 @@ Private Sub BuildAllLabelsPreview()
     Application.ScreenUpdating = False
 
     Dim shp As Shape
-    For Each shp In ws.Shapes
-        If Left(shp.name, 3) = "al_" Then shp.Delete
-    Next shp
+    Dim si As Long
+    For si = ws.Shapes.Count To 1 Step -1
+        ws.Shapes(si).Delete   ' clear ALL shapes (cards, buttons, stray/old images); rebuilt below
+    Next si
     ws.Cells.Clear
     ws.Cells.Interior.Pattern = xlNone
     ws.Rows.RowHeight = 14
@@ -965,7 +966,7 @@ Private Sub BuildAllLabelsPreview()
         Call FmtLbl(ws.Cells(base + 2, 1), 11, True, "L", "C")
         ws.Cells(base + 2, 1).Font.Size = PatientNameFontSize(IIf(patName <> "", patName, "[Patient Name]"), medLine)
         ws.Range(ws.Cells(base + 2, 5), ws.Cells(base + 2, 6)).Merge
-        ws.Cells(base + 2, 5).Value = "Rx " & IIf(dateRx <> "", dateRx, "--") & "   DOB " & IIf(dob <> "", dob, "--")
+        ws.Cells(base + 2, 5).Value = "Rx " & IIf(dateRx <> "", dateRx, "--") & Chr(10) & "DOB " & IIf(dob <> "", dob, "--")
         Call FmtLbl(ws.Cells(base + 2, 5), 7, True, "R", "C")
 
         ws.Range(ws.Cells(base + 3, 1), ws.Cells(base + 3, 6)).Merge
@@ -1000,7 +1001,7 @@ Private Sub BuildAllLabelsPreview()
 
         ws.Rows(base).RowHeight = LOGO_HDR_ROW1_PT
         ws.Rows(base + 1).RowHeight = LOGO_HDR_ROW2_PT
-        ws.Rows(base + 2).RowHeight = 18
+        ws.Rows(base + 2).RowHeight = 22
         ws.Rows(base + 3).RowHeight = 20
         ws.Rows(base + 4).RowHeight = 12
         ws.Rows(base + 5).RowHeight = 11
@@ -1040,7 +1041,13 @@ Private Sub BuildAllLabelsPreview()
             ws.Cells(base + 9, 1).Font.Color = RGB(191, 54, 12)
         End If
 
-        Call AddRowButton(ws, "al_print_" & r, "Print this label", "RowPrint", base, RGB(123, 31, 162))
+        Dim chkCap As String, chkClr As Long
+        If IsRowSelected(wsM, r) Then
+            chkCap = "Uncheck this label": chkClr = RGB(46, 125, 50)
+        Else
+            chkCap = "Check this label": chkClr = RGB(84, 110, 122)
+        End If
+        Call AddRowButton(ws, "al_check_" & r, chkCap, "RowCheck", base, chkClr)
         Call AddRowButton(ws, "al_edit_" & r, "Edit this med", "RowEdit", base + 3, RGB(21, 101, 192))
         Call AddRowButton(ws, "al_remove_" & r, "Remove this med", "RowRemove", base + 6, RGB(191, 54, 12))
 NextR:
@@ -1049,6 +1056,9 @@ NextR:
     If n = 0 Then
         ws.Cells(3, 1).Value = "No medications to preview yet. Parse or add medications first."
     End If
+
+    Call AddButtonToSheet(ws, "galtop_prnchk", "Print Checked Labels", "PrintCheckedLabels", 1, 8, 170, 24, RGB(216, 67, 21))
+    Call AddButtonToSheet(ws, "galtop_refresh", "Refresh Previews", "PreviewAllLabels", 1, 11, 150, 24, RGB(0, 121, 107))
 
     ws.Activate
     ws.Cells(1, 1).Select
@@ -1096,6 +1106,14 @@ Public Sub RowPrint()
     On Error Resume Next
     ThisWorkbook.Sheets(SH_ALL).Activate
     On Error GoTo 0
+End Sub
+
+Public Sub RowCheck()
+    Dim r As Long
+    r = CallerRow()
+    If r <= MEDS_HDR_ROWS Then Exit Sub
+    Call ToggleRowSelect(r)
+    Call BuildAllLabelsPreview
 End Sub
 
 Public Sub RowRemove()

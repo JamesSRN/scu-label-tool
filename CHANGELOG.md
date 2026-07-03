@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+### Header redesign, refills, gallery, emblem fix (2026-07-02)
+
+**Three-zone header (print + gallery)**
+- Header split into three zones: clinic name (two lines, left) | SC emblem (centered) | phone-over-address (right).
+- Cell map now: name **A2:C2** / **A3:C3**, emblem **D2:E3** (merged, centered), phone **F2:H2**, address **F3:H3**. Gallery cards mirror this (name A:B, emblem C:D, phone/addr E:F).
+- Clinic name font changed to **Century Gothic** (`FONT_LABEL_HDR = "Century Gothic"`, Arial fallback). Phone/address in Arial via new `FmtLblContactRight`; name line 2 via new `FmtLblNameSub`.
+- New constants: `CLINIC_NAMESUB_FONT_PRINT = 7`, `CLINIC_PHONE_FONT_PRINT = 11`; `CLINIC_ADDR_FONT_PRINT` 7 → **8.5**; header rows `LOGO_HDR_ROW1_PT/ROW2_PT` 20/10 → **18/12**.
+- Emblem now **centered** in its slot on both surfaces — `InsertLabelLogo` gained an optional `centerHoriz` parameter.
+- Patient name vertically centered on the Rx/DOB block. In the gallery, Rx and DOB now **stack** (Rx over DOB) to match the print.
+
+**Bottom of label**
+- Directions (SIG) block enlarged to **3 lines** (A10:H12).
+- **EXP/LOT pinned to the bottom row** (A15:D15 / E15:H15).
+- **Refills** added after quantity on the form/qty line (print label + gallery).
+
+**Gallery buttons**
+- `Print Checked Labels` and `Refresh Previews` are now **code-created at the top-right** of the gallery; each rebuild sweeps stray manually-placed autoshapes.
+- Per-card `Print this label` → state-aware **`Check this label` / `Uncheck this label`** (`RowCheck` → `ToggleRowSelect`, which toggles the med's `Print?` selection on the Medications tab).
+
+**Emblem-blank bug (critical fix)**
+- The logo had vanished from print AND gallery because **`scu_emblem.png` was a fully transparent (blank) image** — `Build-ScuEmblem.ps1` had zeroed the alpha channel. Regenerated `scu_emblem.png` from the source crop (ink forced to solid black, **alpha preserved**). **`Build-ScuEmblem.ps1` still needs repair — do not run it until fixed.**
+
 ### Label layout, logo, print (2026-06-30)
 
 **Layout & typography**

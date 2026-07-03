@@ -1,6 +1,6 @@
 # SCU Label Printing Tool - Handoff
 
-Last updated: 2026-06-30 (end of label/logo/print tuning session)
+Last updated: 2026-07-02 (Century Gothic three-zone header; centered emblem; refills on the qty line; gallery buttons reworked; **emblem-blank bug fixed**)
 
 An Excel + VBA tool for the **Saturday Clinic for the Uninsured (SCU)** free
 pharmacy. It turns pasted prescription text into a validated medication table and
@@ -49,8 +49,13 @@ Code/docs are version-controlled; the `.xlsm` (PHI) is local-only by design.
   protected from manual edits) and **P = "Print?"** (double-click toggles a checkmark).
   Buttons (col Q): `+ Add Medication`, `- Remove Selected`, `Review & Validate`,
   `Preview ALL Labels`, `Print Checked Labels`.
-- **Label Previews** - auto-generated gallery, one card per medication, each with
-  Print / Edit / Remove. Rebuilds on tab activate.
+- **Label Previews** - auto-generated gallery, one card per medication (cards mirror
+  the print label's three-zone header). **Top-right buttons** (code-created each
+  rebuild): `Print Checked Labels`, `Refresh Previews`. **Per-card buttons**:
+  **`Check this label` / `Uncheck this label`** (state-aware; toggles the med's
+  `Print?` checkbox on the Medications tab via `RowCheck` -> `ToggleRowSelect`),
+  `Edit this med`, `Remove this med`. Rebuilds on tab activate; the rebuild sweeps
+  stray/manually-placed buttons (deletes all `al_*` shapes and loose autoshapes).
 - **Log** - running dispense log.
 - **Setup & Help** - instructions.
 - **Label Preview** (HIDDEN) - the internal print surface. Every label renders
@@ -98,54 +103,61 @@ Label Previews.
 
 Polished, clinic-grade DK-1202 label. Printed area = **A1:H15**, landscape.
 
+Header is **three zones**: clinic name (two lines, left) | SC emblem (centered) |
+phone-over-address (right).
+
 ```
-SATURDAY CLINIC FOR THE UNINSURED                 [ SC emblem, top-right ]
-1121 E. North Ave, Milwaukee WI  .  (414) 588-2865
+SATURDAY CLINIC          ( SC )              (414) 588-2865
+for the Uninsured       emblem      1121 E. North Ave, Milwaukee WI
 -----------------------------------------------------------
 Doe, Jonathan                            Rx    06/29/2026
-                                         DOB   03/14/1985
-
+                        (name centered)   DOB   03/14/1985
 Metronidazole 500 mg          <- HERO line (largest, bold)
-Tablet  .  Qty 56
-
+Tablet  .  Qty 56  .  Refills 2
 DIRECTIONS
-Take 1 tablet by mouth twice daily with food.
+Take 1 tablet by mouth twice daily          (3-line block,
+with food until the course is finished.      white on black)
 -----------------------------------------------------------
-EXP  05/2027                   LOT  ABC1234
+EXP  05/2027                   LOT  ABC1234   <- pinned to bottom row
 ```
 
 Cell map (rows 16–18 hold off-label helper text that does not print):
 
 | Field | Cell(s) |
 |---|---|
-| Clinic name (bold, bottom-aligned) | **A2:F2** (merged) |
-| Contact line (top-aligned) | **A3:F3** (merged) |
-| Logo slot (no fill) | **G2:H3** (merged) |
-| Patient name | A5:E6 (merged) |
+| Clinic name line 1 "SATURDAY CLINIC" (Century Gothic, bold) | **A2:C2** (merged) |
+| Clinic name line 2 "FOR THE UNINSURED" (small) | **A3:C3** (merged) |
+| Emblem slot (centered, no fill) | **D2:E3** (merged) |
+| Phone (Arial bold, right, bottom) | **F2:H2** (merged) |
+| Address (Arial, right, top) | **F3:H3** (merged) |
+| Patient name (vertically centered on the Rx/DOB block) | A5:E6 (merged) |
 | Rx date | F5:H5 (right) |
 | DOB | F6:H6 (right) |
 | Medication + strength (hero) | A7:H7 |
-| Dosage form + qty | A8:H8 |
+| Dosage form + qty **+ refills** | A8:H8 |
 | "DIRECTIONS" mini-label | A9:H9 |
-| SIG / directions | A10:H12 (white on black) |
-| EXP | A13:D13 |
-| LOT | E13:H13 (right) |
+| SIG / directions (**3 lines**) | A10:H12 (white on black) |
+| EXP (**bottom row**) | A15:D15 |
+| LOT (**bottom row**) | E15:H15 (right) |
 
 **Design / type:** Hierarchy is carried by size + weight + small uppercase labels
-(never color - thermal is monochrome). Fonts use **Helvetica** when installed,
-with **Arial** fallback (`LabelHeaderFont()` for header lines; body via `FmtLbl`).
+(never color - thermal is monochrome). The **clinic name uses Century Gothic**
+(`FONT_LABEL_HDR = "Century Gothic"`, resolved by `LabelHeaderFont()` with an
+**Arial** fallback if the PC lacks it); the phone/address and body use **Arial**.
 Two thin hairline rules (under the header, above the footer); no heavy box. The
-medication name is the focal point; EXP/LOT are pinned in a footer.
+medication name is the focal point; EXP/LOT are pinned to the bottom row.
 
 **Adaptive sizing:**
 
 | Element | Logic |
 |---|---|
-| Patient name | `PatientNameFontSize()` — steps 17→8 pt, always **≥ med line + 1 pt** |
+| Patient name | `PatientNameFontSize()` — steps 17→8 pt, always **≥ med line + 1 pt**; vertically centered on the Rx/DOB block |
 | Medication / SIG | `NameFontSize()` / `SigFontSize()` — steps down for long text |
-| Clinic name | `FmtLblClinicName()` — **14 pt print / 12 pt gallery**, always **bold**, bottom-aligned in row 2 |
-| Clinic address | `FmtLblHeader()` — **7 pt print**, top-aligned in row 3; one line, `ShrinkToFit`, no wrap |
-| Header row heights | **20 pt** (row 2) + **10 pt** (row 3) — tight pairing with emblem band |
+| Clinic name line 1 | `FmtLblClinicName()` (Century Gothic, **bold**, left, bottom) — `CLINIC_NAME_FONT_PRINT = 14` / gallery 12; `ShrinkToFit` |
+| Clinic name line 2 | `FmtLblNameSub()` (Century Gothic, left, top) — `CLINIC_NAMESUB_FONT_PRINT = 7` |
+| Phone (top-right) | `FmtLblContactRight(..., True, "B")` (Arial bold, right) — `CLINIC_PHONE_FONT_PRINT = 11` |
+| Address (below phone) | `FmtLblContactRight(..., False, "T")` (Arial, right) — `CLINIC_ADDR_FONT_PRINT = 8.5` |
+| Header row heights | **18 pt** (row 2) + **12 pt** (row 3) = 30 pt band; print area rows 1–15 total **170 pt** |
 
 **Print width:** `LABEL_WIDTH_PT = 242` scales columns A:H via
 `ApplyLabelContentWidth` so content uses more of the 100 mm die-cut. **228 pt** was
@@ -158,22 +170,28 @@ Brother after any width change.
 |---|---|
 | Manual source crop | `cropped_Black SCU Logo + Transparent Background - Copy.png` |
 | Workbook file | `scu_emblem.png` (built by `tools/Build-ScuEmblem.ps1`) |
-| Build script | Copies manual crop and forces every visible pixel to **solid black** (`#000000`) for crisp thermal output (gray snake anti-aliasing prints poorly) |
+| Build script | `Build-ScuEmblem.ps1` is meant to copy the crop and force ink to solid black (`#000000`) for crisp thermal output. **It is currently BROKEN (zeros the alpha -> fully transparent PNG) — do not run it** until repaired; `scu_emblem.png` is maintained by hand for now. |
 | Aspect ratio | `LOGO_ASPECT = 1.488` (6150×4133 px) |
-| Print height | **`LOGO_HEIGHT_PRINT = 30 pt`**, vertically centered in rows 2–3 |
-| Gallery height | **`LOGO_HEIGHT_GALLERY = 28 pt`**, column F slot |
-| Slot inset | **`LOGO_SLOT_INSET_PT = 4`** (print), **`LOGO_GALLERY_INSET_PT = 2`** (gallery) |
-| Right pad | **`LOGO_RIGHT_PAD_PT = 0`** — emblem flush to print-area right edge |
-| Insertion | `InsertLabelLogo` — insert at natural aspect (never `maxW × height` box); `LockAspectRatio`; `ZOrder msoBringToFront`; `xlFreeFloating`; centered vertically in band after final size |
+| Print height | **`LOGO_HEIGHT_PRINT = 30 pt`**, **centered in the D2:E3 slot** (both axes) |
+| Gallery height | **`LOGO_HEIGHT_GALLERY = 28 pt`**, **centered in the C:D card slot** |
+| Horizontal placement | **centered** — `InsertLabelLogo(..., centerHoriz:=True)` for both surfaces (was flush-right) |
+| Insertion | `InsertLabelLogo` — insert at natural aspect (never `maxW × height` box); `LockAspectRatio`; `ZOrder msoBringToFront`; `xlFreeFloating`; centered in band + slot after final size |
 | Print refresh | `RefreshPrintLabelLogo` runs on every preview update and before each print (gallery rebuilds logos on tab activate; print sheet does not) |
-| Resolution | **`LogoFilePath()` uses only local `scu_emblem.png` beside the workbook** — embedded `LogoB64()` fallback **removed** (caused partial/weird logos after rebuild) |
+| Resolution | **`LogoFilePath()` uses only local `scu_emblem.png` beside the workbook** (embedded `LogoB64()` fallback removed). The workbook is in a local Documents folder, so `ThisWorkbook.Path` is a real path and `Dir()` finds the file. |
 
 Do **not** re-enable automatic logo cropping without explicit approval — the
 manual crop is the source of truth.
 
-**Logo gotcha (fixed):** merging A2:H2 hid the emblem under cell fill (only a
-sliver showed). Header merges now leave **G2:H3** open for the emblem; text uses
-**A2:F2** / **A3:F3**; logo shape is brought to front.
+**CRITICAL emblem-blank bug (fixed 2026-07-02):** the logo vanished from BOTH the
+print label and every gallery card. Root cause: **`scu_emblem.png` was a fully
+transparent (blank) image** — `Build-ScuEmblem.ps1` had regenerated it with the
+alpha channel zeroed, so `AddPicture` was inserting an invisible picture (the shape
+existed; nothing showed). The code was fine. Fix: regenerated `scu_emblem.png` from
+the source crop by forcing ink to solid black **while keeping the alpha** (133 K
+opaque px, verified). **`Build-ScuEmblem.ps1` is still buggy — do NOT run it until
+it's repaired**, or it will blank the emblem again. Diagnostic if it recurs:
+Immediate window `?"[" & Dir(ThisWorkbook.Path & "\scu_emblem.png") & "]"` (path OK),
+then check the PNG actually has opaque pixels.
 
 **Print geometry:** `ApplyLabelPageSetup` sets `A1:H15`, `Zoom = 100`, no
 fit-to-page, **no `.PaperSize`** (Brother driver controls media), 0.04 in margins,
@@ -201,9 +219,13 @@ for `.bas` / `.vbs`.)
 
 ### Quick path (recommended)
 
-1. Close `MedicationDispensing.xlsm`.
-2. Run `tools/Build-ScuEmblem.ps1` when the manual crop changes → rebuilds
-   `scu_emblem.png` (pure black for thermal). Re-run after any crop edit.
+1. **Close `MedicationDispensing.xlsm` completely** (check Task Manager for stray
+   `Microsoft Excel` processes). If it stays open, Build-Release works on a second
+   copy and Excel asks to **"replace the already present document"** — answering
+   **Yes** overwrites the freshly-built file with the stale open copy and **wipes the
+   logos**. Close it first so the prompt never appears.
+2. **Do NOT run `tools/Build-ScuEmblem.ps1`** — it is currently broken and blanks
+   `scu_emblem.png` (see §7 gotchas). The emblem is already correct; leave it.
 3. Double-click **`Build-Release.vbs`** (needs **Trust access to the VBA project
    object model** + folder as **Trusted Location**).
 4. Click OK on **Setup complete!** and **Release build complete**.
@@ -283,6 +305,11 @@ See `tools/BUILD_RELEASE_NOTES.md` for full detail.
    needed.
 7. **Dead code cleanup (optional):** `LogoB64()` remains in `MedParser.bas` but is
    unused after fallback removal — safe to delete later to shrink the module.
+8. **Repair `tools/Build-ScuEmblem.ps1`** — it currently **blanks** `scu_emblem.png`
+   (zeros the alpha channel), which made the logo invisible everywhere on 2026-07-02.
+   Until it's fixed, do **not** run it. Correct behavior: force ink to solid black
+   **while keeping the alpha channel** (or emit black-on-white fully opaque).
+   `scu_emblem.png` has been regenerated by hand for now.
 
 **Done / verified (2026-06-30):** release build (`Build-Release.vbs`); label layout
 and typography; emblem (aspect, pure black, print + gallery sync); one label per
@@ -297,10 +324,15 @@ print (no blank follow-on label); logo/header layout on screen and print path
   or BOM) makes the VBA importer reject the file. Always save CRLF + pure ASCII.
 - **`MatchHeaderFormat` for new columns.** Do not raw `PasteSpecial` header formats
   onto new Medications/Log columns — use the helper (fixes runtime 1004).
-- **`Shapes.AddPicture` / logo** — use local `scu_emblem.png` only; run
-  `Build-ScuEmblem.ps1` after crop edits. Never insert at `maxWidth × height`
-  (squashes aspect). Reserve **G2:H3** for the emblem; text in **A2:F2** /
-  **A3:F3**; bring shape to front. Do **not** re-enable `LogoB64()` fallback.
+- **`Shapes.AddPicture` / logo** — use local `scu_emblem.png` only. The emblem is
+  **centered in D2:E3** (print) / C:D (gallery); text in **A2:C** (name) and
+  **F2:H** (phone/address); bring shape to front; never insert at `maxWidth × height`
+  (squashes aspect). Do **not** re-enable `LogoB64()` fallback.
+- **`Build-ScuEmblem.ps1` is currently BROKEN** — it regenerated `scu_emblem.png`
+  as a fully transparent (blank) image (alpha zeroed), making the logo invisible on
+  every surface even though `Dir()` finds the file and `AddPicture` succeeds. **Do
+  not run it until repaired.** If the emblem disappears, confirm the PNG actually has
+  opaque black pixels — not just that the file exists.
 - **Gallery vs print logo** — gallery rebuilds on tab activate; print sheet needs
   `RefreshPrintLabelLogo` on every `UpdateLabelPreviewForMedRow` / print.
 - **Blank label between prints** — if it returns, check Excel print preview page
@@ -322,6 +354,12 @@ print (no blank follow-on label); logo/header layout on screen and print path
   native Windows, and don't try to relocate the repo folder via Explorer.
 - **Macros blocked by Mark-of-the-Web** when the file lives in OneDrive - fixed via
   Trusted Location.
+- **Close the workbook before Build-Release.** If `MedicationDispensing.xlsm` is
+  open while `Build-Release.vbs` runs, Excel prompts **"replace the already present
+  document."** **Yes** lets the stale open copy overwrite the freshly-built one and
+  **wipes the emblems** — always answer **No**, or (better) close the workbook first
+  so the prompt never appears. (`Build-Release.vbs` and `MedParser.bas` contain no
+  file-replace logic; this is purely the file being open twice.)
 
 ---
 
@@ -335,15 +373,17 @@ print (no blank follow-on label); logo/header layout on screen and print path
 | `AddMedicationRow` / `RemoveSelectedMedication` / `RenumberMeds` | List editing. Remove Selected removes all checked rows. |
 | `ApplyRowState` / `ApplyAllRowStates` / `IsRowSelected` / `ToggleRowSelect` | Row color by state; confidence triad; selection checkmark. |
 | `PrintCheckedLabels` | Batch-print every checked med; logs each. |
-| `BuildLabelPreviewLayout` / `ApplyLabelContentWidth` / `ApplyLabelPageSetup` / `UpdateLabelPreviewForMedRow` / `FmtLbl` / `FmtLblHeader` / `FmtLblClinicName` | Label layout, width scaling (`LABEL_WIDTH_PT = 242`), page setup, value writing, bold clinic name. |
-| `InsertLabelLogo` / `RefreshPrintLabelLogo` / `EnsurePrintLabelHeaderLayout` / `LogoFilePath` | Emblem insert (30 pt print / 28 pt gallery), refresh before print, header merges A2:F2 / G2:H3. |
+| `BuildLabelPreviewLayout` / `ApplyLabelContentWidth` / `ApplyLabelPageSetup` / `UpdateLabelPreviewForMedRow` | Label layout, width scaling (`LABEL_WIDTH_PT = 242`), page setup, value writing (incl. **Refills** on the qty line; **EXP/LOT on bottom row 15**). |
+| `FmtLbl` / `FmtLblHeader` / `FmtLblClinicName` / `FmtLblNameSub` / `FmtLblContactRight` | Cell formatting. Header three-zone helpers: clinic name lines (Century Gothic), phone/address (Arial, right-aligned). |
+| `InsertLabelLogo` / `RefreshPrintLabelLogo` / `EnsurePrintLabelHeaderLayout` / `LogoFilePath` | Emblem insert (30 pt print / 28 pt gallery), **centered** (`centerHoriz`), refresh before print; three-zone header merges A2:C2 / A3:C3 / **D2:E3** (emblem) / F2:H2 / F3:H3. |
 | `PrepareLabelSheetForPrint` / `PrintLabelSurfaceSafe` | Suppress extra shapes; single-page `PrintOut From:=1, To:=1`. |
 | `LabelHeaderFont` / `SetMiniValue` / `MedFontSize` / `NameFontSize` / `PatientNameFontSize` / `SigFontSize` | Fonts and adaptive sizing. |
 | `MatchHeaderFormat` | Safe header format copy (PasteSpecial 1004 fix). |
 | `PrintLabel` / `PrintCheckedLabels` / `SelectBrotherPrinter` / `MarkPrinted` | Auto-select Brother, confirm, print, bump # of Prints. |
 | `LogPrint(medRow, vol)` / `AskInitials` | Full per-print Log row (single + batch). |
 | `StartNewPatient` | Clear patient + meds, keep the Log. |
-| `PreviewAllLabels` / `BuildAllLabelsPreview` / `EnsureAllLabelsSheet` | Label Previews gallery. |
+| `PreviewAllLabels` / `BuildAllLabelsPreview` / `EnsureAllLabelsSheet` | Label Previews gallery (three-zone cards mirroring the print label; top-right `Print Checked Labels` / `Refresh Previews` created each rebuild; rebuild sweeps stray autoshapes). |
+| `RowCheck` / `RowEdit` / `RowRemove` (`RowPrint` legacy) | Per-card gallery actions. **`RowCheck` -> `ToggleRowSelect`** toggles the med's `Print?` selection (updates the Medications tab), then rebuilds the gallery. |
 | `ResetSession` / `ClearPasteArea` | Full reset (incl. Log) / clear paste box. |
 
 ---

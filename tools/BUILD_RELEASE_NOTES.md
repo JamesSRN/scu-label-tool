@@ -14,9 +14,19 @@
 2. If bootstrapping: shows a **warning MsgBox** that patient data from a previous `.xlsm` is **not** restored — check `_backups\` or Windows File History.
 3. Removes the existing `MedParser` module and imports `MedParser.bas` from the repo root.
 4. Runs `'MedicationDispensing.xlsm'!SetupWorkbook` (compile check + rebuild buttons/label layout + `PreviewAllLabels`).
-5. Saves the workbook.
+5. **Saves AND closes** the workbook, then quits its Excel instance.
 
-Click **OK** on the **Setup complete!** dialog when it appears, then on the final **Release build complete** message.
+Click **OK** on the **Setup complete!** dialog when it appears, then on the final **Release build complete** message. On success the workbook is now closed — reopen `MedicationDispensing.xlsm` to use it.
+
+## Robustness — never leaves a stray Excel process
+
+The script cleans up on **every** exit (added 2026-07-02):
+
+- If the workbook opens **read-only** (already open in another window, or a stray Excel is holding it, or the file is marked read-only), it shows a plain-English message and quits **before changing anything**.
+- Every failure path (open failed, read-only, VBA project not accessible, `SetupWorkbook` compile error, save failed) shows a clear message **and quits Excel** via a shared cleanup — so no background `EXCEL.EXE` is left locking the file.
+- On success it saves, closes the workbook, and quits Excel.
+
+If an **older** run already left stray Excel processes, end them once via **Task Manager** (any `Microsoft Excel` / `EXCEL.EXE`) so the `~$MedicationDispensing.xlsm` lock clears; after that the script keeps itself clean.
 
 ## Optional automation
 
@@ -24,15 +34,20 @@ Click **OK** on the **Setup complete!** dialog when it appears, then on the fina
 
 ## Emblem asset
 
-After updating the manual crop file, run:
+**WARNING (2026-07-02): `tools/Build-ScuEmblem.ps1` is currently BROKEN — do NOT run it.**
+It regenerated `scu_emblem.png` as a fully **transparent (blank)** PNG (it zeroed the
+alpha channel), which made the logo invisible on every label even though the file
+existed and loaded. `scu_emblem.png` has been rebuilt by hand (ink forced to solid
+black, **alpha preserved**) and is correct — leave it as-is until the script is fixed.
 
-```powershell
-powershell -ExecutionPolicy Bypass -File tools/Build-ScuEmblem.ps1
-```
+The script's *intended* job: copy `cropped_Black SCU Logo + Transparent Background - Copy.png`
+→ `scu_emblem.png`, forcing ink to solid black `#000000` for thermal **while keeping the
+alpha channel** (or emitting black-on-white fully opaque). Repair that (do not zero the
+alpha), then it is safe to run again, followed by `Build-Release.vbs`.
 
-That copies `cropped_Black SCU Logo + Transparent Background - Copy.png` → `scu_emblem.png` and forces every visible pixel to **solid black** (`#000000`) for crisp thermal output. Then run `Build-Release.vbs` so the workbook picks up the new image.
-
-**Important:** `LogoFilePath()` uses **only** the local `scu_emblem.png` beside the workbook. The old embedded `LogoB64()` fallback was removed — if the PNG is missing, the logo will not appear until you run the emblem script.
+**Note:** `LogoFilePath()` uses **only** the local `scu_emblem.png` beside the workbook
+(the embedded `LogoB64()` fallback was removed) — if the PNG is missing or blank, the
+logo will not appear.
 
 ## `MedParser.bas` requirements
 
@@ -60,5 +75,15 @@ Volunteers should open the built `.xlsm` only; they do not run the build script.
 | Print | Single page `PrintOut From:=1, To:=1`; logo refresh before print |
 | Width | `LABEL_WIDTH_PT = 242` (re-test on Brother) |
 | Bootstrap | Warning when `.xlsm` was missing |
+
+## Session updates (2026-07-02)
+
+| Area | Change |
+|------|--------|
+| Header | Three-zone Century Gothic: name **A2:C2 / A3:C3**, emblem centered **D2:E3**, phone **F2:H2** / address **F3:H3** |
+| Emblem | Centered (`centerHoriz`); `scu_emblem.png` rebuilt after the blank-PNG bug (see Emblem asset warning) |
+| Bottom | Directions **3 lines**; **EXP/LOT on bottom row 15**; **Refills** on the qty line |
+| Gallery | Cards mirror the header; top-right `Print Checked Labels` / `Refresh Previews`; per-card `Check` / `Uncheck`; full shape-clear each rebuild; Rx over DOB |
+| Build-Release | Robust cleanup — never leaves a stray Excel; read-only guard; **saves and closes** on success |
 
 See `HANDOFF.md` and `CHANGELOG.md` for the full problem/solution list.
