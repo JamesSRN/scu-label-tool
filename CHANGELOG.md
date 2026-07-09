@@ -43,6 +43,10 @@ Work toward the V2 build, applied in blocks (see `docs/IMPROVEMENT_REPORT_2026-0
 - `Build-Release.vbs` resolves the bootstrap template from `templates\Template_MedicationDispensing.xlsm` first, falling back to the original root filename - so the build works before *or* after the reorg (non-breaking).
 - Added `tools/reorg-v2.ps1`: a preview-by-default migration script (run locally; `-Execute` to apply) that deletes the redundant ~10 MB nested repo clone under `_backups\`, removes stale Excel locks, untracks the `tools\` temp files, and moves reference docs into `docs\` and logo-source art into `assets\logo-source\`. Build-critical files (`MedParser.bas`, `Build-Release.vbs`, `scu_emblem.png`, `MedicationDispensing.xlsm`) stay at the root. The reorg itself is run by the user (the sandbox can't operate on the real repo).
 
+**Block 8 - volunteer quick-start card (2026-07-09)**
+- Added `docs/SCU_QuickStart_Card.pdf`: a one-page, print-ready reference (4 steps: enter/paste, review + Exp/Lot, check, print) with a "Good to know" strip covering Reprint Last Batch, Start New Patient, close-clears-and-archives behavior, and the printer/roll. For laminating and taping by the clinic workstation.
+- **In-app "Start Here" guide sheet.** The workbook now builds a first sheet ("Start Here") mirroring the card - the 4 color-coded steps, a "Good to know" strip, and a "Go to Patient & Input" button - and **opens to it** (activated in `Workbook_Open`; the build ends on it too). New `BuildQuickStartSheet` / `GuideStep` / `GoToInput`; `SH_GUIDE` constant.
+
 ### Print progress popup + EXP/LOT shrink-to-fit (2026-07-09)
 
 - **Progress popup during Print Checked Labels.** After the confirm dialog, a small `frmBusy` popup ("Locating the Brother QL-1100c..." -> "Preparing the label page...") covers the delay while the printer is located and the page is set up, then hides just before the initials prompt. New `BusyShow(pct, msg)` / `BusyHide` helpers in `MedParser.bas` (module var `busyFrm`); the form is built by `Build-Release.vbs`. Falls back to the status bar if `frmBusy` isn't present.

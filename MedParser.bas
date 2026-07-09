@@ -19,6 +19,7 @@ Private Const SH_MEDS   As String = "Medications"
 Private Const SH_LABEL  As String = "Label Preview"
 Private Const SH_LOG    As String = "Log"
 Private Const SH_ALL    As String = "Label Previews"
+Private Const SH_GUIDE  As String = "Start Here"
 
 ' -- Medications sheet column indices ------------------------
 Private Const C_NUM     As Integer = 1
@@ -219,6 +220,156 @@ Public Sub CheckWorkbookStructure()
     Dbg "CheckWorkbookStructure: " & IIf(problems = "", "OK", "PROBLEMS")
 End Sub
 
+' Jump from the guide to the working tab (wired to the guide's button).
+Public Sub GoToInput()
+    On Error Resume Next
+    ThisWorkbook.Sheets(SH_INPUT).Activate
+    ThisWorkbook.Sheets(SH_INPUT).Range("C5").Select
+    On Error GoTo 0
+End Sub
+
+' One numbered step block on the Start Here sheet: colored badge + title + wrapped text.
+Private Sub GuideStep(ws As Worksheet, ByVal topRow As Long, ByVal num As Integer, ByVal clr As Long, ByVal title As String, ByVal txt As String)
+    On Error Resume Next
+    ws.Range(ws.Cells(topRow, 2), ws.Cells(topRow + 3, 2)).Merge
+    With ws.Cells(topRow, 2)
+        .Value = num
+        .Interior.Color = clr
+        .Font.Color = RGB(255, 255, 255)
+        .Font.Bold = True
+        .Font.Size = 16
+        .HorizontalAlignment = xlCenter
+        .VerticalAlignment = xlCenter
+    End With
+    ws.Range(ws.Cells(topRow, 3), ws.Cells(topRow, 8)).Merge
+    With ws.Cells(topRow, 3)
+        .Value = title
+        .Font.Bold = True
+        .Font.Size = 12.5
+        .Font.Color = clr
+        .VerticalAlignment = xlCenter
+    End With
+    ws.Range(ws.Cells(topRow + 1, 3), ws.Cells(topRow + 3, 8)).Merge
+    With ws.Cells(topRow + 1, 3)
+        .Value = txt
+        .Font.Bold = False
+        .Font.Size = 10.5
+        .Font.Color = RGB(38, 50, 56)
+        .WrapText = True
+        .VerticalAlignment = xlTop
+        .HorizontalAlignment = xlLeft
+    End With
+    On Error GoTo 0
+End Sub
+
+' Build (or rebuild) the "Start Here" quick-start sheet and make it the FIRST sheet, so
+' the workbook opens to it. Best-effort/cosmetic - never fails the build.
+Private Sub BuildQuickStartSheet()
+    On Error Resume Next
+    Dim ws As Worksheet
+    Set ws = Nothing
+    Set ws = ThisWorkbook.Sheets(SH_GUIDE)
+    If ws Is Nothing Then
+        Set ws = ThisWorkbook.Sheets.Add(Before:=ThisWorkbook.Sheets(1))
+        ws.Name = SH_GUIDE
+    End If
+    ws.Move Before:=ThisWorkbook.Sheets(1)
+
+    Application.ScreenUpdating = False
+    ws.Cells.Clear
+    Dim shp As Shape
+    For Each shp In ws.Shapes
+        shp.Delete
+    Next shp
+    ws.Cells.Interior.Color = RGB(255, 255, 255)
+
+    ws.Columns("A").ColumnWidth = 2.5
+    ws.Columns("B").ColumnWidth = 6
+    ws.Columns("C:H").ColumnWidth = 15
+
+    ' Header band
+    ws.Range("A1:H3").Interior.Color = RGB(0, 121, 107)
+    ws.Range(ws.Cells(2, 1), ws.Cells(2, 8)).Merge
+    With ws.Cells(2, 1)
+        .Value = "   SCU Label Printing"
+        .Font.Color = RGB(255, 255, 255)
+        .Font.Bold = True
+        .Font.Size = 22
+        .VerticalAlignment = xlCenter
+    End With
+    ws.Range(ws.Cells(3, 1), ws.Cells(3, 8)).Merge
+    With ws.Cells(3, 1)
+        .Value = "   Quick-Start Guide   -   print a medication label in 4 steps        v" & APP_VERSION
+        .Font.Color = RGB(255, 255, 255)
+        .Font.Size = 11
+        .VerticalAlignment = xlCenter
+    End With
+
+    Call GuideStep(ws, 5, 1, RGB(21, 101, 192), "Enter & paste", _
+        "On the 'Patient & Input' tab, type the patient Name and DOB, paste the medication list into the box, then click PARSE MEDICATIONS.")
+    Call GuideStep(ws, 10, 2, RGB(0, 121, 107), "Review & add Exp / Lot", _
+        "On the 'Medications' tab click Review & Validate and fix anything flagged (an amber Expiration cell means check the date). When prompted, enter Expiration (MM/YYYY) and Lot. For a med split across two bottles, separate values with commas.")
+    Call GuideStep(ws, 15, 3, RGB(216, 67, 21), "Check what to print", _
+        "Double-click the 'Print?' cell next to each medication you want (or use 'Check this label' in the gallery). A green row means it is selected.")
+    Call GuideStep(ws, 20, 4, RGB(46, 125, 50), "Print", _
+        "Click 'Print Checked Labels', confirm the list, and enter your initials. Any label missing Exp/Lot is skipped and named. When done you land on the Log.")
+
+    ws.Range(ws.Cells(26, 2), ws.Cells(26, 8)).Merge
+    With ws.Cells(26, 2)
+        .Value = "Good to know"
+        .Font.Bold = True
+        .Font.Size = 11
+        .Font.Color = RGB(0, 121, 107)
+    End With
+    Dim gk As Variant
+    gk = Array( _
+        "-   Reprint Last Batch:  reprints the last set after a paper jam or misfeed.", _
+        "-   Start NEW Patient:  clears the screen for the next patient (the Log is kept).", _
+        "-   Closing the file clears patient info and the Log; a dated CSV backup is saved.", _
+        "-   Labels print on the Brother QL-1100c with the DK-1202 (62 x 100 mm) roll.")
+    Dim gi As Integer
+    For gi = 0 To UBound(gk)
+        ws.Range(ws.Cells(27 + gi, 2), ws.Cells(27 + gi, 8)).Merge
+        With ws.Cells(27 + gi, 2)
+            .Value = gk(gi)
+            .Font.Size = 10
+            .Font.Color = RGB(38, 50, 56)
+            .WrapText = False
+            .VerticalAlignment = xlCenter
+        End With
+    Next gi
+
+    ' Row heights
+    ws.Rows(1).RowHeight = 6
+    ws.Rows(2).RowHeight = 32
+    ws.Rows(3).RowHeight = 20
+    ws.Rows(4).RowHeight = 10
+    Dim tops As Variant, ti As Integer, s As Long
+    tops = Array(5, 10, 15, 20)
+    For ti = 0 To 3
+        s = tops(ti)
+        ws.Rows(s).RowHeight = 16
+        ws.Rows(s + 1).RowHeight = 15
+        ws.Rows(s + 2).RowHeight = 15
+        ws.Rows(s + 3).RowHeight = 15
+        ws.Rows(s + 4).RowHeight = 6
+    Next ti
+    ws.Rows(25).RowHeight = 8
+    ws.Rows(26).RowHeight = 20
+    For gi = 0 To 3
+        ws.Rows(27 + gi).RowHeight = 16
+    Next gi
+    ws.Rows(31).RowHeight = 10
+
+    Call AddButtonToSheet(ws, "btnGuideStart", "Go to Patient & Input  >", "GoToInput", 32, 2, 240, 30, RGB(21, 101, 192))
+
+    ws.Activate
+    ActiveWindow.DisplayGridlines = False
+    ws.Cells(1, 1).Select
+    Application.ScreenUpdating = True
+    On Error GoTo 0
+End Sub
+
 Public Sub SetupWorkbook()
     Application.OnKey "^+P", "ParseMedications"
     Application.OnKey "^+R", "ResetSession"
@@ -281,6 +432,9 @@ Public Sub SetupWorkbook()
     Dim wsGallery As Worksheet
     Set wsGallery = EnsureAllLabelsSheet()
 
+    ' Build the Start Here guide as the first sheet (the workbook opens to it).
+    Call BuildQuickStartSheet
+
     ' Version stamp so the loaded build is visible at a glance (support / troubleshooting).
     On Error Resume Next
     ws1.Cells(58, 2).Value = "SCU Label Tool  v" & APP_VERSION & "   -   built " & Format(Date, "YYYY-MM-DD")
@@ -288,8 +442,8 @@ Public Sub SetupWorkbook()
     ws1.Cells(58, 2).Font.Color = RGB(150, 150, 150)
     On Error GoTo 0
 
-    ws1.Activate
     On Error Resume Next
+    ThisWorkbook.Sheets(SH_GUIDE).Activate    ' end on the Start Here guide (opens here)
     ws3.Visible = xlSheetHidden
     On Error GoTo 0
 

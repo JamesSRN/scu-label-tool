@@ -250,6 +250,7 @@ tw.CodeModule.AddFromString _
     "    On Error Resume Next" & vbCrLf & _
     "    CheckWorkbookStructure" & vbCrLf & _
     "    ClearSessionSilent" & vbCrLf & _
+    "    ThisWorkbook.Sheets(""Start Here"").Activate" & vbCrLf & _
     "End Sub" & vbCrLf & _
     "Private Sub Workbook_BeforeClose(Cancel As Boolean)" & vbCrLf & _
     "    On Error Resume Next" & vbCrLf & _
