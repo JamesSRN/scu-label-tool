@@ -38,6 +38,11 @@ Work toward the V2 build, applied in blocks (see `docs/IMPROVEMENT_REPORT_2026-0
 **Block 6 - targeted constants (2026-07-09)**
 - Centralized the medication-name **wrap threshold and wrap font** (`MED_WRAP_MAXLEN = 38`, `MED_WRAP_FONT = 11`) that were duplicated in both the print label and the gallery, so the two can't drift out of sync. Values unchanged. The single-use, physically-calibrated row-height table was intentionally left as-is (extracting it would risk the tuned print geometry for no benefit).
 
+**Block 7 - folder reorg (light-touch, 2026-07-09)**
+- `.gitignore` now ignores throwaway `tools\_*` scratch images and `*.generated.txt`, and documents an optional exception for a tracked clean template.
+- `Build-Release.vbs` resolves the bootstrap template from `templates\Template_MedicationDispensing.xlsm` first, falling back to the original root filename - so the build works before *or* after the reorg (non-breaking).
+- Added `tools/reorg-v2.ps1`: a preview-by-default migration script (run locally; `-Execute` to apply) that deletes the redundant ~10 MB nested repo clone under `_backups\`, removes stale Excel locks, untracks the `tools\` temp files, and moves reference docs into `docs\` and logo-source art into `assets\logo-source\`. Build-critical files (`MedParser.bas`, `Build-Release.vbs`, `scu_emblem.png`, `MedicationDispensing.xlsm`) stay at the root. The reorg itself is run by the user (the sandbox can't operate on the real repo).
+
 ### Print progress popup + EXP/LOT shrink-to-fit (2026-07-09)
 
 - **Progress popup during Print Checked Labels.** After the confirm dialog, a small `frmBusy` popup ("Locating the Brother QL-1100c..." -> "Preparing the label page...") covers the delay while the printer is located and the page is set up, then hides just before the initials prompt. New `BusyShow(pct, msg)` / `BusyHide` helpers in `MedParser.bas` (module var `busyFrm`); the form is built by `Build-Release.vbs`. Falls back to the status bar if `frmBusy` isn't present.

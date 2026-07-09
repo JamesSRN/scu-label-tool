@@ -12,3 +12,11 @@ dispense-log/
 
 # Local backups
 _backups/
+
+# Throwaway build/debug scratch images and generated blobs in tools\
+tools/_*
+tools/*.generated.txt
+
+# Clean template MAY be tracked despite the *.xlsm rule above (no PHI). Uncomment the
+# exception if you move a PHI-free template into templates\ (see tools/reorg-v2.ps1):
+# !templates/Template_MedicationDispensing.xlsm

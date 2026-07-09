@@ -22,7 +22,12 @@ Dim hasForm, comp, frm, dsn, ctl, tw, twCode
 
 Set fso = CreateObject("Scripting.FileSystemObject")
 scriptDir = fso.GetParentFolderName(WScript.ScriptFullName)
-bootstrapPath = fso.BuildPath(scriptDir, "Broken_PrettyPrint_MedicationDispensing.xlsm")
+' Bootstrap template: prefer the tracked templates\ copy (after the V2 reorg), else fall
+' back to the original root filename, so the build works before OR after the reorg.
+bootstrapPath = fso.BuildPath(scriptDir, "templates\Template_MedicationDispensing.xlsm")
+If Not fso.FileExists(bootstrapPath) Then
+    bootstrapPath = fso.BuildPath(scriptDir, "Broken_PrettyPrint_MedicationDispensing.xlsm")
+End If
 xlsmPath = fso.BuildPath(scriptDir, "MedicationDispensing.xlsm")
 basPath = fso.BuildPath(scriptDir, "MedParser.bas")
 
