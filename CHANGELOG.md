@@ -35,6 +35,9 @@ Work toward the V2 build, applied in blocks (see `docs/IMPROVEMENT_REPORT_2026-0
 - **Gallery logo alignment fix.** The gallery header row heights are now set *before* the card loop, so each card's SC emblem is positioned against the correct row tops and lines up with the (shifted-down) cards instead of sitting too high.
 - **Land on the Log after printing.** After Print Checked Labels or Reprint Last Batch, the workbook now switches to the dispense Log (scrolled to the newest entry) so the volunteer sees the record. New `ShowLogSheet`.
 
+**Block 6 - targeted constants (2026-07-09)**
+- Centralized the medication-name **wrap threshold and wrap font** (`MED_WRAP_MAXLEN = 38`, `MED_WRAP_FONT = 11`) that were duplicated in both the print label and the gallery, so the two can't drift out of sync. Values unchanged. The single-use, physically-calibrated row-height table was intentionally left as-is (extracting it would risk the tuned print geometry for no benefit).
+
 ### Print progress popup + EXP/LOT shrink-to-fit (2026-07-09)
 
 - **Progress popup during Print Checked Labels.** After the confirm dialog, a small `frmBusy` popup ("Locating the Brother QL-1100c..." -> "Preparing the label page...") covers the delay while the printer is located and the page is set up, then hides just before the initials prompt. New `BusyShow(pct, msg)` / `BusyHide` helpers in `MedParser.bas` (module var `busyFrm`); the form is built by `Build-Release.vbs`. Falls back to the status bar if `frmBusy` isn't present.

@@ -113,6 +113,12 @@ Public Const DEBUG_MODE As Boolean = False
 ' repeat prints; self-heals if the cached printer can no longer be selected).
 Private gCachedPrinter As String
 
+' Medication-name wrapping - shared by the print label AND the gallery so the two stay
+' in sync: a name longer than MED_WRAP_MAXLEN chars wraps to two lines at MED_WRAP_FONT pt
+' instead of shrinking to a single small line.
+Private Const MED_WRAP_MAXLEN As Long = 38
+Private Const MED_WRAP_FONT As Single = 11
+
 ' ============================================================
 '  BUSY / PROGRESS POPUP  (used during the print-prep delay)
 ' ============================================================
@@ -1094,9 +1100,9 @@ Private Sub BuildAllLabelsPreview()
         ws.Cells(base + 3, 1).Value = medLine
         Call FmtLbl(ws.Cells(base + 3, 1), 13, True, "L", "C")
         ws.Cells(base + 3, 1).WrapText = True
-        Dim medWrap As Boolean: medWrap = (Len(medLine) > 38)
+        Dim medWrap As Boolean: medWrap = (Len(medLine) > MED_WRAP_MAXLEN)
         If medWrap Then
-            ws.Cells(base + 3, 1).Font.Size = 11
+            ws.Cells(base + 3, 1).Font.Size = MED_WRAP_FONT
         Else
             ws.Cells(base + 3, 1).Font.Size = MedFontSize(medLine)
         End If
@@ -3261,11 +3267,11 @@ Public Sub UpdateLabelPreviewForMedRow(ByVal medRow As Long, Optional ByVal refr
     wsL.Cells(7, 1).Value = medLine
     wsL.Cells(7, 1).Font.Bold = True
     wsL.Cells(7, 1).WrapText = True
-    If Len(medLine) > 38 Then
+    If Len(medLine) > MED_WRAP_MAXLEN Then
         ' Long name: wrap to two lines at a readable size (uses the white space in
         ' the med band) instead of shrinking to a tiny single line. Row 7 grows and
         ' the spacer rows 13/14 shrink so the A1:H15 print area height is preserved.
-        wsL.Cells(7, 1).Font.Size = 11
+        wsL.Cells(7, 1).Font.Size = MED_WRAP_FONT
         wsL.Rows(7).RowHeight = 28
         wsL.Rows(13).RowHeight = 1
         wsL.Rows(14).RowHeight = 1
