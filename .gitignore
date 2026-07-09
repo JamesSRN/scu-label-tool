@@ -4,6 +4,9 @@
 *.xls
 *.csv
 
+# Dispense-log CSV archive (PHI - local only, never commit)
+dispense-log/
+
 # Excel lock files
 ~$*
 

@@ -131,11 +131,11 @@ Set dsn = frm.Designer
     Set ctl = NewCtl("Forms.Label.1", "lblMed", True)
     ctl.Left = 16 : ctl.Top = 12 : ctl.Width = 244 : ctl.Height = 44 : ctl.Font.Bold = True : ctl.Font.Size = 16 : ctl.WordWrap = True
     Set ctl = NewCtl("Forms.Label.1", "lblExp", True)
-    ctl.Left = 16 : ctl.Top = 64 : ctl.Width = 244 : ctl.Height = 12 : ctl.Caption = "Expiration (MM/YYYY - check the bottle):"
+    ctl.Left = 16 : ctl.Top = 64 : ctl.Width = 244 : ctl.Height = 12 : ctl.Caption = "Expiration MM/YYYY (comma-separate multiple bottles):"
     Set ctl = NewCtl("Forms.TextBox.1", "txtExp", True)
     ctl.Left = 16 : ctl.Top = 78 : ctl.Width = 244 : ctl.Height = 18
     Set ctl = NewCtl("Forms.Label.1", "lblLot", True)
-    ctl.Left = 16 : ctl.Top = 106 : ctl.Width = 244 : ctl.Height = 12 : ctl.Caption = "Lot number (check the bottle or package):"
+    ctl.Left = 16 : ctl.Top = 106 : ctl.Width = 244 : ctl.Height = 12 : ctl.Caption = "Lot number (comma-separate multiple bottles):"
     Set ctl = NewCtl("Forms.TextBox.1", "txtLot", True)
     ctl.Left = 16 : ctl.Top = 120 : ctl.Width = 244 : ctl.Height = 18
     Set ctl = NewCtl("Forms.CommandButton.1", "btnOK", True)
@@ -146,6 +146,10 @@ Set dsn = frm.Designer
         "    Me.Caption = ""Enter Expiration and Lot""" & vbCrLf & _
         "    Me.Width = 292" & vbCrLf & _
         "    Me.Height = 286" & vbCrLf & _
+        "End Sub" & vbCrLf & _
+        "Private Sub UserForm_Activate()" & vbCrLf & _
+        "    On Error Resume Next" & vbCrLf & _
+        "    txtExp.SetFocus" & vbCrLf & _
         "End Sub" & vbCrLf & _
         "Private Sub btnOK_Click()" & vbCrLf & "    Me.Hide" & vbCrLf & "End Sub"
 On Error GoTo 0
@@ -239,6 +243,7 @@ If tw.CodeModule.CountOfLines > 0 Then tw.CodeModule.DeleteLines 1, tw.CodeModul
 tw.CodeModule.AddFromString _
     "Private Sub Workbook_Open()" & vbCrLf & _
     "    On Error Resume Next" & vbCrLf & _
+    "    CheckWorkbookStructure" & vbCrLf & _
     "    ClearSessionSilent" & vbCrLf & _
     "End Sub" & vbCrLf & _
     "Private Sub Workbook_BeforeClose(Cancel As Boolean)" & vbCrLf & _

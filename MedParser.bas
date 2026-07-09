@@ -97,6 +97,22 @@ Private busyFrm As Object
 Private gLastBatchRows As String
 Private gLastBatchVol As String
 
+' V2: append each print to a dated local CSV archive (PHI - stays on this machine,
+' git-ignored) so the day's dispensing record survives the on-close Log wipe.
+' Set to False to disable the archive entirely.
+Private Const DISPENSE_CSV_ENABLED As Boolean = True
+
+' V2 app version - stamped into the workbook by SetupWorkbook so the loaded build is visible.
+Public Const APP_VERSION As String = "2.0"
+
+' V2 debug switch: when True, Dbg() writes a timestamped trace to the VBE Immediate
+' window (Ctrl+G). Leave False for production (Dbg is then a no-op).
+Public Const DEBUG_MODE As Boolean = False
+
+' Session cache for the resolved Brother printer name (skips the slow WMI lookup on
+' repeat prints; self-heals if the cached printer can no longer be selected).
+Private gCachedPrinter As String
+
 ' ============================================================
 '  BUSY / PROGRESS POPUP  (used during the print-prep delay)
 ' ============================================================
@@ -155,6 +171,48 @@ Private Sub MatchHeaderFormat(ByVal src As Range, ByVal dest As Range)
     On Error GoTo 0
 End Sub
 
+' Debug trace to the VBE Immediate window (only when DEBUG_MODE = True). No-op otherwise.
+Private Sub Dbg(ByVal msg As String)
+    If DEBUG_MODE Then Debug.Print Format(Now(), "hh:nn:ss") & "  " & msg
+End Sub
+
+' Verify the required sheets + the Print? column marker exist; alert ONLY on a problem so
+' a volunteer who deleted or renamed something gets a clear message instead of a cryptic
+' runtime error later. Called on workbook open.
+Public Sub CheckWorkbookStructure()
+    On Error Resume Next
+    Dim problems As String, i As Integer, found As Boolean
+    Dim names As Variant, sh As Object
+    problems = ""
+    names = Array(SH_INPUT, SH_MEDS, SH_LABEL, SH_LOG, SH_ALL)
+    For i = LBound(names) To UBound(names)
+        found = False
+        For Each sh In ThisWorkbook.Sheets
+            If sh.Name = names(i) Then found = True: Exit For
+        Next sh
+        If Not found Then problems = problems & "   - Missing sheet: '" & names(i) & "'" & vbCrLf
+    Next i
+
+    Dim wsMed As Worksheet
+    Set wsMed = Nothing
+    Set wsMed = ThisWorkbook.Sheets(SH_MEDS)
+    If Not wsMed Is Nothing Then
+        If InStr(LCase(CStr(wsMed.Cells(2, C_SEL).Value)), "print") = 0 Then
+            problems = problems & "   - The 'Print?' column header is not where expected " & _
+                       "(Medications columns may have been changed)." & vbCrLf
+        End If
+    End If
+
+    If problems <> "" Then
+        MsgBox "The workbook structure looks off:" & vbCrLf & vbCrLf & problems & vbCrLf & _
+               "If a sheet or column was changed, rebuild from the template (Build-Release) " & _
+               "or restore a backup before dispensing.", _
+               vbExclamation, "Workbook Check"
+    End If
+    On Error GoTo 0
+    Dbg "CheckWorkbookStructure: " & IIf(problems = "", "OK", "PROBLEMS")
+End Sub
+
 Public Sub SetupWorkbook()
     Application.OnKey "^+P", "ParseMedications"
     Application.OnKey "^+R", "ResetSession"
@@ -169,7 +227,7 @@ Public Sub SetupWorkbook()
     Call AddButtonToSheet(ws1, "btnParse",  "PARSE MEDICATIONS",  "ParseMedications",   48, 2, 240, 26, RGB(21, 101, 192))
     Call AddButtonToSheet(ws1, "btnClear",  "Clear Paste Area",    "ClearPasteArea",     50, 2, 150, 20, RGB(84, 110, 122))
     Call AddButtonToSheet(ws1, "btnReset",  "Reset Session",       "ResetSession",       50, 3, 150, 20, RGB(191, 54, 12))
-    Call AddButtonToSheet(ws1, "btnNewPt",  "Start NEW Patient",   "StartNewPatient",    53, 2, 200, 24, RGB(0, 121, 107))
+    Call AddButtonToSheet(ws1, "btnNewPt",  "Start NEW Patient",   "StartNewPatient",    53, 2, 230, 28, RGB(0, 121, 107))
     Call BuildLabelPreviewLayout(ws3)
     Call PreviewAllLabels
     Call AddButtonToSheet(ws3, "btnUpd",    "Update Label Preview", "UpdateLabelPreviewFromSelection", 20, 1, 220, 24, RGB(21, 101, 192))
@@ -182,7 +240,7 @@ Public Sub SetupWorkbook()
     Call AddButtonToSheet(ws2, "btnRemMed", "- Remove Selected",  "RemoveSelectedMedication", 3, 17, 150, 22, RGB(191, 54, 12))
     Call AddButtonToSheet(ws2, "btnRevMed", "Review & Validate",  "ReviewMedications",        5, 17, 150, 22, RGB(21, 101, 192))
     Call AddButtonToSheet(ws2, "btnPrvAll", "Preview ALL Labels",   "PreviewAllLabels",         7, 17, 150, 22, RGB(0, 121, 107))
-    Call AddButtonToSheet(ws2, "btnPrnChk", "Print Checked Labels", "PrintCheckedLabels",       9, 17, 150, 22, RGB(216, 67, 21))
+    Call AddButtonToSheet(ws2, "btnPrnChk", "Print Checked Labels", "PrintCheckedLabels",       9, 17, 190, 30, RGB(216, 67, 21))
     ' Removed the single "Print Selected Label" button - printing is now via Print Checked Labels
     On Error Resume Next
     ws2.Shapes("btnPrnMed").Delete
@@ -216,12 +274,20 @@ Public Sub SetupWorkbook()
     ' Consolidate previews: migrate/rename the gallery and hide the internal print sheet
     Dim wsGallery As Worksheet
     Set wsGallery = EnsureAllLabelsSheet()
+
+    ' Version stamp so the loaded build is visible at a glance (support / troubleshooting).
+    On Error Resume Next
+    ws1.Cells(58, 2).Value = "SCU Label Tool  v" & APP_VERSION & "   -   built " & Format(Date, "YYYY-MM-DD")
+    ws1.Cells(58, 2).Font.Size = 8
+    ws1.Cells(58, 2).Font.Color = RGB(150, 150, 150)
+    On Error GoTo 0
+
     ws1.Activate
     On Error Resume Next
     ws3.Visible = xlSheetHidden
     On Error GoTo 0
 
-    MsgBox "Setup complete!" & vbCrLf & _
+    MsgBox "Setup complete!  (v" & APP_VERSION & ")" & vbCrLf & _
            "Keyboard shortcuts registered:" & vbCrLf & _
            "  Ctrl+Shift+P  =  Parse Medications" & vbCrLf & _
            "  Ctrl+Shift+R  =  Reset Session" & vbCrLf & _
@@ -950,12 +1016,19 @@ Private Sub BuildAllLabelsPreview()
     Dim lastRow As Long
     lastRow = wsM.Cells(wsM.Rows.Count, C_NAME).End(xlUp).Row
 
+    ' Header band (rows 1-3) sized BEFORE the card loop so each card's logo is placed
+    ' against the correct row tops (the logo is positioned relative to its base row).
+    ' Two rows tall so Print Checked Labels + Reprint Last Batch stack one above the other.
+    ws.Rows(1).RowHeight = 34
+    ws.Rows(2).RowHeight = 34
+    ws.Rows(3).RowHeight = 8
+
     Dim n As Integer, base As Long, r As Long
     n = 0
     For r = MEDS_HDR_ROWS + 1 To lastRow
         If Trim(wsM.Cells(r, C_NAME).Value) = "" Then GoTo NextR
         n = n + 1
-        base = 3 + (n - 1) * 12
+        base = 4 + (n - 1) * 12    ' cards start at row 4 (rows 1-3 are the button header band)
 
         Dim medName As String, strength As String, qty As String, formTxt As String
         Dim sig As String, expv As String, lotv As String, dateRx As String, warn As String
@@ -1111,12 +1184,12 @@ NextR:
     Next r
 
     If n = 0 Then
-        ws.Cells(3, 1).Value = "No medications to preview yet. Parse or add medications first."
+        ws.Cells(4, 1).Value = "No medications to preview yet. Parse or add medications first."
     End If
 
-    Call AddButtonToSheet(ws, "galtop_prnchk", "Print Checked Labels", "PrintCheckedLabels", 1, 8, 170, 24, RGB(216, 67, 21))
+    Call AddButtonToSheet(ws, "galtop_prnchk", "Print Checked Labels", "PrintCheckedLabels", 1, 8, 176, 30, RGB(216, 67, 21))
     Call AddButtonToSheet(ws, "galtop_refresh", "Refresh Previews", "PreviewAllLabels", 1, 11, 150, 24, RGB(0, 121, 107))
-    Call AddButtonToSheet(ws, "galtop_reprint", "Reprint Last Batch", "ReprintLastBatch", 2, 8, 170, 24, RGB(0, 131, 143))
+    Call AddButtonToSheet(ws, "galtop_reprint", "Reprint Last Batch", "ReprintLastBatch", 2, 8, 176, 30, RGB(0, 131, 143))
 
     ws.Activate
     ws.Cells(1, 1).Select
@@ -1180,9 +1253,24 @@ Public Sub RowRemove()
     If r <= MEDS_HDR_ROWS Then Exit Sub
     Dim wsM As Worksheet
     Set wsM = ThisWorkbook.Sheets(SH_MEDS)
-    wsM.Activate
-    wsM.Cells(r, C_NAME).Select
-    Call RemoveSelectedMedication
+
+    Dim nm As String
+    nm = Trim(wsM.Cells(r, C_NAME).Value & " " & wsM.Cells(r, C_STR).Value)
+    If nm = "" Then Exit Sub
+
+    ' Confirm before removing THIS specific medication (named), so an accidental click
+    ' on the gallery can't silently delete a row.
+    If MsgBox("Remove this medication?" & vbCrLf & vbCrLf & "   " & nm & vbCrLf & vbCrLf & _
+              "(This cannot be undone.)", vbYesNo + vbExclamation, "Remove Medication") = vbNo Then Exit Sub
+
+    ' Delete only the table columns (1..C_SEL) and shift up, so the side buttons stay put.
+    Application.EnableEvents = False
+    wsM.Range(wsM.Cells(r, 1), wsM.Cells(r, C_SEL)).Delete Shift:=xlUp
+    Application.EnableEvents = True
+
+    Call RenumberMeds
+    Call ValidateMedications(False)
+    Call ApplyAllRowStates(wsM)
     Call BuildAllLabelsPreview
 End Sub
 
@@ -2487,8 +2575,10 @@ Private Sub ApplyRowState(ws As Worksheet, r As Long)
                 .NumberFormat = "@"
                 If Trim(.Value) = "" Then
                     .Interior.Color = RGB(255, 205, 210)    ' missing - red
+                ElseIf c = C_EXP And IsBadExpFormat(CStr(.Value)) Then
+                    .Interior.Color = RGB(255, 224, 130)    ' filled but wrong format - amber
                 Else
-                    .Interior.Color = bg                     ' filled - blends with row (no orange)
+                    .Interior.Color = bg                     ' filled + valid - blends with row
                 End If
             ElseIf c = C_CONF Then
                 Select Case Trim(ws.Cells(r, C_CONF).Value)
@@ -2628,6 +2718,7 @@ Public Sub PrintCheckedLabels()
     Call BusyShow(65, "Preparing the label page...")
     Call ApplyLabelContentWidth(wsL)
     Call ApplyLabelPageSetup(wsL)
+    Call RefreshPrintLabelLogo(wsL)      ' insert the logo once; the loop reuses it
     Call BusyShow(100, "Ready.")
     Call BusyHide
 
@@ -2647,7 +2738,7 @@ Public Sub PrintCheckedLabels()
                 skippedNames = skippedNames & "   - " & _
                     Trim(Trim(ws.Cells(r, C_NAME).Value) & " " & Trim(ws.Cells(r, C_STR).Value)) & vbCrLf
             Else
-                Call UpdateLabelPreviewForMedRow(r)
+                Call UpdateLabelPreviewForMedRow(r, False)
                 If PrintLabelSurfaceSafe(1) Then
                     Call MarkPrinted(r)
                     Call LogPrint(r, batchVol)
@@ -2663,6 +2754,9 @@ Public Sub PrintCheckedLabels()
     ' Remember this batch so "Reprint Last Batch" can re-run it after a jam/misfeed.
     gLastBatchRows = printedRows
     gLastBatchVol = batchVol
+    Dbg "PrintCheckedLabels: done=" & done & " skipped=" & skipped
+
+    Call ShowLogSheet      ' land on the dispense Log after printing
 
     Dim msg As String, icon As Integer
     msg = done & " label(s) sent to the Brother."
@@ -2716,6 +2810,7 @@ Public Sub ReprintLastBatch()
     Call BusyShow(65, "Preparing the label page...")
     Call ApplyLabelContentWidth(wsL)
     Call ApplyLabelPageSetup(wsL)
+    Call RefreshPrintLabelLogo(wsL)      ' insert the logo once; the loop reuses it
     Call BusyShow(100, "Ready.")
     Call BusyHide
 
@@ -2726,7 +2821,7 @@ Public Sub ReprintLastBatch()
         If Trim(rowArr(i)) <> "" Then
             r = CLng(rowArr(i))
             If Trim(ws.Cells(r, C_NAME).Value) <> "" Then
-                Call UpdateLabelPreviewForMedRow(r)
+                Call UpdateLabelPreviewForMedRow(r, False)
                 If PrintLabelSurfaceSafe(1) Then
                     Call MarkPrinted(r)
                     Call LogPrint(r, Trim(gLastBatchVol & " (reprint)"))
@@ -2737,7 +2832,21 @@ Public Sub ReprintLastBatch()
     Next i
     Application.ScreenUpdating = True
 
+    Call ShowLogSheet      ' land on the dispense Log after printing
     MsgBox done & " label(s) reprinted on the Brother.", vbInformation, "Reprint Complete"
+End Sub
+
+' Show the dispense Log sheet and scroll to the most recent entry (called after printing).
+Private Sub ShowLogSheet()
+    On Error Resume Next
+    Dim wsLg As Worksheet
+    Set wsLg = ThisWorkbook.Sheets(SH_LOG)
+    wsLg.Activate
+    Dim lastLg As Long
+    lastLg = wsLg.Cells(wsLg.Rows.Count, 1).End(xlUp).Row
+    If lastLg < 1 Then lastLg = 1
+    wsLg.Cells(lastLg, 1).Select
+    On Error GoTo 0
 End Sub
 
 Private Function FirstEmptyRow(ws As Worksheet) As Long
@@ -2754,11 +2863,74 @@ End Function
 '  VALIDATION  /  REVIEW  /  ADD  /  REMOVE
 ' ============================================================
 Private Function IsBadExpFormat(s As String) As Boolean
+    ' True if any comma-separated expiration is not MM/YYYY or MM/DD/YYYY AFTER
+    ' normalization (so ".", "-", spaces and 2-digit years are tolerated - they get
+    ' standardized, not rejected). Multiple values (e.g. two bottles) are each checked.
     Dim re As Object
     Set re = CreateObject("VBScript.RegExp")
-    ' Accept MM/YYYY, MM/YY, MM-YYYY, MM-YY
-    re.Pattern = "^\s*(0?[1-9]|1[0-2])[/\-](\d{2}|\d{4})\s*$"
-    IsBadExpFormat = Not re.Test(s)
+    re.Pattern = "^(0[1-9]|1[0-2])/(\d{4})$|^(0[1-9]|1[0-2])/(0[1-9]|[12]\d|3[01])/(\d{4})$"
+    Dim parts() As String, i As Long, p As String
+    parts = Split(NormalizeExp(s), ",")
+    IsBadExpFormat = False
+    For i = LBound(parts) To UBound(parts)
+        p = Trim(parts(i))
+        If p = "" Then IsBadExpFormat = True: Exit Function
+        If Not re.Test(p) Then IsBadExpFormat = True: Exit Function
+    Next i
+End Function
+
+' Standardize expiration input. Splits on commas (multiple bottles), and for each part
+' converts ".", "-" and spaces to "/", zero-pads the month/day, and expands 2-digit
+' years to 4 digits. Keeps MM/YYYY, or MM/DD/YYYY when a day was entered. Any part that
+' is not a recognizable date is passed through unchanged (validation then flags it).
+Public Function NormalizeExp(ByVal raw As String) As String
+    Dim parts() As String, i As Long, outp As String
+    parts = Split(raw, ",")
+    outp = ""
+    For i = LBound(parts) To UBound(parts)
+        If i > LBound(parts) Then outp = outp & ", "
+        outp = outp & NormExpPart(Trim(parts(i)))
+    Next i
+    NormalizeExp = outp
+End Function
+
+Private Function NormExpPart(ByVal s As String) As String
+    NormExpPart = s
+    If s = "" Then Exit Function
+    Dim t As String
+    t = s
+    t = Replace(t, ".", "/")
+    t = Replace(t, "-", "/")
+    t = Replace(t, " ", "/")
+    Do While InStr(t, "//") > 0
+        t = Replace(t, "//", "/")
+    Loop
+    Dim comp() As String, k As Long
+    comp = Split(t, "/")
+    For k = LBound(comp) To UBound(comp)
+        If comp(k) = "" Or Not IsNumeric(comp(k)) Then Exit Function   ' not a date -> leave original
+    Next k
+    If UBound(comp) = 1 Then
+        NormExpPart = ExpPad2(comp(0)) & "/" & ExpYear4(comp(1))
+    ElseIf UBound(comp) = 2 Then
+        NormExpPart = ExpPad2(comp(0)) & "/" & ExpPad2(comp(1)) & "/" & ExpYear4(comp(2))
+    End If
+End Function
+
+Private Function ExpPad2(ByVal s As String) As String
+    Dim n As Long
+    n = CLng(Val(s))
+    ExpPad2 = Right("0" & CStr(n), 2)
+End Function
+
+Private Function ExpYear4(ByVal s As String) As String
+    Dim n As Long
+    n = CLng(Val(s))
+    If Len(CStr(n)) <= 2 Then
+        ExpYear4 = CStr(2000 + (n Mod 100))
+    Else
+        ExpYear4 = CStr(n)
+    End If
 End Function
 
 Private Function PromptExpiration(medLabel As String) As String
@@ -2769,8 +2941,9 @@ Private Function PromptExpiration(medLabel As String) As String
     Do
         val = Trim(InputBox( _
             "Enter EXPIRATION DATE for:" & vbCrLf & medLabel & vbCrLf & _
-            "(format: MM/YYYY  -  check the bottle)", _
+            "(format: MM/YYYY  -  check the bottle; use commas for multiple bottles)", _
             "Expiration Required", val))
+        val = NormalizeExp(val)
         If val = "" Then Exit Do
         If Not IsBadExpFormat(val) Then Exit Do
         If MsgBox("'" & val & "' does not look like MM/YYYY (for example 05/2027)." & vbCrLf & vbCrLf & _
@@ -2800,6 +2973,7 @@ Private Sub PromptExpLotPair(medLabel As String, ByRef expVal As String, ByRef l
             lotVal = Trim(f.txtLot.Value)
             If Err.Number <> 0 Then Exit Do
             ok = True
+            expVal = NormalizeExp(expVal)      ' standardize separators / years, keep commas
             If expVal = "" Then Exit Do
             If Not IsBadExpFormat(expVal) Then Exit Do
             If MsgBox("'" & expVal & "' does not look like MM/YYYY (for example 05/2027)." & vbCrLf & vbCrLf & _
@@ -2842,8 +3016,10 @@ Public Sub ValidateMedications(ByVal showSummary As Boolean)
         If Trim(ws.Cells(r, C_EXP).Value) = "" Then w = w & "EXPIRATION missing. "
         If Trim(ws.Cells(r, C_LOT).Value) = "" Then w = w & "LOT missing. "
         If Trim(ws.Cells(r, C_EXP).Value) <> "" Then
+            ws.Cells(r, C_EXP).NumberFormat = "@"
+            ws.Cells(r, C_EXP).Value = NormalizeExp(CStr(ws.Cells(r, C_EXP).Value))
             If IsBadExpFormat(CStr(ws.Cells(r, C_EXP).Value)) Then _
-                w = w & "Check expiration format (use MM/YYYY). "
+                w = w & "Check expiration format (use MM/YYYY, comma-separate multiples). "
         End If
 
         ' Duplicate check (same name + strength as an earlier row)
@@ -3036,7 +3212,7 @@ End Sub
 ' ============================================================
 '  LABEL PREVIEW
 ' ============================================================
-Public Sub UpdateLabelPreviewForMedRow(ByVal medRow As Long)
+Public Sub UpdateLabelPreviewForMedRow(ByVal medRow As Long, Optional ByVal refreshChrome As Boolean = True)
     Dim wsM As Worksheet, wsL As Worksheet, wsI As Worksheet
     Set wsM = ThisWorkbook.Sheets(SH_MEDS)
     Set wsL = ThisWorkbook.Sheets(SH_LABEL)
@@ -3121,8 +3297,13 @@ Public Sub UpdateLabelPreviewForMedRow(ByVal medRow As Long)
     Call SetMiniValue(wsL.Cells(15, 1), "EXP", IIf(expDate <> "", expDate, "--"), 12, "L")
     Call SetMiniValue(wsL.Cells(15, 5), "LOT", IIf(lotNum <> "", lotNum, "--"), 12, "R")
 
-    Call ApplyLabelContentWidth(wsL)
-    Call RefreshPrintLabelLogo(wsL)
+    ' Chrome (column widths + logo + header merges) is identical on every label. Batch
+    ' printing sets it once up-front and passes refreshChrome:=False here to skip the
+    ' costly per-label logo re-insert from disk. Single-label preview keeps the default.
+    If refreshChrome Then
+        Call ApplyLabelContentWidth(wsL)
+        Call RefreshPrintLabelLogo(wsL)
+    End If
 End Sub
 
 Public Sub UpdateLabelPreviewFromSelection()
@@ -3279,6 +3460,24 @@ End Sub
 ' Find the Brother QL-1100c and make it Excel's active printer.
 ' Returns the printer name on success, "" if not found / not selectable.
 Private Function SelectBrotherPrinter() As String
+    ' Session cache (B7): the WMI lookup + port probing is the slow part, so once we know
+    ' the Brother's name we reuse it and only re-detect if selecting it fails.
+    If gCachedPrinter <> "" Then
+        If SetActivePrinterByName(gCachedPrinter) Then
+            SelectBrotherPrinter = gCachedPrinter
+            Dbg "SelectBrotherPrinter: cache hit '" & gCachedPrinter & "'"
+            Exit Function
+        End If
+        gCachedPrinter = ""      ' cached printer no longer selectable -> full re-detect
+    End If
+    Dim nm As String
+    nm = DetectBrotherPrinter()
+    gCachedPrinter = nm          ' "" if not found (harmless; re-detected next time)
+    Dbg "SelectBrotherPrinter: detected '" & nm & "'"
+    SelectBrotherPrinter = nm
+End Function
+
+Private Function DetectBrotherPrinter() As String
     Dim foundName As String, foundPort As String
     foundName = ""
     foundPort = ""
@@ -3311,14 +3510,14 @@ Private Function SelectBrotherPrinter() As String
         Application.ActivePrinter = foundName & " on " & foundPort & ":"
         If Err.Number = 0 Then
             On Error GoTo 0
-            SelectBrotherPrinter = foundName
+            DetectBrotherPrinter = foundName
             Exit Function
         End If
         Err.Clear
         Application.ActivePrinter = foundName & " on " & foundPort
         If Err.Number = 0 Then
             On Error GoTo 0
-            SelectBrotherPrinter = foundName
+            DetectBrotherPrinter = foundName
             Exit Function
         End If
         On Error GoTo 0
@@ -3339,12 +3538,12 @@ Private Function SelectBrotherPrinter() As String
     Dim i As Integer
     For i = 0 To UBound(candidates)
         If SetActivePrinterByName(candidates(i)) Then
-            SelectBrotherPrinter = candidates(i)
+            DetectBrotherPrinter = candidates(i)
             Exit Function
         End If
     Next i
 
-    SelectBrotherPrinter = ""
+    DetectBrotherPrinter = ""
 End Function
 
 ' Set Application.ActivePrinter by base name, probing the Ne00:..Ne99: port aliases.
@@ -3410,7 +3609,56 @@ Private Sub LogPrint(ByVal medRow As Long, ByVal vol As String)
             If nextLog Mod 2 = 0 Then .Interior.Color = RGB(245, 245, 245)
         End With
     Next c
+
+    ' Mirror this row to the dated local CSV archive (best-effort; never blocks printing).
+    Call ArchiveDispenseRow(wsLg, nextLog)
 End Sub
+
+' Append one dispense-Log row to a dated local CSV so the day's record survives the
+' on-close Log wipe. The file lives in a "dispense-log" folder next to the workbook and
+' is git-ignored (it contains PHI and must never leave this machine). Best-effort: any
+' failure here is swallowed so it can never interrupt printing.
+Private Sub ArchiveDispenseRow(wsLg As Worksheet, logRow As Long)
+    On Error Resume Next
+    If Not DISPENSE_CSV_ENABLED Then Exit Sub
+    Dim basePath As String
+    basePath = ThisWorkbook.Path
+    If basePath = "" Then Exit Sub          ' workbook never saved -> no place to write
+
+    Dim folder As String
+    folder = basePath & "\dispense-log"
+    If Dir(folder, vbDirectory) = "" Then MkDir folder
+
+    Dim fpath As String
+    fpath = folder & "\" & Format(Date, "YYYY-MM-DD") & ".csv"
+    Dim isNew As Boolean
+    isNew = (Dir(fpath) = "")
+
+    Dim ff As Integer
+    ff = FreeFile
+    Open fpath For Append As #ff
+    If isNew Then
+        Print #ff, "Timestamp,Patient,DOB,Medication,Strength,Directions,Qty,Refills,Expiration,Lot,RxDate,Initials,DosageForm,PrintCount"
+    End If
+    Dim ln As String, c As Integer
+    ln = ""
+    For c = 1 To 14
+        If c > 1 Then ln = ln & ","
+        ln = ln & CsvField(CStr(wsLg.Cells(logRow, c).Value))
+    Next c
+    Print #ff, ln
+    Close #ff
+    On Error GoTo 0
+End Sub
+
+' Quote one value as an RFC-4180 CSV field (double internal quotes; flatten newlines).
+Private Function CsvField(ByVal s As String) As String
+    s = Replace(s, vbCrLf, " ")
+    s = Replace(s, vbCr, " ")
+    s = Replace(s, vbLf, " ")
+    s = Replace(s, """", """""")
+    CsvField = """" & s & """"
+End Function
 
 ' ============================================================
 '  SELF-TEST HARNESS
