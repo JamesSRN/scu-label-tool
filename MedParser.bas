@@ -89,6 +89,47 @@ Private Type MedRecord
     RawText    As String
 End Type
 
+' Holds the "please wait" popup while Print Checked Labels locates the printer.
+Private busyFrm As Object
+
+' Last successfully-printed batch, for "Reprint Last Batch" (session-only; cleared on
+' close). gLastBatchRows is a comma-separated list of Medications-tab row numbers.
+Private gLastBatchRows As String
+Private gLastBatchVol As String
+
+' ============================================================
+'  BUSY / PROGRESS POPUP  (used during the print-prep delay)
+' ============================================================
+Public Sub BusyShow(ByVal pct As Long, ByVal msg As String)
+    ' Show (or update) a small progress popup. Falls back to the status bar
+    ' if the frmBusy UserForm isn't present in this workbook.
+    On Error GoTo StatusFallback
+    If busyFrm Is Nothing Then
+        Set busyFrm = VBA.UserForms.Add("frmBusy")
+    End If
+    busyFrm.SetProgress pct, msg
+    busyFrm.Show vbModeless
+    DoEvents
+    Exit Sub
+StatusFallback:
+    On Error Resume Next
+    Set busyFrm = Nothing
+    Application.StatusBar = "Please wait - " & msg & " (" & pct & "%)"
+    DoEvents
+    On Error GoTo 0
+End Sub
+
+Public Sub BusyHide()
+    On Error Resume Next
+    If Not busyFrm Is Nothing Then
+        busyFrm.Hide
+        Unload busyFrm
+        Set busyFrm = Nothing
+    End If
+    Application.StatusBar = False
+    On Error GoTo 0
+End Sub
+
 ' ============================================================
 '  WORKBOOK SETUP  (run once after importing this module)
 ' ============================================================
@@ -526,11 +567,11 @@ Private Sub BuildLabelPreviewLayout(ws As Worksheet)
     ws.Range("D2:E3").Merge
     ws.Range("F2:H2").Merge
     ws.Range("F3:H3").Merge
-    ws.Range("A5:E6").Merge
-    ws.Range("F5:H5").Merge
-    ws.Range("F6:H6").Merge
+    ws.Range("A5:D6").Merge
+    ws.Range("E5:H6").Merge
     ws.Range("A7:H7").Merge
-    ws.Range("A8:H8").Merge
+    ws.Range("A8:E8").Merge
+    ws.Range("F8:H8").Merge
     ws.Range("A9:H9").Merge
     ws.Range("A10:H12").Merge
     ws.Range("A15:D15").Merge
@@ -549,8 +590,8 @@ Private Sub BuildLabelPreviewLayout(ws As Worksheet)
     End With
 
     ws.Cells(5, 1).Formula = "=IF('Patient & Input'!C5<>"""",'Patient & Input'!C5,""[Patient Name]"")"
-    ws.Cells(5, 6).Formula = "=IF('Patient & Input'!C7<>"""",""Rx  ""&TEXT('Patient & Input'!C7,""m/d/yyyy""),""Rx  --"")"
-    ws.Cells(6, 6).Formula = "=IF('Patient & Input'!C6<>"""",""DOB  ""&'Patient & Input'!C6,""DOB  --"")"
+    ws.Cells(5, 5).Formula = "=IF('Patient & Input'!C6<>"""",""DOB  ""&'Patient & Input'!C6,""DOB  --"")"
+    ws.Cells(8, 6).Formula = "=IF('Patient & Input'!C7<>"""",""Rx  ""&TEXT('Patient & Input'!C7,""m/d/yyyy""),""Rx  --"")"
 
     If Trim(ws.Cells(7, 1).Value) = "" Then _
         ws.Cells(7, 1).Value = "[Select a medication row, then Update]"
@@ -564,11 +605,11 @@ Private Sub BuildLabelPreviewLayout(ws As Worksheet)
     Call FmtLblNameSub(ws.Cells(3, 1), CLINIC_NAMESUB_FONT_PRINT)
     Call FmtLblContactRight(ws.Cells(2, 6), CLINIC_PHONE_FONT_PRINT, True, "B")
     Call FmtLblContactRight(ws.Cells(3, 6), CLINIC_ADDR_FONT_PRINT, False, "T")
-    Call FmtLbl(ws.Cells(5, 1), 17, True, "L", "C")
-    Call FmtLbl(ws.Cells(5, 6), 7, False, "R", "B")
-    Call FmtLbl(ws.Cells(6, 6), 11, True, "R", "T")
+    Call FmtLbl(ws.Cells(5, 1), 14, True, "L", "C")
+    Call FmtLbl(ws.Cells(5, 5), 14, True, "R", "C")
     Call FmtLbl(ws.Cells(7, 1), 14, True, "L", "C")
     Call FmtLbl(ws.Cells(8, 1), 8, False, "L", "C")
+    Call FmtLbl(ws.Cells(8, 6), 8, False, "R", "C")
     Call FmtLbl(ws.Cells(9, 1), 6.5, True, "L", "C")
     Call FmtLbl(ws.Cells(10, 1), 8, True, "L", "T")
     Call FmtLbl(ws.Cells(17, 1), 8, False, "L", "C")
@@ -751,10 +792,16 @@ Private Sub SetMiniValue(c As Range, miniText As String, valueText As String, vS
     c.WrapText = False
     c.Font.Name = "Arial"
     c.Font.Color = RGB(0, 0, 0)
+    ' Shrink-to-fit for the value (merged cells ignore Excel's ShrinkToFit, so size by length)
+    Dim vs As Single
+    vs = vSize
+    If Len(valueText) > 14 Then vs = 9
+    If Len(valueText) > 20 Then vs = 7.5
+    If Len(valueText) > 26 Then vs = 6.5
     On Error Resume Next
     c.Characters(1, Len(miniText)).Font.Size = 7
     c.Characters(1, Len(miniText)).Font.Bold = False
-    c.Characters(Len(miniText) + 1, Len(s) - Len(miniText)).Font.Size = vSize
+    c.Characters(Len(miniText) + 1, Len(s) - Len(miniText)).Font.Size = vs
     c.Characters(Len(miniText) + 1, Len(s) - Len(miniText)).Font.Bold = True
     On Error GoTo 0
     Select Case hAlign
@@ -961,22 +1008,32 @@ Private Sub BuildAllLabelsPreview()
             .Interior.Pattern = xlNone
         End With
 
-        ws.Range(ws.Cells(base + 2, 1), ws.Cells(base + 2, 4)).Merge
+        ws.Range(ws.Cells(base + 2, 1), ws.Cells(base + 2, 3)).Merge
         ws.Cells(base + 2, 1).Value = IIf(patName <> "", patName, "[Patient Name]")
-        Call FmtLbl(ws.Cells(base + 2, 1), 11, True, "L", "C")
-        ws.Cells(base + 2, 1).Font.Size = PatientNameFontSize(IIf(patName <> "", patName, "[Patient Name]"), medLine)
-        ws.Range(ws.Cells(base + 2, 5), ws.Cells(base + 2, 6)).Merge
-        ws.Cells(base + 2, 5).Value = "Rx " & IIf(dateRx <> "", dateRx, "--") & Chr(10) & "DOB " & IIf(dob <> "", dob, "--")
-        Call FmtLbl(ws.Cells(base + 2, 5), 7, True, "R", "C")
+        Call FmtLbl(ws.Cells(base + 2, 1), 13, True, "L", "C")
+        ws.Cells(base + 2, 1).Font.Size = MedFontSize(medLine)
+        ws.Range(ws.Cells(base + 2, 4), ws.Cells(base + 2, 6)).Merge
+        ws.Cells(base + 2, 4).Value = "DOB " & IIf(dob <> "", dob, "--")
+        Call FmtLbl(ws.Cells(base + 2, 4), 13, True, "R", "C")
+        ws.Cells(base + 2, 4).Font.Size = MedFontSize(medLine)
 
         ws.Range(ws.Cells(base + 3, 1), ws.Cells(base + 3, 6)).Merge
         ws.Cells(base + 3, 1).Value = medLine
         Call FmtLbl(ws.Cells(base + 3, 1), 13, True, "L", "C")
-        ws.Cells(base + 3, 1).Font.Size = MedFontSize(medLine)
+        ws.Cells(base + 3, 1).WrapText = True
+        Dim medWrap As Boolean: medWrap = (Len(medLine) > 38)
+        If medWrap Then
+            ws.Cells(base + 3, 1).Font.Size = 11
+        Else
+            ws.Cells(base + 3, 1).Font.Size = MedFontSize(medLine)
+        End If
 
-        ws.Range(ws.Cells(base + 4, 1), ws.Cells(base + 4, 6)).Merge
+        ws.Range(ws.Cells(base + 4, 1), ws.Cells(base + 4, 4)).Merge
         ws.Cells(base + 4, 1).Value = fq
         Call FmtLbl(ws.Cells(base + 4, 1), 8, False, "L", "C")
+        ws.Range(ws.Cells(base + 4, 5), ws.Cells(base + 4, 6)).Merge
+        ws.Cells(base + 4, 5).Value = "Rx " & IIf(dateRx <> "", dateRx, "--")
+        Call FmtLbl(ws.Cells(base + 4, 5), 8, False, "R", "C")
 
         ws.Range(ws.Cells(base + 5, 1), ws.Cells(base + 5, 6)).Merge
         ws.Cells(base + 5, 1).Value = "DIRECTIONS"
@@ -1002,7 +1059,7 @@ Private Sub BuildAllLabelsPreview()
         ws.Rows(base).RowHeight = LOGO_HDR_ROW1_PT
         ws.Rows(base + 1).RowHeight = LOGO_HDR_ROW2_PT
         ws.Rows(base + 2).RowHeight = 22
-        ws.Rows(base + 3).RowHeight = 20
+        ws.Rows(base + 3).RowHeight = IIf(medWrap, 30, 20)
         ws.Rows(base + 4).RowHeight = 12
         ws.Rows(base + 5).RowHeight = 11
         ws.Rows(base + 6).RowHeight = 14
@@ -1059,6 +1116,7 @@ NextR:
 
     Call AddButtonToSheet(ws, "galtop_prnchk", "Print Checked Labels", "PrintCheckedLabels", 1, 8, 170, 24, RGB(216, 67, 21))
     Call AddButtonToSheet(ws, "galtop_refresh", "Refresh Previews", "PreviewAllLabels", 1, 11, 150, 24, RGB(0, 121, 107))
+    Call AddButtonToSheet(ws, "galtop_reprint", "Reprint Last Batch", "ReprintLastBatch", 2, 8, 170, 24, RGB(0, 131, 143))
 
     ws.Activate
     ws.Cells(1, 1).Select
@@ -1135,19 +1193,60 @@ Public Sub RowEdit()
     Dim wsM As Worksheet
     Set wsM = ThisWorkbook.Sheets(SH_MEDS)
 
-    Dim t As String
-    t = InputBox("Medication NAME:", "Edit medication", CStr(wsM.Cells(r, C_NAME).Value))
-    If StrPtr(t) <> 0 Then wsM.Cells(r, C_NAME).Value = Trim(t)
-    t = InputBox("STRENGTH (e.g. 10 mg):", "Edit medication", CStr(wsM.Cells(r, C_STR).Value))
-    If StrPtr(t) <> 0 Then wsM.Cells(r, C_STR).Value = Trim(t)
-    t = InputBox("INSTRUCTIONS (SIG):", "Edit medication", CStr(wsM.Cells(r, C_SIG).Value))
-    If StrPtr(t) <> 0 Then wsM.Cells(r, C_SIG).Value = Trim(t)
-    t = InputBox("QUANTITY:", "Edit medication", CStr(wsM.Cells(r, C_QTY).Value))
-    If StrPtr(t) <> 0 Then wsM.Cells(r, C_QTY).Value = Trim(t)
+    If Not EditMedWithForm(wsM, r) Then
+        Dim t As String
+        t = InputBox("Medication NAME:", "Edit medication", CStr(wsM.Cells(r, C_NAME).Value))
+        If StrPtr(t) <> 0 Then wsM.Cells(r, C_NAME).Value = Trim(t)
+        t = InputBox("STRENGTH (e.g. 10 mg):", "Edit medication", CStr(wsM.Cells(r, C_STR).Value))
+        If StrPtr(t) <> 0 Then wsM.Cells(r, C_STR).Value = Trim(t)
+        t = InputBox("DOSAGE FORM (tablet, capsule...):", "Edit medication", CStr(wsM.Cells(r, C_FORM).Value))
+        If StrPtr(t) <> 0 Then wsM.Cells(r, C_FORM).Value = Trim(t)
+        t = InputBox("QUANTITY:", "Edit medication", CStr(wsM.Cells(r, C_QTY).Value))
+        If StrPtr(t) <> 0 Then wsM.Cells(r, C_QTY).Value = Trim(t)
+        t = InputBox("DIRECTIONS (SIG):", "Edit medication", CStr(wsM.Cells(r, C_SIG).Value))
+        If StrPtr(t) <> 0 Then wsM.Cells(r, C_SIG).Value = Trim(t)
+        t = InputBox("EXPIRATION (MM/YYYY):", "Edit medication", CStr(wsM.Cells(r, C_EXP).Value))
+        If StrPtr(t) <> 0 Then wsM.Cells(r, C_EXP).Value = Trim(t)
+        t = InputBox("LOT number:", "Edit medication", CStr(wsM.Cells(r, C_LOT).Value))
+        If StrPtr(t) <> 0 Then wsM.Cells(r, C_LOT).Value = Trim(t)
+    End If
 
     Call ValidateMedications(False)
     Call BuildAllLabelsPreview
 End Sub
+
+Private Function EditMedWithForm(wsM As Worksheet, r As Long) As Boolean
+    EditMedWithForm = False
+    Dim f As Object
+    On Error GoTo Done
+    Set f = VBA.UserForms.Add("frmMedEdit")
+    If f Is Nothing Then Exit Function
+    f.txtName.Value = CStr(wsM.Cells(r, C_NAME).Value)
+    f.txtStr.Value = CStr(wsM.Cells(r, C_STR).Value)
+    f.txtForm.Value = CStr(wsM.Cells(r, C_FORM).Value)
+    f.txtQty.Value = CStr(wsM.Cells(r, C_QTY).Value)
+    f.txtSig.Value = CStr(wsM.Cells(r, C_SIG).Value)
+    f.txtExp.Value = CStr(wsM.Cells(r, C_EXP).Value)
+    f.txtLot.Value = CStr(wsM.Cells(r, C_LOT).Value)
+    f.Result = ""
+    f.Show
+    If f.Result = "OK" Then
+        wsM.Cells(r, C_NAME).Value = Trim(f.txtName.Value)
+        wsM.Cells(r, C_STR).Value = Trim(f.txtStr.Value)
+        wsM.Cells(r, C_FORM).Value = Trim(f.txtForm.Value)
+        wsM.Cells(r, C_QTY).Value = Trim(f.txtQty.Value)
+        wsM.Cells(r, C_SIG).Value = Trim(f.txtSig.Value)
+        wsM.Cells(r, C_EXP).Value = Trim(f.txtExp.Value)
+        wsM.Cells(r, C_LOT).Value = Trim(f.txtLot.Value)
+    End If
+    EditMedWithForm = True
+    Unload f
+    Exit Function
+Done:
+    On Error Resume Next
+    Unload f
+    EditMedWithForm = False
+End Function
 
 Private Sub AddButtonToSheet(ws As Worksheet, btnName As String, _
                               caption As String, macro As String, _
@@ -1293,17 +1392,13 @@ Public Sub ParseMedications()
                     medLabel = Trim(wsMed.Cells(r, C_NAME).Value & " " & wsMed.Cells(r, C_STR).Value)
                     wsMed.Cells(r, C_EXP).NumberFormat = "@"
                     wsMed.Cells(r, C_LOT).NumberFormat = "@"
-                    If Trim(wsMed.Cells(r, C_EXP).Value) = "" Then
-                        wsMed.Cells(r, C_EXP).Value = Trim(InputBox( _
-                            "Enter EXPIRATION DATE for:" & vbCrLf & medLabel & vbCrLf & _
-                            "(format: MM/YYYY  -  check the bottle)", _
-                            "Expiration Required", ""))
-                    End If
-                    If Trim(wsMed.Cells(r, C_LOT).Value) = "" Then
-                        wsMed.Cells(r, C_LOT).Value = Trim(InputBox( _
-                            "Enter LOT NUMBER for:" & vbCrLf & medLabel & vbCrLf & _
-                            "(check the bottle or package)", _
-                            "Lot Number Required", ""))
+                    If Trim(wsMed.Cells(r, C_EXP).Value) = "" Or Trim(wsMed.Cells(r, C_LOT).Value) = "" Then
+                        Dim eVal As String, lVal As String
+                        eVal = Trim(wsMed.Cells(r, C_EXP).Value)
+                        lVal = Trim(wsMed.Cells(r, C_LOT).Value)
+                        Call PromptExpLotPair(medLabel, eVal, lVal)
+                        wsMed.Cells(r, C_EXP).Value = eVal
+                        wsMed.Cells(r, C_LOT).Value = lVal
                     End If
                 End If
             Next r
@@ -1412,10 +1507,56 @@ Public Sub StartNewPatient()
         Next r
     End If
 
+    ' Forget the remembered batch (belongs to the previous patient).
+    gLastBatchRows = ""
+    gLastBatchVol = ""
+
     wsIn.Activate
     wsIn.Range("C5").Select
     MsgBox "Ready for the next patient." & vbCrLf & "The dispense Log was kept.", _
            vbInformation, "New Patient"
+End Sub
+
+Public Sub ClearSessionSilent()
+    ' Silent Start-NEW-Patient: clears patient + meds + paste, KEEPS the Log.
+    ' Used by the workbook Open / BeforeClose auto-reset (no prompts).
+    On Error Resume Next
+    Dim wsIn As Worksheet, wsMed As Worksheet
+    Set wsIn = ThisWorkbook.Sheets(SH_INPUT)
+    Set wsMed = ThisWorkbook.Sheets(SH_MEDS)
+    If wsIn Is Nothing Or wsMed Is Nothing Then Exit Sub
+    wsIn.Range("C5").Value = ""
+    wsIn.Range("C6").Value = ""
+    wsIn.Range("C7").Value = Format(Now(), "MM/DD/YYYY")
+    wsIn.Range("B12").Value = ""
+    wsIn.Range("C12").Value = ""
+    Dim lastRow As Long, r As Long
+    lastRow = wsMed.Cells(wsMed.Rows.Count, C_NAME).End(xlUp).Row
+    If lastRow > MEDS_HDR_ROWS Then
+        wsMed.Rows(MEDS_HDR_ROWS + 1 & ":" & lastRow).ClearContents
+        wsMed.Range(wsMed.Cells(MEDS_HDR_ROWS + 1, 1), wsMed.Cells(lastRow, C_SEL)).Interior.ColorIndex = xlNone
+        For r = MEDS_HDR_ROWS + 1 To lastRow
+            wsMed.Cells(r, C_EXP).NumberFormat = "@"
+            wsMed.Cells(r, C_LOT).NumberFormat = "@"
+        Next r
+    End If
+    ' Forget any remembered batch so "Reprint Last Batch" can never reprint a previous
+    ' patient's labels after the session resets.
+    gLastBatchRows = ""
+    gLastBatchVol = ""
+    On Error GoTo 0
+End Sub
+
+Public Sub ClearLogSilent()
+    ' Silently clear the dispense Log (used by the on-close full auto-reset).
+    On Error Resume Next
+    Dim wsLog As Worksheet
+    Set wsLog = ThisWorkbook.Sheets(SH_LOG)
+    If wsLog Is Nothing Then Exit Sub
+    Dim lastLog As Long
+    lastLog = wsLog.Cells(wsLog.Rows.Count, 1).End(xlUp).Row
+    If lastLog > LOG_HDR_ROWS Then wsLog.Range(wsLog.Cells(LOG_HDR_ROWS + 1, 1), wsLog.Cells(lastLog, 14)).ClearContents
+    On Error GoTo 0
 End Sub
 
 ' ============================================================
@@ -2473,28 +2614,38 @@ Public Sub PrintCheckedLabels()
               "YES = print all       NO = cancel", _
               vbYesNo + vbQuestion, "Print Checked Labels") = vbNo Then Exit Sub
 
+    Call BusyShow(15, "Locating the Brother QL-1100c...")
     Dim brother As String
     brother = SelectBrotherPrinter()
     If brother = "" Then
+        Call BusyHide
         MsgBox "Brother QL-1100c not found. Make sure it is plugged in, powered on," & vbCrLf & _
                "and loaded with the DK-1202 roll, then try again.", _
                vbExclamation, "Printer Not Found"
         Exit Sub
     End If
 
+    Call BusyShow(65, "Preparing the label page...")
     Call ApplyLabelContentWidth(wsL)
     Call ApplyLabelPageSetup(wsL)
+    Call BusyShow(100, "Ready.")
+    Call BusyHide
 
     Dim batchVol As String
     batchVol = AskInitials()
     Dim done As Integer, skipped As Integer
+    Dim skippedNames As String, printedRows As String
     done = 0
     skipped = 0
+    skippedNames = ""
+    printedRows = ""
     Application.ScreenUpdating = False
     For r = MEDS_HDR_ROWS + 1 To lastRow
         If Trim(ws.Cells(r, C_NAME).Value) <> "" And IsRowSelected(ws, r) Then
             If Trim(ws.Cells(r, C_EXP).Value) = "" Or Trim(ws.Cells(r, C_LOT).Value) = "" Then
                 skipped = skipped + 1
+                skippedNames = skippedNames & "   - " & _
+                    Trim(Trim(ws.Cells(r, C_NAME).Value) & " " & Trim(ws.Cells(r, C_STR).Value)) & vbCrLf
             Else
                 Call UpdateLabelPreviewForMedRow(r)
                 If PrintLabelSurfaceSafe(1) Then
@@ -2502,16 +2653,91 @@ Public Sub PrintCheckedLabels()
                     Call LogPrint(r, batchVol)
                     Call ApplyRowState(ws, r)
                     done = done + 1
+                    printedRows = printedRows & r & ","
                 End If
             End If
         End If
     Next r
     Application.ScreenUpdating = True
 
-    Dim msg As String
+    ' Remember this batch so "Reprint Last Batch" can re-run it after a jam/misfeed.
+    gLastBatchRows = printedRows
+    gLastBatchVol = batchVol
+
+    Dim msg As String, icon As Integer
     msg = done & " label(s) sent to the Brother."
-    If skipped > 0 Then msg = msg & vbCrLf & skipped & " skipped (missing Expiration or Lot)."
-    MsgBox msg, vbInformation, "Print Complete"
+    icon = vbInformation
+    If skipped > 0 Then
+        msg = msg & vbCrLf & vbCrLf & skipped & " SKIPPED (missing Expiration or Lot):" & vbCrLf & _
+              skippedNames & vbCrLf & _
+              "Add the missing Exp/Lot on the Medications tab, then reprint."
+        icon = vbExclamation
+    End If
+    MsgBox msg, icon, "Print Complete"
+End Sub
+
+' Reprint the last successfully-printed batch (for paper jams / misfeeds). Reuses the
+' same rows and volunteer initials; logs each as a reprint. Session-only.
+Public Sub ReprintLastBatch()
+    If Trim(gLastBatchRows) = "" Then
+        MsgBox "There is no batch to reprint yet." & vbCrLf & _
+               "Use 'Print Checked Labels' first, then this button can reprint it.", _
+               vbInformation, "Reprint Last Batch"
+        Exit Sub
+    End If
+
+    Dim ws As Worksheet, wsL As Worksheet
+    Set ws = ThisWorkbook.Sheets(SH_MEDS)
+    Set wsL = ThisWorkbook.Sheets(SH_LABEL)
+
+    Dim rowArr() As String
+    rowArr = Split(gLastBatchRows, ",")
+    Dim i As Long, nRows As Integer
+    nRows = 0
+    For i = LBound(rowArr) To UBound(rowArr)
+        If Trim(rowArr(i)) <> "" Then nRows = nRows + 1
+    Next i
+
+    If MsgBox("Reprint the last " & nRows & " label(s) on the Brother QL-1100c?" & vbCrLf & vbCrLf & _
+              "Make sure the DK-1202 (62 x 100 mm) roll is loaded." & vbCrLf & vbCrLf & _
+              "YES = reprint       NO = cancel", _
+              vbYesNo + vbQuestion, "Reprint Last Batch") = vbNo Then Exit Sub
+
+    Call BusyShow(15, "Locating the Brother QL-1100c...")
+    Dim brother As String
+    brother = SelectBrotherPrinter()
+    If brother = "" Then
+        Call BusyHide
+        MsgBox "Brother QL-1100c not found. Make sure it is plugged in, powered on," & vbCrLf & _
+               "and loaded with the DK-1202 roll, then try again.", _
+               vbExclamation, "Printer Not Found"
+        Exit Sub
+    End If
+    Call BusyShow(65, "Preparing the label page...")
+    Call ApplyLabelContentWidth(wsL)
+    Call ApplyLabelPageSetup(wsL)
+    Call BusyShow(100, "Ready.")
+    Call BusyHide
+
+    Dim r As Long, done As Integer
+    done = 0
+    Application.ScreenUpdating = False
+    For i = LBound(rowArr) To UBound(rowArr)
+        If Trim(rowArr(i)) <> "" Then
+            r = CLng(rowArr(i))
+            If Trim(ws.Cells(r, C_NAME).Value) <> "" Then
+                Call UpdateLabelPreviewForMedRow(r)
+                If PrintLabelSurfaceSafe(1) Then
+                    Call MarkPrinted(r)
+                    Call LogPrint(r, Trim(gLastBatchVol & " (reprint)"))
+                    done = done + 1
+                End If
+            End If
+        End If
+    Next i
+    Application.ScreenUpdating = True
+
+    MsgBox done & " label(s) reprinted on the Brother.", vbInformation, "Reprint Complete"
 End Sub
 
 Private Function FirstEmptyRow(ws As Worksheet) As Long
@@ -2534,6 +2760,62 @@ Private Function IsBadExpFormat(s As String) As Boolean
     re.Pattern = "^\s*(0?[1-9]|1[0-2])[/\-](\d{2}|\d{4})\s*$"
     IsBadExpFormat = Not re.Test(s)
 End Function
+
+Private Function PromptExpiration(medLabel As String) As String
+    ' Prompt for MM/YYYY expiration. If the format looks wrong, offer a correction
+    ' but still ALLOW the entered value - never blocks the volunteer.
+    Dim val As String
+    val = ""
+    Do
+        val = Trim(InputBox( _
+            "Enter EXPIRATION DATE for:" & vbCrLf & medLabel & vbCrLf & _
+            "(format: MM/YYYY  -  check the bottle)", _
+            "Expiration Required", val))
+        If val = "" Then Exit Do
+        If Not IsBadExpFormat(val) Then Exit Do
+        If MsgBox("'" & val & "' does not look like MM/YYYY (for example 05/2027)." & vbCrLf & vbCrLf & _
+                  "Yes  =  re-enter it" & vbCrLf & _
+                  "No  =  keep '" & val & "' as typed", _
+                  vbYesNo + vbExclamation, "Check Expiration Format") = vbNo Then Exit Do
+    Loop
+    PromptExpiration = val
+End Function
+
+Private Sub PromptExpLotPair(medLabel As String, ByRef expVal As String, ByRef lotVal As String)
+    ' Two-field popup (frmExpLot, built by Build-Release) asking a med's Expiration AND
+    ' Lot together. If the form is not present, fall back to two plain input boxes.
+    Dim f As Object, ok As Boolean
+    ok = False
+    On Error Resume Next
+    Set f = VBA.UserForms.Add("frmExpLot")
+    If Not (f Is Nothing) Then
+        Do
+            f.lblMed.Caption = medLabel
+            f.txtExp.Value = expVal
+            f.txtLot.Value = lotVal
+            Err.Clear
+            f.Show
+            If Err.Number <> 0 Then Exit Do
+            expVal = Trim(f.txtExp.Value)
+            lotVal = Trim(f.txtLot.Value)
+            If Err.Number <> 0 Then Exit Do
+            ok = True
+            If expVal = "" Then Exit Do
+            If Not IsBadExpFormat(expVal) Then Exit Do
+            If MsgBox("'" & expVal & "' does not look like MM/YYYY (for example 05/2027)." & vbCrLf & vbCrLf & _
+                      "Yes  =  re-enter it" & vbCrLf & "No  =  keep it as typed", _
+                      vbYesNo + vbExclamation, "Check Expiration Format") = vbNo Then Exit Do
+        Loop
+        Unload f
+    End If
+    On Error GoTo 0
+    If Not ok Then
+        If Trim(expVal) = "" Then expVal = PromptExpiration(medLabel)
+        If Trim(lotVal) = "" Then lotVal = Trim(InputBox( _
+            "Enter LOT NUMBER for:" & vbCrLf & medLabel & vbCrLf & "(check the bottle or package)", _
+            "Lot Number Required", lotVal))
+    End If
+End Sub
 
 ' Scan every medication row, flag problems in the WARNINGS column.
 Public Sub ValidateMedications(ByVal showSummary As Boolean)
@@ -2796,15 +3078,30 @@ Public Sub UpdateLabelPreviewForMedRow(ByVal medRow As Long)
 
     Dim pn As String: pn = IIf(patName <> "", patName, "[Patient Name]")
     wsL.Cells(5, 1).Value = pn
-    wsL.Cells(5, 1).Font.Size = PatientNameFontSize(pn, medLine)
-    wsL.Cells(5, 6).Value = "Rx  " & IIf(dateRx <> "", dateRx, "--")
-    wsL.Cells(6, 6).Value = "DOB  " & IIf(dob <> "", dob, "--")
+    wsL.Cells(5, 1).Font.Size = MedFontSize(medLine)
+    wsL.Cells(5, 5).Value = "DOB  " & IIf(dob <> "", dob, "--")
+    wsL.Cells(5, 5).Font.Size = MedFontSize(medLine)
 
     wsL.Cells(7, 1).Value = medLine
     wsL.Cells(7, 1).Font.Bold = True
-    wsL.Cells(7, 1).Font.Size = MedFontSize(medLine)
+    wsL.Cells(7, 1).WrapText = True
+    If Len(medLine) > 38 Then
+        ' Long name: wrap to two lines at a readable size (uses the white space in
+        ' the med band) instead of shrinking to a tiny single line. Row 7 grows and
+        ' the spacer rows 13/14 shrink so the A1:H15 print area height is preserved.
+        wsL.Cells(7, 1).Font.Size = 11
+        wsL.Rows(7).RowHeight = 28
+        wsL.Rows(13).RowHeight = 1
+        wsL.Rows(14).RowHeight = 1
+    Else
+        wsL.Cells(7, 1).Font.Size = MedFontSize(medLine)
+        wsL.Rows(7).RowHeight = 20
+        wsL.Rows(13).RowHeight = 3
+        wsL.Rows(14).RowHeight = 2
+    End If
 
     wsL.Cells(8, 1).Value = fq
+    wsL.Cells(8, 6).Value = "Rx  " & IIf(dateRx <> "", dateRx, "--")
 
     Dim sigText As String
     sigText = IIf(sig <> "", sig, "[Directions not found - enter manually]")

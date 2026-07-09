@@ -2,6 +2,51 @@
 
 ## Unreleased
 
+### V2 build
+
+Work toward the V2 build, applied in blocks (see `docs/IMPROVEMENT_REPORT_2026-07-09.md`).
+
+**Block 1 - source pre-check (2026-07-09)**
+- Added `tools/check-encoding.ps1`: validates `MedParser.bas` and `Build-Release.vbs` are pure ASCII, have no BOM, use Windows CRLF (no lone LF / doubled CR), and have balanced block keywords. Encoding problems exit 1 (build-breaking); balance is advisory (exit 3) since the VBA compile is the authoritative structural check.
+- `Build-Release.vbs` now runs that check first and **aborts the build only on an encoding failure** (fail-safe: if PowerShell or the script is unavailable, or only a balance advisory is returned, the build proceeds).
+
+**Block 2 - print workflow UX (2026-07-09)**
+- **Skipped labels are now named.** The Print Complete dialog lists each medication skipped for a missing Expiration/Lot (by name), instead of only a count, and uses a warning icon when anything was skipped (`PrintCheckedLabels`).
+- **Reprint Last Batch.** New `ReprintLastBatch` action + gallery button reprints the last successfully-printed batch (same rows + initials, logged as a reprint) for paper-jam/misfeed recovery. The remembered batch is **cleared on any session reset or Start New Patient**, so it can never reprint a previous patient's labels. Session-only (module vars `gLastBatchRows`, `gLastBatchVol`).
+- Dev note: `MedParser.bas` defines a custom String-typed `IIf`; new code must use an explicit `If` for numeric/flag values rather than `IIf`.
+
+### Print progress popup + EXP/LOT shrink-to-fit (2026-07-09)
+
+- **Progress popup during Print Checked Labels.** After the confirm dialog, a small `frmBusy` popup ("Locating the Brother QL-1100c..." -> "Preparing the label page...") covers the delay while the printer is located and the page is set up, then hides just before the initials prompt. New `BusyShow(pct, msg)` / `BusyHide` helpers in `MedParser.bas` (module var `busyFrm`); the form is built by `Build-Release.vbs`. Falls back to the status bar if `frmBusy` isn't present.
+- **EXP/LOT shrink-to-fit.** The footer Expiration/Lot value now steps its font down for long values (14/9/7.5/6.5 pt by length) so long lot numbers stay on one line. Excel's real ShrinkToFit is ignored on merged cells, so this is done by length in `SetMiniValue` (applies to print + gallery).
+- **Long medication names wrap to two lines.** When a medication + strength line is longer than 38 characters it now wraps to two lines at a readable 11 pt (instead of shrinking to a cramped single 10 pt line), filling the white space in the med band. Row 7 grows to 28 pt and the spacer rows 13/14 shrink to 1 pt each, so the `A1:H15` print-area height is unchanged. Short names are unchanged. Mirrored in the gallery previews. `UpdateLabelPreviewForMedRow`, `BuildAllLabelsPreview`.
+- **`frmExpLot` popup enlarged.** Widened/heightened (292 x 258) with a bigger bottom margin so the OK button and lower fields no longer clip on the bottom-left.
+- **Forms are now self-healing (`EnsureForm`).** `Build-Release.vbs` rebuilds `frmExpLot`, `frmMedEdit`, and `frmBusy` **every run** instead of "create-if-missing" — so an old, cropped, or wrongly-captioned form (e.g. a stale "UserForm1" that the old builder kept skipping) is resized and rebuilt automatically. **No manual delete needed anymore.** `EnsureForm` clears the form's controls + code and resizes it but never calls `VBComponents.Remove` (which previously caused an "Unknown runtime error" before `xl.Run`).
+- **Bigger medication name on `frmExpLot`.** The medication + strength line is now 16 pt bold (was ~8 pt) with word-wrap, so it's easy to read at a glance while entering Exp/Lot; the form grew to fit (286 tall).
+- **Old-form controls reconciled by name (`NewCtl` + `HideExtras`).** Removing controls from an existing form via automation proved unreliable on the clinic PC — the stale small-font `lblMed` and a leftover header label survived, and re-adding `lblMed` silently failed as a duplicate (so the 16 pt size never applied). The builder now **reuses each control by name and sets its properties** (which does work) and **hides any leftover controls**, so an old form is corrected in place instead of duplicated.
+- **Form caption + size set at runtime (`UserForm_Initialize`).** Each form now sets its own `Me.Caption`/`Me.Width`/`Me.Height` when it loads, fixing forms that opened titled "UserForm1" and cropped at the bottom (the design-time `frm.Properties` sizing didn't apply reliably, likely under Windows display scaling). Heights bumped for margin: frmExpLot 270, frmMedEdit 350, frmBusy 170.
+- **Build-Release progress meter.** `Build-Release.vbs` now shows a filled-block progress bar in Excel's status bar for each phase (Starting Excel -> Opening workbook -> Importing MedParser -> Building forms -> Installing handlers -> Compiling + layout -> Saving -> Done), so the previously "silent" build startup gives live feedback. New `Prog(pct, msg)` helper; the status bar is handed back to Excel when the build finishes.
+- **`frmBusy` popup enlarged.** Grown to 288 x 152 (same fix as `frmExpLot`) so the percent label no longer clips at the bottom. Picked up automatically via `EnsureForm` (no manual delete).
+
+### Input forms, exp/lot prompt, session auto-reset (2026-07-02)
+
+**Expiration / Lot prompt**
+- After parsing, Exp + Lot are asked **per medication** (paired), not all-Exp-then-all-Lot.
+- Expiration is format-checked (`MM/YYYY`, also `MM/YY`, `MM-YYYY`): if it looks wrong the volunteer is prompted to re-enter, but can keep it as typed (never blocked). `PromptExpiration`, `IsBadExpFormat`.
+
+**Two-field UserForms (built by `Build-Release.vbs`, baked into the workbook)**
+- `frmExpLot` — one popup per med with **Expiration** and **Lot** fields together (`PromptExpLotPair`).
+- `frmMedEdit` — "Edit this med" now opens a prefilled editor: **Medication + Strength bold at the top**, then Dosage form, Quantity, Directions (multi-line), Expiration, Lot. Refills intentionally excluded (edit on the sheet if ever needed). `RowEdit` / `EditMedWithForm`.
+- Forms are referenced **late-bound** in `MedParser.bas` (no compile dependency) and both routines **fall back to plain input boxes** if a form isn't present, so editing/prompting always works.
+- Forms are **create-if-missing**. To change an existing form's design, delete it once in the VBA editor, then rebuild (automation can't safely `Remove`+recreate a form in the same run — doing so caused an "Unknown runtime error").
+
+**Session auto-reset (PHI hygiene)**
+- `ThisWorkbook.Workbook_Open` clears patient + meds + paste box (keeps the Log) so it always opens empty; `Workbook_BeforeClose` does a **full wipe including the Log** (`ClearSessionSilent` + `ClearLogSilent`) and **saves**, so no patient data persists on disk. Handlers installed by `Build-Release.vbs`, which **replaces** the ThisWorkbook module each build (so a stale/legacy `Workbook_Open` can't block the clear-on-open).
+
+**Build-Release**
+- Now also builds `frmExpLot` + `frmMedEdit` and installs the auto-reset handlers. On a compile/runtime failure it now **leaves Excel open** so the exact line is inspectable (Alt+F11 -> Debug -> Compile); other failures still clean up.
+- Fixed a builder bug where a duplicated `btnCancel_Click` was injected into `frmMedEdit` (regex stopped at the first `End Sub`) -> "Ambiguous name" compile error.
+
 ### Header redesign, refills, gallery, emblem fix (2026-07-02)
 
 **Three-zone header (print + gallery)**

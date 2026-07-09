@@ -13,6 +13,7 @@
 1. Opens `MedicationDispensing.xlsm` (or copies `Broken_PrettyPrint_MedicationDispensing.xlsm` if the target is missing).
 2. If bootstrapping: shows a **warning MsgBox** that patient data from a previous `.xlsm` is **not** restored — check `_backups\` or Windows File History.
 3. Removes the existing `MedParser` module and imports `MedParser.bas` from the repo root.
+3b. Builds the `frmExpLot` and `frmMedEdit` UserForms (if missing) and installs the `ThisWorkbook` auto-reset handlers. See "Generated UserForms & handlers" below.
 4. Runs `'MedicationDispensing.xlsm'!SetupWorkbook` (compile check + rebuild buttons/label layout + `PreviewAllLabels`).
 5. **Saves AND closes** the workbook, then quits its Excel instance.
 
@@ -27,6 +28,44 @@ The script cleans up on **every** exit (added 2026-07-02):
 - On success it saves, closes the workbook, and quits Excel.
 
 If an **older** run already left stray Excel processes, end them once via **Task Manager** (any `Microsoft Excel` / `EXCEL.EXE`) so the `~$MedicationDispensing.xlsm` lock clears; after that the script keeps itself clean.
+
+## Generated UserForms & handlers
+
+Build-Release generates UserForms **into the workbook** (so runtime needs no
+"Trust access to the VBA project object model" setting on volunteer PCs):
+
+- **`frmExpLot`** — Expiration + Lot in one popup (used per medication).
+- **`frmMedEdit`** — prefilled "Edit medication" editor (Medication + Strength bold on
+  top; Dosage form, Quantity, Directions, Expiration, Lot).
+- **`frmBusy`** — "please wait" progress popup shown during the Print Checked Labels
+  delay (printer lookup + page setup). Has a `SetProgress(pct, msg)` method driven by
+  `BusyShow` / `BusyHide` in `MedParser.bas`; falls back to the status bar if absent.
+
+It also installs `Workbook_Open` / `Workbook_BeforeClose` **auto-reset** handlers in
+`ThisWorkbook` (clear patient + meds on open/close, keep the Log), guarded so they
+are never duplicated.
+
+**All three forms are self-healing (rebuilt every run) via `EnsureForm`.** You no
+longer need to delete a form to change its design — `EnsureForm` finds the existing
+form (or adds it), **clears its controls + code, resizes it, and the block re-adds
+everything fresh**, so an old cropped/renamed copy is corrected automatically on the
+next build. `EnsureForm` deliberately **never calls `VBComponents.Remove` on the
+form** (only `Designer.Controls.Remove` per control): removing the whole form
+component in the same run as the following `xl.Run SetupWorkbook` triggered an
+"Unknown runtime error" in an earlier version.
+
+Form-building notes for whoever edits the builder:
+
+- Set the form's caption/size **at runtime in `UserForm_Initialize`** (`Me.Caption`,
+  `Me.Width`, `Me.Height`). Design-time `frm.Properties("Caption"/"Width"/"Height")`
+  proved unreliable on some machines (form opened titled "UserForm1" and cropped at the
+  bottom, probably under Windows display scaling); the runtime approach always applies.
+  `EnsureForm` still sets the `frm.Properties` too, as a harmless belt-and-suspenders.
+  Do **not** use `frm.Designer.Caption/Width/Height` (silently ignored).
+- Add controls with `frm.Designer.Controls.Add("Forms.TextBox.1", "name", True)` and
+  set control `.Left/.Top/.Width/.Height/.Caption/.Font.*` normally.
+- Inject form code with `frm.CodeModule.AddFromString`. Make sure event subs aren't
+  duplicated (a duplicate `btnCancel_Click` caused an "Ambiguous name" compile error).
 
 ## Optional automation
 
@@ -85,5 +124,14 @@ Volunteers should open the built `.xlsm` only; they do not run the build script.
 | Bottom | Directions **3 lines**; **EXP/LOT on bottom row 15**; **Refills** on the qty line |
 | Gallery | Cards mirror the header; top-right `Print Checked Labels` / `Refresh Previews`; per-card `Check` / `Uncheck`; full shape-clear each rebuild; Rx over DOB |
 | Build-Release | Robust cleanup — never leaves a stray Excel; read-only guard; **saves and closes** on success |
+
+## Session updates (2026-07-09)
+
+| Area | Change |
+|------|--------|
+| Print flow | `frmBusy` progress popup during the Print Checked Labels printer-lookup/page-setup delay (`BusyShow`/`BusyHide`, status-bar fallback) |
+| Label | Long med names (>38 chars) **wrap to two 11 pt lines** (row 7 -> 28 pt, spacers 13/14 -> 1 pt, print height preserved); EXP/LOT value shrinks by length |
+| Forms | `frmExpLot` **enlarged to 292 x 258** and `frmBusy` **enlarged to 288 x 152** to stop the bottom crop. Forms are now **self-healing** (`EnsureForm` rebuilds them every run) so **no manual delete is needed** — just rebuild and old cropped copies are corrected |
+| Build feedback | Excel opens **visible** and a filled-block **progress meter** runs in its status bar through every build phase (`Prog(pct, msg)`); the bar is released back to Excel when the build finishes |
 
 See `HANDOFF.md` and `CHANGELOG.md` for the full problem/solution list.
