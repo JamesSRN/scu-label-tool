@@ -5,6 +5,10 @@ pharmacy that turns a block of pasted prescription text into clean, validated
 medication labels printed on a **Brother QL-1100c** (DK-1202, 62 x 100 mm,
 landscape) - and keeps a running dispense log.
 
+> **Download & install:** grab the latest `SCU-Label-Printing-vX.Y.zip` from the
+> **[Releases page](https://github.com/JamesSRN/scu-label-tool/releases)**, unzip, and
+> open `MedicationDispensing.xlsm`. Full steps in **[docs/RELEASE.md](docs/RELEASE.md)**.
+
 It is built to be **robust for high-turnover volunteers**: the tool parses,
 checks, and flags entries so that someone using it for the first time is guided
 toward correct labels and caught before mistakes reach a patient.

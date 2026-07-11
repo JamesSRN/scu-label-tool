@@ -47,6 +47,9 @@ Work toward the V2 build, applied in blocks (see `docs/IMPROVEMENT_REPORT_2026-0
 - Added `docs/SCU_QuickStart_Card.pdf`: a one-page, print-ready reference (4 steps: enter/paste, review + Exp/Lot, check, print) with a "Good to know" strip covering Reprint Last Batch, Start New Patient, close-clears-and-archives behavior, and the printer/roll. For laminating and taping by the clinic workstation.
 - **In-app "Start Here" guide sheet.** The workbook now builds a first sheet ("Start Here") mirroring the card - the 4 color-coded steps, a "Good to know" strip, and a "Go to Patient & Input" button - and **opens to it** (activated in `Workbook_Open`; the build ends on it too). New `BuildQuickStartSheet` / `GuideStep` / `GoToInput`; `SH_GUIDE` constant.
 
+**Release packaging (2026-07-09)**
+- Added `docs/RELEASE.md` (download/install steps for clinics + how a maintainer cuts a GitHub Release) and `tools/make-release-zip.ps1`, which packages `dist\SCU-Label-Printing-v<version>.zip` (workbook + emblem + quick-start card + `INSTALL.txt`) with a PHI-free confirmation prompt. `dist\` is git-ignored; the ZIP is attached to a GitHub Release rather than committed. README now links the Releases page.
+
 ### Print progress popup + EXP/LOT shrink-to-fit (2026-07-09)
 
 - **Progress popup during Print Checked Labels.** After the confirm dialog, a small `frmBusy` popup ("Locating the Brother QL-1100c..." -> "Preparing the label page...") covers the delay while the printer is located and the page is set up, then hides just before the initials prompt. New `BusyShow(pct, msg)` / `BusyHide` helpers in `MedParser.bas` (module var `busyFrm`); the form is built by `Build-Release.vbs`. Falls back to the status bar if `frmBusy` isn't present.
