@@ -47,6 +47,20 @@ Work toward the V2 build, applied in blocks (see `docs/IMPROVEMENT_REPORT_2026-0
 - Added `docs/SCU_QuickStart_Card.pdf`: a one-page, print-ready reference (4 steps: enter/paste, review + Exp/Lot, check, print) with a "Good to know" strip covering Reprint Last Batch, Start New Patient, close-clears-and-archives behavior, and the printer/roll. For laminating and taping by the clinic workstation.
 - **In-app "Start Here" guide sheet.** The workbook now builds a first sheet ("Start Here") mirroring the card - the 4 color-coded steps, a "Good to know" strip, and a "Go to Patient & Input" button - and **opens to it** (activated in `Workbook_Open`; the build ends on it too). New `BuildQuickStartSheet` / `GuideStep` / `GoToInput`; `SH_GUIDE` constant.
 
+**Log: Encounters - numbered + green-banded (2026-07-09)**
+- Each print action (a batch print, a reprint, or a single label) is now logged as one **Encounter**, numbered 1, 2, 3, ... in a new **Encounter** column (Log col 16, also added to the dated CSV). Every med row in the same print shares the number, derived from the Log itself (`NextEncounter`) so it survives across prints and macro resets.
+- Each encounter's Log rows are **shaded** in one of **3 cycling greens**, so each patient's print reads as one clearly-bounded block. Replaced the old plain even/odd gray banding.
+
+**Add Medication prompts for Exp/Lot (2026-07-09)**
+- The manual **+ Add Medication** flow now offers the same **Enter Expiration and Lot** popup the Parse flow uses (`PromptExpLotPair`, with the MM/YYYY format check), right after the name/strength/instructions prompts. Choosing No leaves the highlighted cells to fill later.
+
+**Missing Quantity + Source now highlight yellow (2026-07-09)**
+- Empty **Quantity** and empty **Source** cells highlight **yellow** (like Exp/Lot highlight red when missing) until filled; validation still lists both as warnings.
+
+**Table grid + Refills default (2026-07-09)**
+- The Medications data area now gets a **light-gray box grid** across the full width (all columns through Print?), so the table reads as outlined boxes even when empty. The grid survives clearing (borders aren't wiped with contents).
+- **Refills now defaults to 0** when parsing (or a manual add) finds no refill count, instead of leaving the cell blank.
+
 **Fix: Reset/New Patient could leave medication rows behind (2026-07-09)**
 - All three clear paths (Reset Session, Start NEW Patient, and the silent on-open/close reset) previously found the last row to clear by scanning the **Name** column. If leftover data sat in other columns but the Name cell was blank (a partial row, or old data left after the column reorder), the scan found "nothing" and skipped it - so the sheet still showed stale rows. Replaced with a single `ClearMedArea` helper that wipes a **fixed range** (rows 3-503, all table columns) unconditionally, re-applies the Exp/Lot text format and the Source dropdown. `SetupWorkbook` now also calls it, so a freshly built workbook always opens with a clean Medications tab.
 

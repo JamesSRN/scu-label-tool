@@ -686,6 +686,13 @@ Public Sub SetupWorkbook()
         .Borders(xlEdgeBottom).Weight = xlMedium
     End With
     ws2.Rows(2).RowHeight = 30
+    ' Light-gray grid across the data area so the whole table reads as a set of boxes,
+    ' outlined all the way to the right edge (Print?), even before any meds are entered.
+    With ws2.Range(ws2.Cells(MEDS_HDR_ROWS + 1, 1), ws2.Cells(MEDS_HDR_ROWS + 40, C_SEL)).Borders
+        .LineStyle = xlContinuous
+        .Weight = xlThin
+        .Color = RGB(208, 208, 208)
+    End With
     ws2.Columns(C_RAW).Hidden = True            ' internal: original parse text
     ws2.Columns(C_PRTD).Hidden = True           ' internal: superseded by "# of Prints"
 
@@ -705,8 +712,9 @@ Public Sub SetupWorkbook()
     wsLog.Cells(2, 13).Value = "Initials"
     wsLog.Cells(2, 14).Value = "Dosage Form"
     wsLog.Cells(2, 15).Value = "Print #"
+    wsLog.Cells(2, 16).Value = "Encounter"
     Dim lh As Variant
-    For Each lh In Array(11, 12, 13, 14, 15)
+    For Each lh In Array(11, 12, 13, 14, 15, 16)
         Call MatchHeaderFormat(wsLog.Cells(2, 10), wsLog.Cells(2, CLng(lh)))
     Next lh
     wsLog.Columns(11).ColumnWidth = 12   ' Source
@@ -714,6 +722,7 @@ Public Sub SetupWorkbook()
     wsLog.Columns(13).ColumnWidth = 8    ' Initials
     wsLog.Columns(14).ColumnWidth = 13   ' Dosage Form
     wsLog.Columns(15).ColumnWidth = 7    ' Print #
+    wsLog.Columns(16).ColumnWidth = 10   ' Encounter
 
     ' Default Date of Rx to today
     If Trim(ws1.Range("C7").Value) = "" Then
@@ -2000,7 +2009,7 @@ Public Sub ResetSession()
     Dim lastLog As Long
     lastLog = wsLog.Cells(wsLog.Rows.Count, 1).End(xlUp).Row
     If lastLog > LOG_HDR_ROWS Then
-        With wsLog.Range(wsLog.Cells(LOG_HDR_ROWS + 1, 1), wsLog.Cells(lastLog, 15))
+        With wsLog.Range(wsLog.Cells(LOG_HDR_ROWS + 1, 1), wsLog.Cells(lastLog, 16))
             .ClearContents
             .Interior.ColorIndex = xlNone
         End With
@@ -2097,7 +2106,7 @@ Public Sub ClearLogSilent()
     If wsLog Is Nothing Then Exit Sub
     Dim lastLog As Long
     lastLog = wsLog.Cells(wsLog.Rows.Count, 1).End(xlUp).Row
-    If lastLog > LOG_HDR_ROWS Then wsLog.Range(wsLog.Cells(LOG_HDR_ROWS + 1, 1), wsLog.Cells(lastLog, 15)).ClearContents
+    If lastLog > LOG_HDR_ROWS Then wsLog.Range(wsLog.Cells(LOG_HDR_ROWS + 1, 1), wsLog.Cells(lastLog, 16)).ClearContents
     On Error GoTo 0
 End Sub
 
@@ -2992,7 +3001,11 @@ Private Sub WriteMedRow(ws As Worksheet, r As Long, rec As MedRecord, _
     ws.Cells(r, C_FORM).Value  = rec.DosageForm
     ws.Cells(r, C_SIG).Value   = rec.SIG
     ws.Cells(r, C_QTY).Value   = rec.Quantity
-    ws.Cells(r, C_REF).Value   = rec.Refills
+    If Trim(rec.Refills) = "" Then          ' Refills default to 0 when none parsed
+        ws.Cells(r, C_REF).Value = "0"
+    Else
+        ws.Cells(r, C_REF).Value = rec.Refills
+    End If
     ws.Cells(r, C_EXP).Value   = rec.Expiration
     ws.Cells(r, C_LOT).Value   = rec.LotNumber
     ws.Cells(r, C_DATE).Value  = dateRx
@@ -3053,10 +3066,16 @@ Private Sub ApplyRowState(ws As Worksheet, r As Long)
                 Else
                     .Interior.Color = bg                     ' filled + valid - blends with row
                 End If
+            ElseIf c = C_QTY Then
+                If Trim(.Value) = "" Then
+                    .Interior.Color = RGB(255, 241, 118)    ' Quantity missing - yellow
+                Else
+                    .Interior.Color = bg
+                End If
             ElseIf c = C_SRC Then
                 .HorizontalAlignment = xlCenter
                 If Trim(.Value) = "" Then
-                    .Interior.Color = RGB(255, 205, 210)    ' Source required - red until picked
+                    .Interior.Color = RGB(255, 241, 118)    ' Source required - yellow until picked
                 Else
                     .Interior.Color = bg
                 End If
@@ -3215,6 +3234,8 @@ Public Sub PrintCheckedLabels()
 
     Dim batchVol As String
     batchVol = AskInitials()
+    Dim encNum As Long
+    encNum = NextEncounter()          ' this whole batch = one patient encounter
     Dim done As Integer, skipped As Integer
     Dim skippedNames As String, printedRows As String
     done = 0
@@ -3232,7 +3253,7 @@ Public Sub PrintCheckedLabels()
                 Call UpdateLabelPreviewForMedRow(r, False)
                 If PrintLabelSurfaceSafe(LABEL_COPIES) Then
                     Call MarkPrinted(r)
-                    Call LogPrint(r, batchVol)
+                    Call LogPrint(r, batchVol, encNum)
                     Call ApplyRowState(ws, r)
                     done = done + 1
                     printedRows = printedRows & r & ","
@@ -3307,6 +3328,8 @@ Public Sub ReprintLastBatch()
 
     Dim r As Long, done As Integer
     done = 0
+    Dim encNum As Long
+    encNum = NextEncounter()          ' a reprint is logged as its own encounter
     Application.ScreenUpdating = False
     For i = LBound(rowArr) To UBound(rowArr)
         If Trim(rowArr(i)) <> "" Then
@@ -3315,7 +3338,7 @@ Public Sub ReprintLastBatch()
                 Call UpdateLabelPreviewForMedRow(r, False)
                 If PrintLabelSurfaceSafe(LABEL_COPIES) Then
                     Call MarkPrinted(r)
-                    Call LogPrint(r, Trim(gLastBatchVol & " (reprint)"))
+                    Call LogPrint(r, Trim(gLastBatchVol & " (reprint)"), encNum)
                     done = done + 1
                 End If
             End If
@@ -3636,6 +3659,21 @@ Public Sub AddMedicationRow()
     rr = FirstEmptyRow(ws)
     WriteMedRow ws, rr, rec, Trim(wsI.Range("C5").Value), Trim(wsI.Range("C6").Value), _
                 Trim(wsI.Range("C7").Value), 0
+
+    ' Offer to collect Expiration + Lot now, exactly like the Parse flow does.
+    ws.Cells(rr, C_EXP).NumberFormat = "@"
+    ws.Cells(rr, C_LOT).NumberFormat = "@"
+    If MsgBox("Enter EXPIRATION and LOT for " & nm & " now?" & vbCrLf & _
+              "(No = fill the highlighted cells on the sheet later.)", _
+              vbYesNo + vbQuestion, "Enter Exp / Lot?") = vbYes Then
+        Dim eVal As String, lVal As String
+        eVal = ""
+        lVal = ""
+        Call PromptExpLotPair(Trim(nm & " " & rec.Strength), eVal, lVal)
+        ws.Cells(rr, C_EXP).Value = eVal
+        ws.Cells(rr, C_LOT).Value = lVal
+    End If
+
     Call RenumberMeds
     Call ValidateMedications(False)
     ws.Activate
@@ -3913,7 +3951,7 @@ Public Sub PrintLabel()
         On Error Resume Next
         Application.Dialogs(xlDialogPrint).Show
         On Error GoTo 0
-        Call LogPrint(medRowToMark, AskInitials())
+        Call LogPrint(medRowToMark, AskInitials(), NextEncounter())
         Call MarkPrinted(medRowToMark)
         Exit Sub
     End If
@@ -3932,7 +3970,7 @@ Public Sub PrintLabel()
         "YES = print now       NO = cancel", _
         vbYesNo + vbQuestion, "Confirm Label Print") = vbNo Then Exit Sub
 
-    Call LogPrint(medRowToMark, AskInitials())
+    Call LogPrint(medRowToMark, AskInitials(), NextEncounter())
 
     If Not PrintLabelSurfaceSafe(LABEL_COPIES) Then
         MsgBox "Printing failed. Check the printer connection and that a label roll" & vbCrLf & _
@@ -4068,7 +4106,24 @@ Private Function AskInitials() As String
                   "Volunteer Initials", ""))
 End Function
 
-Private Sub LogPrint(ByVal medRow As Long, ByVal vol As String)
+' The next encounter number = one more than the highest already in the Log (col 16).
+' Derived from the Log itself (not a module counter) so it survives across prints and a
+' macro reset, and every med in one print batch is stamped with the same value.
+Private Function NextEncounter() As Long
+    On Error Resume Next
+    Dim wsLg As Worksheet, lastLog As Long, r As Long, mx As Long
+    Set wsLg = ThisWorkbook.Sheets(SH_LOG)
+    lastLog = wsLg.Cells(wsLg.Rows.Count, 1).End(xlUp).Row
+    mx = 0
+    For r = LOG_HDR_ROWS + 1 To lastLog
+        If IsNumeric(wsLg.Cells(r, 16).Value) Then
+            If CLng(wsLg.Cells(r, 16).Value) > mx Then mx = CLng(wsLg.Cells(r, 16).Value)
+        End If
+    Next r
+    NextEncounter = mx + 1
+End Function
+
+Private Sub LogPrint(ByVal medRow As Long, ByVal vol As String, ByVal encounter As Long)
     On Error Resume Next
     Dim wsI As Worksheet, wsM As Worksheet, wsLg As Worksheet
     Set wsI = ThisWorkbook.Sheets(SH_INPUT)
@@ -4098,15 +4153,27 @@ Private Sub LogPrint(ByVal medRow As Long, ByVal vol As String)
         wsLg.Cells(nextLog, 15).Value = wsM.Cells(medRow, C_CNT).Value    ' Print #
     End If
     wsLg.Cells(nextLog, 13).Value = vol                                  ' Initials
+    wsLg.Cells(nextLog, 16).Value = encounter                            ' Encounter #
+
+    ' Shade the whole row by encounter, cycling 3 greens, so each patient's print reads
+    ' as one clearly-bounded block in the Log.
+    Dim encColor As Long
+    Select Case (encounter - 1) Mod 3
+        Case 0:    encColor = RGB(232, 245, 233)   ' lightest green
+        Case 1:    encColor = RGB(200, 230, 201)   ' light green
+        Case Else: encColor = RGB(165, 214, 167)   ' medium green
+    End Select
 
     Dim c As Integer
-    For c = 1 To 15
+    For c = 1 To 16
         With wsLg.Cells(nextLog, c)
             .Font.Name = "Arial"
             .Font.Size = 9
-            If nextLog Mod 2 = 0 Then .Interior.Color = RGB(245, 245, 245)
+            .Interior.Color = encColor
         End With
     Next c
+    wsLg.Cells(nextLog, 16).HorizontalAlignment = xlCenter
+    wsLg.Cells(nextLog, 16).Font.Bold = True
 
     ' Mirror this row to the dated local CSV archive (best-effort; never blocks printing).
     Call ArchiveDispenseRow(wsLg, nextLog)
@@ -4136,11 +4203,11 @@ Private Sub ArchiveDispenseRow(wsLg As Worksheet, logRow As Long)
     ff = FreeFile
     Open fpath For Append As #ff
     If isNew Then
-        Print #ff, "Timestamp,Patient,DOB,Medication,Strength,Directions,Qty,Refills,Expiration,Lot,Source,RxDate,Initials,DosageForm,PrintCount"
+        Print #ff, "Timestamp,Patient,DOB,Medication,Strength,Directions,Qty,Refills,Expiration,Lot,Source,RxDate,Initials,DosageForm,PrintCount,Encounter"
     End If
     Dim ln As String, c As Integer
     ln = ""
-    For c = 1 To 15
+    For c = 1 To 16
         If c > 1 Then ln = ln & ","
         ln = ln & CsvField(CStr(wsLg.Cells(logRow, c).Value))
     Next c
