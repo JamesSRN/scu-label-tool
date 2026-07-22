@@ -4,7 +4,15 @@
 
 ### V2 build
 
-Work toward the V2 build, applied in blocks (see `docs/IMPROVEMENT_REPORT_2026-07-09.md`).
+Work toward the V2 build, applied in blocks (see `IMPROVEMENT_REPORT_2026-07-09.md`).
+
+**Edit a past Encounter (2026-07-09)**
+- New **Edit Past Encounter** / **Save Edited Encounter** buttons on the Medications tab. Each print now saves a **full snapshot** of the patient's med list under its Encounter # (hidden `EncounterData` sheet). Reopening an encounter (pick from a list by number) restores the patient + every med exactly (all fields, incl. lot/exp/source), where you can add, remove, or fix meds.
+- **Save replaces** that encounter's Log rows and snapshot in place (same number, no duplicates) and **rebuilds the Tebra note** from the corrected Log. It then **asks whether to reprint** the corrected labels (2 copies each, no re-logging). Edited Log rows are marked "(edited)" in the Initials column; the dated CSV keeps history (append-only).
+- Snapshots share the Log's lifecycle: kept across **Start NEW Patient**, wiped on **full reset / on close**. New Log constant map (`LG_*`) and snapshot map (`ES_*`) drive all Log/snapshot reads and writes.
+
+**Encounter column moved next to Timestamp (2026-07-09)**
+- In the Log (and the dated CSV), **Encounter** moved from the far right to **column 2, right after Timestamp**; all other columns shifted right one. The whole Log now runs through an `LG_*` constant map (header row, LogPrint, Tebra, CSV, NextEncounter), so future Log reorders are a one-line change.
 
 **Block 1 - source pre-check (2026-07-09)**
 - Added `tools/check-encoding.ps1`: validates `MedParser.bas` and `Build-Release.vbs` are pure ASCII, have no BOM, use Windows CRLF (no lone LF / doubled CR), and have balanced block keywords. Encoding problems exit 1 (build-breaking); balance is advisory (exit 3) since the VBA compile is the authoritative structural check.

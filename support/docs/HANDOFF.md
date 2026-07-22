@@ -72,6 +72,8 @@ Code/docs are version-controlled; the `.xlsm` (PHI) is local-only by design.
 - **Start Here** - the in-app quick-start guide; the workbook opens here.
 - **Label Preview** (HIDDEN) - the internal print surface. Every label renders
   here and prints from here. Do NOT delete it.
+- **EncounterData** (HIDDEN) - full per-encounter snapshots (one row per med) that power
+  Edit Past Encounter. Cleared on full reset / close. Do NOT delete it.
 
 Shortcuts: `Ctrl+Shift+P` parse, `Ctrl+Shift+R` reset, `Ctrl+Shift+L` refresh
 Label Previews.
@@ -93,6 +95,8 @@ Label Previews.
 - **Fit-to-page** label print so the bottom Exp/Lot row can't clip (see §4).
 - **`ClearMedArea`**: all clear paths wipe a fixed range, never miss unnamed rows.
 - Medications tab: code-drawn blue banner + box grid; internal columns hidden.
+- **Encounter** column moved to Log col 2 (right after Timestamp); whole Log now runs on an `LG_*` constant map.
+- **Edit a past Encounter**: each print saves a full snapshot (hidden `EncounterData` sheet, `ES_*` map). **Edit Past Encounter** reopens one (pick by number) and restores the patient + all meds; **Save Edited Encounter** replaces that encounter's Log rows + snapshot in place (no dupes), rebuilds the Tebra note, and offers to reprint. Snapshots kept across Start NEW Patient, wiped on full reset / close.
 
 ### Parsing & validation
 - Block splitter starts a new medication per drug-header line, even without blank
@@ -443,7 +447,9 @@ print (no blank follow-on label); logo/header layout on screen and print path
 | `BusyShow(pct, msg)` / `BusyHide` | "Please wait" progress popup (`frmBusy`) shown during the Print Checked Labels printer-lookup + page-setup delay; status-bar fallback if the form is missing. |
 | `MatchHeaderFormat` | Safe header format copy (PasteSpecial 1004 fix). |
 | `PrintLabel` / `PrintCheckedLabels` / `SelectBrotherPrinter` / `MarkPrinted` | Auto-select Brother, confirm, print, bump # of Prints. |
-| `LogPrint(medRow, vol, encounter)` / `AskInitials` / `NextEncounter` | Full per-print Log row (single + batch), stamped with the Encounter # and shaded by one of 3 cycling greens. `NextEncounter` = highest Encounter in the Log + 1. |
+| `LogPrint(medRow, vol, encounter)` / `AskInitials` / `NextEncounter` | Full per-print Log row (single + batch), stamped with the Encounter # (Log col 2) and shaded by one of 3 cycling greens. `NextEncounter` = highest Encounter in the Log + 1. |
+| `EncStore` / `SaveEncounterSnapshot` / `ClearEncounterStore` / `DeleteRowsByEncounter` | Hidden `EncounterData` snapshot store (full med detail per encounter); snapshot on each print; wipe on full reset/close; delete rows for one encounter. |
+| `EditEncounter` / `LoadEncounter` / `SaveEditedEncounter` / `PrintEncounterLabelsNoLog` | Reopen a past encounter (list + pick), restore patient + meds; save = replace that encounter's Log + snapshot, rebuild Tebra, optional reprint (no re-log). |
 | `FillTebraTemplate` / `TebraPatientBlock` / `TebraLogSection` / `TebraLogMedLine` | Build the TEBRA TEMPLATE sheet from the Log: one block per patient, grouped by source. |
 | `ApplySourceValidation` / `ClearMedArea` | Source dropdown (only dropdown in the grid); fixed-range wipe of the med area used by every clear path + build. |
 | `InstallMedSheetEvents` | Re-inject the Medications double-click handler at build (uses `C_*` constants). |

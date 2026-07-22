@@ -62,6 +62,25 @@ Private Const LG_FORM As Long = 15    ' Dosage Form
 Private Const LG_CNT  As Long = 16    ' Print #
 Private Const LG_LAST As Long = 16    ' rightmost Log column
 
+' Encounter snapshot store (hidden sheet). One row per (encounter, med) capturing the FULL
+' medication detail so a past encounter can be reopened and edited exactly as it was.
+Private Const SH_ENC As String = "EncounterData"
+Private Const ES_ENC    As Long = 1     ' Encounter #
+Private Const ES_PT     As Long = 2     ' Patient
+Private Const ES_DOB    As Long = 3     ' DOB
+Private Const ES_RXDATE As Long = 4     ' Patient Rx date (Input C7)
+Private Const ES_NAME   As Long = 5
+Private Const ES_STR    As Long = 6
+Private Const ES_FORM   As Long = 7
+Private Const ES_SIG    As Long = 8
+Private Const ES_QTY    As Long = 9
+Private Const ES_EXP    As Long = 10
+Private Const ES_LOT    As Long = 11
+Private Const ES_SRC    As Long = 12
+Private Const ES_DATE   As Long = 13
+Private Const ES_REF    As Long = 14
+Private Const ES_LAST   As Long = 14
+
 Private Const MEDS_HDR_ROWS As Integer = 3   ' rows before data begins
 Private Const LOG_HDR_ROWS  As Integer = 2
 
@@ -121,6 +140,7 @@ Private busyFrm As Object
 ' close). gLastBatchRows is a comma-separated list of Medications-tab row numbers.
 Private gLastBatchRows As String
 Private gLastBatchVol As String
+Private gEditingEncounter As Long   ' >0 while a past encounter is loaded for editing; 0 otherwise
 
 ' V2: append each print to a dated local CSV archive (PHI - stays on this machine,
 ' git-ignored) so the day's dispensing record survives the on-close Log wipe.
@@ -439,15 +459,15 @@ End Function
 ' Log columns: 4 name, 5 strength, 6 directions, 7 qty, 8 refills, 9 exp, 10 lot, 13 form.
 Private Function TebraLogMedLine(wsLg As Worksheet, ByVal lg As Long) As String
     Dim s As String
-    s = Trim(wsLg.Cells(lg, 4).Value & " " & wsLg.Cells(lg, 5).Value)
-    If Trim(wsLg.Cells(lg, 14).Value) <> "" Then s = Trim(s & " " & Trim(wsLg.Cells(lg, 14).Value))
-    If Trim(wsLg.Cells(lg, 6).Value) <> "" Then s = s & " - " & Trim(wsLg.Cells(lg, 6).Value)
+    s = Trim(wsLg.Cells(lg, LG_NAME).Value & " " & wsLg.Cells(lg, LG_STR).Value)
+    If Trim(wsLg.Cells(lg, LG_FORM).Value) <> "" Then s = Trim(s & " " & Trim(wsLg.Cells(lg, LG_FORM).Value))
+    If Trim(wsLg.Cells(lg, LG_SIG).Value) <> "" Then s = s & " - " & Trim(wsLg.Cells(lg, LG_SIG).Value)
     Dim tail As String
     tail = ""
-    If Trim(wsLg.Cells(lg, 7).Value) <> "" Then tail = TebraAppend(tail, "Qty " & Trim(wsLg.Cells(lg, 7).Value))
-    If Trim(wsLg.Cells(lg, 8).Value) <> "" Then tail = TebraAppend(tail, Trim(wsLg.Cells(lg, 8).Value) & " refills")
-    If Trim(wsLg.Cells(lg, 9).Value) <> "" Then tail = TebraAppend(tail, "Exp " & Trim(wsLg.Cells(lg, 9).Value))
-    If Trim(wsLg.Cells(lg, 10).Value) <> "" Then tail = TebraAppend(tail, "Lot " & Trim(wsLg.Cells(lg, 10).Value))
+    If Trim(wsLg.Cells(lg, LG_QTY).Value) <> "" Then tail = TebraAppend(tail, "Qty " & Trim(wsLg.Cells(lg, LG_QTY).Value))
+    If Trim(wsLg.Cells(lg, LG_REF).Value) <> "" Then tail = TebraAppend(tail, Trim(wsLg.Cells(lg, LG_REF).Value) & " refills")
+    If Trim(wsLg.Cells(lg, LG_EXP).Value) <> "" Then tail = TebraAppend(tail, "Exp " & Trim(wsLg.Cells(lg, LG_EXP).Value))
+    If Trim(wsLg.Cells(lg, LG_LOT).Value) <> "" Then tail = TebraAppend(tail, "Lot " & Trim(wsLg.Cells(lg, LG_LOT).Value))
     If tail <> "" Then s = s & "  (" & tail & ")"
     TebraLogMedLine = s
 End Function
@@ -461,8 +481,8 @@ Private Sub TebraLogSection(ws As Worksheet, ByRef r As Long, wsLg As Worksheet,
     cnt = 0
     dupe = "|"
     For lg = LOG_HDR_ROWS + 1 To lastLog
-        If UCase(Trim(wsLg.Cells(lg, 2).Value)) = UCase(pn) And UCase(Trim(wsLg.Cells(lg, 3).Value)) = UCase(pdob) Then
-            src = UCase(Trim(wsLg.Cells(lg, 11).Value))
+        If UCase(Trim(wsLg.Cells(lg, LG_PT).Value)) = UCase(pn) And UCase(Trim(wsLg.Cells(lg, LG_DOB).Value)) = UCase(pdob) Then
+            src = UCase(Trim(wsLg.Cells(lg, LG_SRC).Value))
             If src = "" Then src = "IN HOUSE"
             If InStr("|" & srcKeys & "|", "|" & src & "|") > 0 Then
                 ln = TebraLogMedLine(wsLg, lg)
@@ -593,8 +613,8 @@ Public Sub FillTebraTemplate()
         Dim seen As String, lg As Long, pn As String, pdob As String, key As String
         seen = "|"
         For lg = LOG_HDR_ROWS + 1 To lastLog
-            pn = Trim(wsLg.Cells(lg, 2).Value)
-            pdob = Trim(wsLg.Cells(lg, 3).Value)
+            pn = Trim(wsLg.Cells(lg, LG_PT).Value)
+            pdob = Trim(wsLg.Cells(lg, LG_DOB).Value)
             If pn <> "" Then
                 key = UCase(pn & "~" & pdob)
                 If InStr(seen, "|" & key & "|") = 0 Then
@@ -638,6 +658,9 @@ Public Sub SetupWorkbook()
     Call AddButtonToSheet(ws2, "btnRevMed", "Review & Validate",  "ReviewMedications",        5, 19, 150, 22, RGB(21, 101, 192))
     Call AddButtonToSheet(ws2, "btnPrvAll", "Preview ALL Labels",   "PreviewAllLabels",         7, 19, 150, 22, RGB(0, 121, 107))
     Call AddButtonToSheet(ws2, "btnPrnChk", "Print Checked Labels", "PrintCheckedLabels",       9, 19, 190, 30, RGB(216, 67, 21))
+    Call AddButtonToSheet(ws2, "btnEditEnc", "Edit Past Encounter",  "EditEncounter",           12, 19, 190, 22, RGB(84, 110, 122))
+    Call AddButtonToSheet(ws2, "btnSaveEnc", "Save Edited Encounter", "SaveEditedEncounter",    14, 19, 190, 22, RGB(0, 121, 107))
+    Call EncStore   ' make sure the hidden encounter-snapshot sheet exists
     ' Removed the single "Print Selected Label" button - printing is now via Print Checked Labels
     On Error Resume Next
     ws2.Shapes("btnPrnMed").Delete
@@ -724,26 +747,37 @@ Public Sub SetupWorkbook()
     Call InstallMedSheetEvents(ws2)
     Call ApplyAllRowStates(ws2)
 
-    ' Dispense Log columns 11-15 written by code so the Log order mirrors the Medications
-    ' tab: Source sits right after Lot (col 10), then Rx Date, Initials, Dosage Form, Print #.
+    ' Dispense Log header row written entirely by code (via LG_* constants) so the column
+    ' order is authoritative: Encounter sits right after Timestamp, then patient + med fields.
     Dim wsLog As Worksheet
     Set wsLog = ThisWorkbook.Sheets(SH_LOG)
-    wsLog.Cells(2, 11).Value = "Source"
-    wsLog.Cells(2, 12).Value = "Rx Date"
-    wsLog.Cells(2, 13).Value = "Initials"
-    wsLog.Cells(2, 14).Value = "Dosage Form"
-    wsLog.Cells(2, 15).Value = "Print #"
-    wsLog.Cells(2, 16).Value = "Encounter"
-    Dim lh As Variant
-    For Each lh In Array(11, 12, 13, 14, 15, 16)
-        Call MatchHeaderFormat(wsLog.Cells(2, 10), wsLog.Cells(2, CLng(lh)))
+    wsLog.Cells(2, LG_TIME).Value = "Timestamp"
+    wsLog.Cells(2, LG_ENC).Value = "Encounter"
+    wsLog.Cells(2, LG_PT).Value = "Patient"
+    wsLog.Cells(2, LG_DOB).Value = "DOB"
+    wsLog.Cells(2, LG_NAME).Value = "Medication"
+    wsLog.Cells(2, LG_STR).Value = "Strength"
+    wsLog.Cells(2, LG_SIG).Value = "Directions"
+    wsLog.Cells(2, LG_QTY).Value = "Qty"
+    wsLog.Cells(2, LG_REF).Value = "Refills"
+    wsLog.Cells(2, LG_EXP).Value = "Expiration"
+    wsLog.Cells(2, LG_LOT).Value = "Lot #"
+    wsLog.Cells(2, LG_SRC).Value = "Source"
+    wsLog.Cells(2, LG_DATE).Value = "Rx Date"
+    wsLog.Cells(2, LG_INIT).Value = "Initials"
+    wsLog.Cells(2, LG_FORM).Value = "Dosage Form"
+    wsLog.Cells(2, LG_CNT).Value = "Print #"
+    Dim lh As Long
+    For lh = 2 To LG_LAST
+        Call MatchHeaderFormat(wsLog.Cells(2, LG_TIME), wsLog.Cells(2, lh))
     Next lh
-    wsLog.Columns(11).ColumnWidth = 12   ' Source
-    wsLog.Columns(12).ColumnWidth = 12   ' Rx Date
-    wsLog.Columns(13).ColumnWidth = 8    ' Initials
-    wsLog.Columns(14).ColumnWidth = 13   ' Dosage Form
-    wsLog.Columns(15).ColumnWidth = 7    ' Print #
-    wsLog.Columns(16).ColumnWidth = 10   ' Encounter
+    wsLog.Columns(LG_ENC).ColumnWidth = 10   ' Encounter
+    wsLog.Columns(LG_SRC).ColumnWidth = 12   ' Source
+    wsLog.Columns(LG_DATE).ColumnWidth = 12  ' Rx Date
+    wsLog.Columns(LG_INIT).ColumnWidth = 8   ' Initials
+    wsLog.Columns(LG_FORM).ColumnWidth = 13  ' Dosage Form
+    wsLog.Columns(LG_CNT).ColumnWidth = 7    ' Print #
+    wsLog.Cells(2, LG_ENC).HorizontalAlignment = xlCenter
 
     ' Default Date of Rx to today
     If Trim(ws1.Range("C7").Value) = "" Then
@@ -2030,11 +2064,12 @@ Public Sub ResetSession()
     Dim lastLog As Long
     lastLog = wsLog.Cells(wsLog.Rows.Count, 1).End(xlUp).Row
     If lastLog > LOG_HDR_ROWS Then
-        With wsLog.Range(wsLog.Cells(LOG_HDR_ROWS + 1, 1), wsLog.Cells(lastLog, 16))
+        With wsLog.Range(wsLog.Cells(LOG_HDR_ROWS + 1, 1), wsLog.Cells(lastLog, LG_LAST))
             .ClearContents
             .Interior.ColorIndex = xlNone
         End With
     End If
+    Call ClearEncounterStore   ' wipe saved encounter snapshots on a full reset
 
     ' Clear label preview dynamic cells
     Dim wsLbl As Worksheet
@@ -2127,7 +2162,8 @@ Public Sub ClearLogSilent()
     If wsLog Is Nothing Then Exit Sub
     Dim lastLog As Long
     lastLog = wsLog.Cells(wsLog.Rows.Count, 1).End(xlUp).Row
-    If lastLog > LOG_HDR_ROWS Then wsLog.Range(wsLog.Cells(LOG_HDR_ROWS + 1, 1), wsLog.Cells(lastLog, 16)).ClearContents
+    If lastLog > LOG_HDR_ROWS Then wsLog.Range(wsLog.Cells(LOG_HDR_ROWS + 1, 1), wsLog.Cells(lastLog, LG_LAST)).ClearContents
+    Call ClearEncounterStore   ' encounters share the Log's lifecycle (kept on New Patient, wiped on full reset/close)
     On Error GoTo 0
 End Sub
 
@@ -3284,6 +3320,9 @@ Public Sub PrintCheckedLabels()
     Next r
     Application.ScreenUpdating = True
 
+    ' Snapshot this encounter's full med list so it can be reopened + edited later.
+    If done > 0 Then Call SaveEncounterSnapshot(encNum)
+
     ' Remember this batch so "Reprint Last Batch" can re-run it after a jam/misfeed.
     gLastBatchRows = printedRows
     gLastBatchVol = batchVol
@@ -3366,6 +3405,8 @@ Public Sub ReprintLastBatch()
         End If
     Next i
     Application.ScreenUpdating = True
+
+    If done > 0 Then Call SaveEncounterSnapshot(encNum)   ' snapshot the reprint as its own encounter
 
     Call ShowLogSheet      ' land on the dispense Log after printing
     MsgBox done & " medication(s) reprinted, " & LABEL_COPIES & " copies each  (" & (done * LABEL_COPIES) & " labels).", vbInformation, "Reprint Complete"
@@ -4137,8 +4178,8 @@ Private Function NextEncounter() As Long
     lastLog = wsLg.Cells(wsLg.Rows.Count, 1).End(xlUp).Row
     mx = 0
     For r = LOG_HDR_ROWS + 1 To lastLog
-        If IsNumeric(wsLg.Cells(r, 16).Value) Then
-            If CLng(wsLg.Cells(r, 16).Value) > mx Then mx = CLng(wsLg.Cells(r, 16).Value)
+        If IsNumeric(wsLg.Cells(r, LG_ENC).Value) Then
+            If CLng(wsLg.Cells(r, LG_ENC).Value) > mx Then mx = CLng(wsLg.Cells(r, LG_ENC).Value)
         End If
     Next r
     NextEncounter = mx + 1
@@ -4224,11 +4265,11 @@ Private Sub ArchiveDispenseRow(wsLg As Worksheet, logRow As Long)
     ff = FreeFile
     Open fpath For Append As #ff
     If isNew Then
-        Print #ff, "Timestamp,Patient,DOB,Medication,Strength,Directions,Qty,Refills,Expiration,Lot,Source,RxDate,Initials,DosageForm,PrintCount,Encounter"
+        Print #ff, "Timestamp,Encounter,Patient,DOB,Medication,Strength,Directions,Qty,Refills,Expiration,Lot,Source,RxDate,Initials,DosageForm,PrintCount"
     End If
     Dim ln As String, c As Integer
     ln = ""
-    For c = 1 To 16
+    For c = 1 To LG_LAST
         If c > 1 Then ln = ln & ","
         ln = ln & CsvField(CStr(wsLg.Cells(logRow, c).Value))
     Next c
@@ -4245,6 +4286,315 @@ Private Function CsvField(ByVal s As String) As String
     s = Replace(s, """", """""")
     CsvField = """" & s & """"
 End Function
+
+' ============================================================
+'  ENCOUNTER SNAPSHOTS + EDITING
+'  Each print saves a FULL snapshot of the patient's med list under its Encounter # (hidden
+'  SH_ENC sheet). A past encounter can be reopened, edited (add / remove / fix meds), then
+'  re-saved - which REPLACES that encounter's Log + snapshot rows (no duplicates) and
+'  refreshes the Tebra note. The dated CSV keeps history (append-only).
+' ============================================================
+
+' The hidden snapshot sheet (created on demand) with its header row.
+Private Function EncStore() As Worksheet
+    Dim ws As Worksheet
+    On Error Resume Next
+    Set ws = ThisWorkbook.Sheets(SH_ENC)
+    On Error GoTo 0
+    If ws Is Nothing Then
+        Set ws = ThisWorkbook.Sheets.Add(After:=ThisWorkbook.Sheets(ThisWorkbook.Sheets.Count))
+        ws.Name = SH_ENC
+    End If
+    ws.Cells(1, ES_ENC).Value = "Enc"
+    ws.Cells(1, ES_PT).Value = "Patient"
+    ws.Cells(1, ES_DOB).Value = "DOB"
+    ws.Cells(1, ES_RXDATE).Value = "RxDate"
+    ws.Cells(1, ES_NAME).Value = "Name"
+    ws.Cells(1, ES_STR).Value = "Strength"
+    ws.Cells(1, ES_FORM).Value = "Form"
+    ws.Cells(1, ES_SIG).Value = "SIG"
+    ws.Cells(1, ES_QTY).Value = "Qty"
+    ws.Cells(1, ES_EXP).Value = "Exp"
+    ws.Cells(1, ES_LOT).Value = "Lot"
+    ws.Cells(1, ES_SRC).Value = "Source"
+    ws.Cells(1, ES_DATE).Value = "Date"
+    ws.Cells(1, ES_REF).Value = "Refills"
+    ws.Visible = xlSheetHidden
+    Set EncStore = ws
+End Function
+
+' Delete every data row on ws (below its header) whose column encCol = encNum. Bottom-up.
+Private Sub DeleteRowsByEncounter(ws As Worksheet, ByVal encCol As Long, ByVal encNum As Long, ByVal firstDataRow As Long)
+    Dim last As Long, r As Long
+    last = ws.Cells(ws.Rows.Count, encCol).End(xlUp).Row
+    For r = last To firstDataRow Step -1
+        If IsNumeric(ws.Cells(r, encCol).Value) Then
+            If CLng(ws.Cells(r, encCol).Value) = encNum Then ws.Rows(r).Delete
+        End If
+    Next r
+End Sub
+
+' Snapshot the CURRENT patient + every named medication row under encounter encNum.
+Private Sub SaveEncounterSnapshot(ByVal encNum As Long)
+    On Error Resume Next
+    Dim wsE As Worksheet, wsM As Worksheet, wsI As Worksheet
+    Set wsE = EncStore()
+    Set wsM = ThisWorkbook.Sheets(SH_MEDS)
+    Set wsI = ThisWorkbook.Sheets(SH_INPUT)
+    Call DeleteRowsByEncounter(wsE, ES_ENC, encNum, 2)   ' idempotent: clear any prior snapshot
+    Dim pt As String, dob As String, rx As String
+    pt = Trim(wsI.Range("C5").Value)
+    dob = Trim(wsI.Range("C6").Value)
+    rx = Trim(wsI.Range("C7").Value)
+    Dim lastMed As Long, r As Long, nr As Long
+    lastMed = wsM.Cells(wsM.Rows.Count, C_NAME).End(xlUp).Row
+    For r = MEDS_HDR_ROWS + 1 To lastMed
+        If Trim(wsM.Cells(r, C_NAME).Value) <> "" Then
+            nr = wsE.Cells(wsE.Rows.Count, ES_ENC).End(xlUp).Row + 1
+            If nr < 2 Then nr = 2
+            wsE.Cells(nr, ES_ENC).Value = encNum
+            wsE.Cells(nr, ES_PT).Value = pt
+            wsE.Cells(nr, ES_DOB).Value = dob
+            wsE.Cells(nr, ES_RXDATE).Value = rx
+            wsE.Cells(nr, ES_NAME).Value = wsM.Cells(r, C_NAME).Value
+            wsE.Cells(nr, ES_STR).Value = wsM.Cells(r, C_STR).Value
+            wsE.Cells(nr, ES_FORM).Value = wsM.Cells(r, C_FORM).Value
+            wsE.Cells(nr, ES_SIG).Value = wsM.Cells(r, C_SIG).Value
+            wsE.Cells(nr, ES_QTY).Value = wsM.Cells(r, C_QTY).Value
+            wsE.Cells(nr, ES_EXP).NumberFormat = "@"
+            wsE.Cells(nr, ES_EXP).Value = wsM.Cells(r, C_EXP).Value
+            wsE.Cells(nr, ES_LOT).NumberFormat = "@"
+            wsE.Cells(nr, ES_LOT).Value = wsM.Cells(r, C_LOT).Value
+            wsE.Cells(nr, ES_SRC).Value = wsM.Cells(r, C_SRC).Value
+            wsE.Cells(nr, ES_DATE).Value = wsM.Cells(r, C_DATE).Value
+            wsE.Cells(nr, ES_REF).Value = wsM.Cells(r, C_REF).Value
+        End If
+    Next r
+    On Error GoTo 0
+End Sub
+
+' Wipe all snapshots (full reset / on-close only; kept across Start NEW Patient).
+Private Sub ClearEncounterStore()
+    On Error Resume Next
+    Dim wsE As Worksheet, last As Long
+    Set wsE = ThisWorkbook.Sheets(SH_ENC)
+    If Not wsE Is Nothing Then
+        last = wsE.Cells(wsE.Rows.Count, ES_ENC).End(xlUp).Row
+        If last >= 2 Then wsE.Range(wsE.Rows(2), wsE.Rows(last)).ClearContents
+    End If
+    gEditingEncounter = 0
+    On Error GoTo 0
+End Sub
+
+' Reopen a past encounter: show a list, pick a number, restore the patient + full med list.
+Public Sub EditEncounter()
+    Dim wsE As Worksheet
+    Set wsE = EncStore()
+    Dim last As Long
+    last = wsE.Cells(wsE.Rows.Count, ES_ENC).End(xlUp).Row
+    If last < 2 Then
+        MsgBox "There are no saved encounters to edit yet." & vbCrLf & _
+               "An encounter is saved each time you Print Checked Labels.", vbInformation, "Edit Encounter"
+        Exit Sub
+    End If
+    ' Distinct encounter numbers, in order of first appearance.
+    Dim seen As String, order As String, r As Long, e As Long
+    seen = "|"
+    order = ""
+    For r = 2 To last
+        If IsNumeric(wsE.Cells(r, ES_ENC).Value) Then
+            e = CLng(wsE.Cells(r, ES_ENC).Value)
+            If InStr(seen, "|" & e & "|") = 0 Then
+                seen = seen & e & "|"
+                order = order & e & ","
+            End If
+        End If
+    Next r
+    Dim listTxt As String, parts() As String, i As Long, mc As Long, pnm As String, pdb As String
+    listTxt = ""
+    parts = Split(order, ",")
+    For i = 0 To UBound(parts)
+        If parts(i) <> "" Then
+            e = CLng(parts(i))
+            mc = 0
+            pnm = ""
+            pdb = ""
+            For r = 2 To last
+                If IsNumeric(wsE.Cells(r, ES_ENC).Value) Then
+                    If CLng(wsE.Cells(r, ES_ENC).Value) = e Then
+                        mc = mc + 1
+                        pnm = Trim(wsE.Cells(r, ES_PT).Value)
+                        pdb = Trim(wsE.Cells(r, ES_DOB).Value)
+                    End If
+                End If
+            Next r
+            listTxt = listTxt & "   " & e & ")   " & pnm
+            If pdb <> "" Then listTxt = listTxt & "   (DOB " & pdb & ")"
+            listTxt = listTxt & "    - " & mc & " med(s)" & vbCrLf
+        End If
+    Next i
+    Dim ans As String
+    ans = Trim(InputBox("Encounters you can edit:" & vbCrLf & vbCrLf & listTxt & vbCrLf & _
+        "Type the ENCOUNTER NUMBER to edit:", "Edit Encounter"))
+    If ans = "" Then Exit Sub
+    If Not IsNumeric(ans) Then
+        MsgBox "Please type one of the encounter numbers shown.", vbExclamation, "Edit Encounter"
+        Exit Sub
+    End If
+    Dim encNum As Long
+    encNum = CLng(ans)
+    If InStr(seen, "|" & encNum & "|") = 0 Then
+        MsgBox "Encounter " & encNum & " was not found in the list.", vbExclamation, "Edit Encounter"
+        Exit Sub
+    End If
+    If MsgBox("Reopen encounter " & encNum & " for editing?" & vbCrLf & vbCrLf & _
+        "This REPLACES the medication list currently on screen with that" & vbCrLf & _
+        "encounter's saved meds. Finish/print the current patient first if needed.", _
+        vbYesNo + vbQuestion, "Edit Encounter") = vbNo Then Exit Sub
+    Call LoadEncounter(encNum)
+End Sub
+
+' Restore a snapshot into the Input + Medications tabs and enter editing mode.
+Private Sub LoadEncounter(ByVal encNum As Long)
+    Dim wsE As Worksheet, wsM As Worksheet, wsI As Worksheet
+    Set wsE = EncStore()
+    Set wsM = ThisWorkbook.Sheets(SH_MEDS)
+    Set wsI = ThisWorkbook.Sheets(SH_INPUT)
+    Application.ScreenUpdating = False
+    Call ClearMedArea(wsM)
+    Dim last As Long, r As Long, rr As Long, gotHdr As Boolean
+    last = wsE.Cells(wsE.Rows.Count, ES_ENC).End(xlUp).Row
+    gotHdr = False
+    For r = 2 To last
+        If IsNumeric(wsE.Cells(r, ES_ENC).Value) Then
+            If CLng(wsE.Cells(r, ES_ENC).Value) = encNum Then
+                If Not gotHdr Then
+                    wsI.Range("C5").Value = wsE.Cells(r, ES_PT).Value
+                    wsI.Range("C6").Value = wsE.Cells(r, ES_DOB).Value
+                    wsI.Range("C7").Value = wsE.Cells(r, ES_RXDATE).Value
+                    gotHdr = True
+                End If
+                Dim rec As MedRecord
+                rec.MedName = CStr(wsE.Cells(r, ES_NAME).Value)
+                rec.Strength = CStr(wsE.Cells(r, ES_STR).Value)
+                rec.DosageForm = CStr(wsE.Cells(r, ES_FORM).Value)
+                rec.SIG = CStr(wsE.Cells(r, ES_SIG).Value)
+                rec.Quantity = CStr(wsE.Cells(r, ES_QTY).Value)
+                rec.Refills = CStr(wsE.Cells(r, ES_REF).Value)
+                rec.Expiration = CStr(wsE.Cells(r, ES_EXP).Value)
+                rec.LotNumber = CStr(wsE.Cells(r, ES_LOT).Value)
+                rec.Confidence = "Restored"
+                rec.Warnings = ""
+                rec.RawText = "[restored from encounter " & encNum & "]"
+                rr = FirstEmptyRow(wsM)
+                Call WriteMedRow(wsM, rr, rec, CStr(wsE.Cells(r, ES_PT).Value), _
+                                 CStr(wsE.Cells(r, ES_DOB).Value), CStr(wsE.Cells(r, ES_DATE).Value), 0)
+                wsM.Cells(rr, C_SRC).Value = wsE.Cells(r, ES_SRC).Value   ' restore Source (WriteMedRow blanks it)
+                Call ApplyRowState(wsM, rr)
+            End If
+        End If
+    Next r
+    Call RenumberMeds
+    Call ValidateMedications(False)
+    gEditingEncounter = encNum
+    Application.ScreenUpdating = True
+    wsM.Activate
+    MsgBox "Editing encounter " & encNum & "." & vbCrLf & vbCrLf & _
+        "Add, remove, or fix medications as needed, then click" & vbCrLf & _
+        """Save Edited Encounter"" to update the Log and Tebra note.", _
+        vbInformation, "Editing Encounter " & encNum
+End Sub
+
+' Save the edited encounter: replace its Log + snapshot rows, refresh Tebra, offer reprint.
+Public Sub SaveEditedEncounter()
+    If gEditingEncounter <= 0 Then
+        MsgBox "You are not editing a saved encounter." & vbCrLf & _
+               "Click ""Edit Encounter"" to reopen one first.", vbInformation, "Save Edited Encounter"
+        Exit Sub
+    End If
+    Dim encNum As Long
+    encNum = gEditingEncounter
+    Dim wsM As Worksheet, wsLg As Worksheet
+    Set wsM = ThisWorkbook.Sheets(SH_MEDS)
+    Set wsLg = ThisWorkbook.Sheets(SH_LOG)
+    Dim lastMed As Long, r As Long, medCount As Long
+    lastMed = wsM.Cells(wsM.Rows.Count, C_NAME).End(xlUp).Row
+    medCount = 0
+    For r = MEDS_HDR_ROWS + 1 To lastMed
+        If Trim(wsM.Cells(r, C_NAME).Value) <> "" Then medCount = medCount + 1
+    Next r
+    If medCount = 0 Then
+        MsgBox "There are no medications to save for this encounter.", vbExclamation, "Save Edited Encounter"
+        Exit Sub
+    End If
+    If MsgBox("Save changes to encounter " & encNum & "?" & vbCrLf & vbCrLf & _
+        medCount & " medication(s) will REPLACE encounter " & encNum & " in the" & vbCrLf & _
+        "Log and Tebra note (no duplicates).", vbYesNo + vbQuestion, "Save Edited Encounter") = vbNo Then Exit Sub
+
+    Dim vol As String
+    vol = AskInitials()
+
+    Application.ScreenUpdating = False
+    Call DeleteRowsByEncounter(wsLg, LG_ENC, encNum, LOG_HDR_ROWS + 1)   ' drop old Log rows
+    Call SaveEncounterSnapshot(encNum)                                    ' refresh snapshot
+    For r = MEDS_HDR_ROWS + 1 To lastMed                                  ' re-log under same #
+        If Trim(wsM.Cells(r, C_NAME).Value) <> "" Then
+            Call LogPrint(r, Trim(vol & " (edited)"), encNum)
+        End If
+    Next r
+    Application.ScreenUpdating = True
+
+    On Error Resume Next
+    Call FillTebraTemplate                                                ' rebuild note from Log
+    On Error GoTo 0
+
+    gEditingEncounter = 0
+    If MsgBox("Encounter " & encNum & " updated in the Log and Tebra note." & vbCrLf & vbCrLf & _
+        "Reprint the corrected labels now (2 copies each)?", _
+        vbYesNo + vbQuestion, "Reprint?") = vbYes Then
+        Call PrintEncounterLabelsNoLog
+    Else
+        Call ShowLogSheet
+    End If
+End Sub
+
+' Print every named med that has Exp + Lot (2 copies each) WITHOUT logging - used by the
+' "reprint after edit" step, since the edited rows were already re-logged in SaveEditedEncounter.
+Private Sub PrintEncounterLabelsNoLog()
+    Dim ws As Worksheet, wsL As Worksheet
+    Set ws = ThisWorkbook.Sheets(SH_MEDS)
+    Set wsL = ThisWorkbook.Sheets(SH_LABEL)
+    Dim brotherName As String
+    brotherName = SelectBrotherPrinter()
+    If brotherName = "" Then
+        If MsgBox("Brother QL-1100c not found. Choose a printer manually?", _
+            vbOKCancel + vbExclamation, "Reprint") = vbCancel Then Exit Sub
+        On Error Resume Next
+        Application.Dialogs(xlDialogPrint).Show
+        On Error GoTo 0
+    End If
+    Call ApplyLabelContentWidth(wsL)
+    Call ApplyLabelPageSetup(wsL)
+    Call RefreshPrintLabelLogo(wsL)
+    Dim lastRow As Long, r As Long, done As Long
+    lastRow = ws.Cells(ws.Rows.Count, C_NAME).End(xlUp).Row
+    done = 0
+    Application.ScreenUpdating = False
+    For r = MEDS_HDR_ROWS + 1 To lastRow
+        If Trim(ws.Cells(r, C_NAME).Value) <> "" Then
+            If Trim(ws.Cells(r, C_EXP).Value) <> "" And Trim(ws.Cells(r, C_LOT).Value) <> "" Then
+                Call UpdateLabelPreviewForMedRow(r, False)
+                If PrintLabelSurfaceSafe(LABEL_COPIES) Then
+                    Call MarkPrinted(r)
+                    done = done + 1
+                End If
+            End If
+        End If
+    Next r
+    Application.ScreenUpdating = True
+    MsgBox done & " medication(s) reprinted, " & LABEL_COPIES & " copies each  (" & _
+        (done * LABEL_COPIES) & " labels).", vbInformation, "Reprint Complete"
+End Sub
 
 ' ============================================================
 '  SELF-TEST HARNESS
