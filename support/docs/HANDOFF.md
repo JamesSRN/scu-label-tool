@@ -48,12 +48,13 @@ Code/docs are version-controlled; the `.xlsm` (PHI) is local-only by design.
   Quantity(6), **Expiration**(7), **Lot**(8), **Source**(9), Rx Date(10),
   Refills(11), Confidence(12), Warnings(13), Raw Text(14, **hidden**),
   Printed?(15, **hidden**), **"# of Prints"**(16, auto-increments, edit-protected),
-  **"Print?"**(17, double-click toggles a checkmark). **Source** is a required
-  dropdown (DOH / IN HOUSE / RxAPS / Other), blank by default. A full-width blue
-  banner (row 1) and a light box-grid are drawn in code by `SetupWorkbook`.
+  **"Check Med"**(17, double-click toggles a checkmark; formerly "Print?"). **Source**
+  is a required dropdown (DOH / IN HOUSE / RxAPS / Other), blank by default. A full-width
+  blue banner (row 1) and a light box-grid are drawn in code by `SetupWorkbook`.
   Missing-field highlights: **red** = Exp/Lot, **yellow** = Quantity/Source.
   Buttons (col S / 19): `+ Add Medication`, `- Remove Selected`, `Review & Validate`,
-  `Preview ALL Labels`, `Print Checked Labels`.
+  `Preview ALL Labels`, `Edit Past Encounter`, `Save Edited Encounter`. **Printing is
+  done only from the gallery** (Preview ALL Labels -> Print Checked Labels).
 - **Label Previews** - auto-generated gallery, one card per medication (cards mirror
   the print label's three-zone header). **Top-right buttons** (code-created each
   rebuild): `Print Checked Labels`, `Refresh Previews`. **Per-card buttons**:

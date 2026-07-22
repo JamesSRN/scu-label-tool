@@ -248,8 +248,8 @@ Public Sub CheckWorkbookStructure()
     Set wsMed = Nothing
     Set wsMed = ThisWorkbook.Sheets(SH_MEDS)
     If Not wsMed Is Nothing Then
-        If InStr(LCase(CStr(wsMed.Cells(2, C_SEL).Value)), "print") = 0 Then
-            problems = problems & "   - The 'Print?' column header is not where expected " & _
+        If InStr(LCase(CStr(wsMed.Cells(2, C_SEL).Value)), "check") = 0 Then
+            problems = problems & "   - The 'Check Med' column header is not where expected " & _
                        "(Medications columns may have been changed)." & vbCrLf
         End If
     End If
@@ -354,9 +354,9 @@ Private Sub BuildQuickStartSheet()
     Call GuideStep(ws, 10, 2, RGB(0, 121, 107), "Review & add Exp / Lot", _
         "On the 'Medications' tab click Review & Validate and fix anything flagged (an amber Expiration cell means check the date). When prompted, enter Expiration (MM/YYYY) and Lot. For a med split across two bottles, separate values with commas.")
     Call GuideStep(ws, 15, 3, RGB(216, 67, 21), "Check what to print", _
-        "Double-click the 'Print?' cell next to each medication you want (or use 'Check this label' in the gallery). A green row means it is selected.")
+        "Double-click the 'Check Med' cell next to each medication you want (or use 'Check this label' in the gallery). A green row means it is selected.")
     Call GuideStep(ws, 20, 4, RGB(46, 125, 50), "Print", _
-        "Click 'Print Checked Labels', confirm the list, and enter your initials. Any label missing Exp/Lot is skipped and named. When done you land on the Log.")
+        "Click 'Preview ALL Labels' to open the gallery, then click 'Print Checked Labels', confirm the list, and enter your initials. Any label missing Exp/Lot is skipped and named. When done you land on the Log.")
 
     ws.Range(ws.Cells(26, 2), ws.Cells(26, 8)).Merge
     With ws.Cells(26, 2)
@@ -648,22 +648,21 @@ Public Sub SetupWorkbook()
     Call BuildLabelPreviewLayout(ws3)
     Call PreviewAllLabels
     Call AddButtonToSheet(ws3, "btnUpd",    "Update Label Preview", "UpdateLabelPreviewFromSelection", 20, 1, 220, 24, RGB(21, 101, 192))
-    Call AddButtonToSheet(ws3, "btnPrint",  "Print This Label",    "PrintLabel",         23, 1, 220, 24, RGB(46, 125, 50))
     On Error Resume Next
     ws3.Shapes("btnUpd").DrawingObject.PrintObject = False
-    ws3.Shapes("btnPrint").DrawingObject.PrintObject = False
+    ws3.Shapes("btnPrint").Delete      ' removed "Print This Label": printing is via the gallery's Print Checked Labels
     On Error GoTo 0
     Call AddButtonToSheet(ws2, "btnAddMed", "+ Add Medication",   "AddMedicationRow",         1, 19, 150, 22, RGB(46, 125, 50))
     Call AddButtonToSheet(ws2, "btnRemMed", "- Remove Selected",  "RemoveSelectedMedication", 3, 19, 150, 22, RGB(191, 54, 12))
     Call AddButtonToSheet(ws2, "btnRevMed", "Review & Validate",  "ReviewMedications",        5, 19, 150, 22, RGB(21, 101, 192))
     Call AddButtonToSheet(ws2, "btnPrvAll", "Preview ALL Labels",   "PreviewAllLabels",         7, 19, 150, 22, RGB(0, 121, 107))
-    Call AddButtonToSheet(ws2, "btnPrnChk", "Print Checked Labels", "PrintCheckedLabels",       9, 19, 190, 30, RGB(216, 67, 21))
-    Call AddButtonToSheet(ws2, "btnEditEnc", "Edit Past Encounter",  "EditEncounter",           12, 19, 190, 22, RGB(84, 110, 122))
-    Call AddButtonToSheet(ws2, "btnSaveEnc", "Save Edited Encounter", "SaveEditedEncounter",    14, 19, 190, 22, RGB(0, 121, 107))
+    Call AddButtonToSheet(ws2, "btnEditEnc", "Edit Past Encounter",  "EditEncounter",           10, 19, 190, 22, RGB(84, 110, 122))
+    Call AddButtonToSheet(ws2, "btnSaveEnc", "Save Edited Encounter", "SaveEditedEncounter",    12, 19, 190, 22, RGB(0, 121, 107))
     Call EncStore   ' make sure the hidden encounter-snapshot sheet exists
-    ' Removed the single "Print Selected Label" button - printing is now via Print Checked Labels
+    ' Print is now done ONLY from the gallery (Preview ALL Labels -> Print Checked Labels).
     On Error Resume Next
     ws2.Shapes("btnPrnMed").Delete
+    ws2.Shapes("btnPrnChk").Delete     ' removed from Medications: print from the gallery instead
     On Error GoTo 0
     ' Medications header row (row 2), written by code so the column ORDER is authoritative
     ' regardless of the template: Source sits right of Lot #, Refills right of Date of Rx.
@@ -679,7 +678,7 @@ Public Sub SetupWorkbook()
     ws2.Cells(2, C_RAW).Value = "Raw text"
     ws2.Cells(2, C_PRTD).Value = "Printed?"
     ws2.Cells(2, C_CNT).Value = "# of Prints"
-    ws2.Cells(2, C_SEL).Value = "Print?"
+    ws2.Cells(2, C_SEL).Value = "Check Med"
     Dim hc As Variant
     For Each hc In Array(C_EXP, C_LOT, C_SRC, C_DATE, C_REF, C_CONF, C_WARN, C_RAW, C_PRTD, C_CNT, C_SEL)
         Call MatchHeaderFormat(ws2.Cells(2, C_QTY), ws2.Cells(2, CLng(hc)))
@@ -1717,7 +1716,9 @@ NextR:
 
     Call AddButtonToSheet(ws, "galtop_prnchk", "Print Checked Labels", "PrintCheckedLabels", 1, 8, 176, 30, RGB(216, 67, 21))
     Call AddButtonToSheet(ws, "galtop_refresh", "Refresh Previews", "PreviewAllLabels", 1, 11, 150, 24, RGB(0, 121, 107))
-    Call AddButtonToSheet(ws, "galtop_reprint", "Reprint Last Batch", "ReprintLastBatch", 2, 8, 176, 30, RGB(0, 131, 143))
+    On Error Resume Next
+    ws.Shapes("galtop_reprint").Delete   ' removed "Reprint Last Batch" (every print already does 2 copies)
+    On Error GoTo 0
 
     ws.Activate
     ws.Cells(1, 1).Select
@@ -3248,7 +3249,7 @@ Public Sub PrintCheckedLabels()
     Next r
     If cnt = 0 Then
         MsgBox "No medications are checked." & vbCrLf & _
-               "Double-click the 'Print?' cell next to each med you want to print.", _
+               "Double-click the 'Check Med' cell next to each med you want to print.", _
                vbExclamation, "Nothing Selected"
         Exit Sub
     End If
@@ -3764,7 +3765,7 @@ Public Sub RemoveSelectedMedication()
 
     If cnt = 0 Then
         MsgBox "No rows are checked." & vbCrLf & _
-               "Check the 'Print?' box on each medication you want to remove, then try again.", _
+               "Check the 'Check Med' box on each medication you want to remove, then try again.", _
                vbExclamation, "Remove Selected"
         Exit Sub
     End If
@@ -4490,6 +4491,7 @@ Private Sub LoadEncounter(ByVal encNum As Long)
                 Call WriteMedRow(wsM, rr, rec, CStr(wsE.Cells(r, ES_PT).Value), _
                                  CStr(wsE.Cells(r, ES_DOB).Value), CStr(wsE.Cells(r, ES_DATE).Value), 0)
                 wsM.Cells(rr, C_SRC).Value = wsE.Cells(r, ES_SRC).Value   ' restore Source (WriteMedRow blanks it)
+                wsM.Cells(rr, C_SEL).Value = ChrW(10003)                  ' pre-check (uncheck any you won't reprint)
                 Call ApplyRowState(wsM, rr)
             End If
         End If
@@ -4500,8 +4502,9 @@ Private Sub LoadEncounter(ByVal encNum As Long)
     Application.ScreenUpdating = True
     wsM.Activate
     MsgBox "Editing encounter " & encNum & "." & vbCrLf & vbCrLf & _
-        "Add, remove, or fix medications as needed, then click" & vbCrLf & _
-        """Save Edited Encounter"" to update the Log and Tebra note.", _
+        "Add, remove, or fix medications as needed. Every med is checked -" & vbCrLf & _
+        "uncheck any you will NOT reprint. Then click ""Save Edited Encounter""" & vbCrLf & _
+        "to update the Log and Tebra note (it will offer to reprint the checked ones).", _
         vbInformation, "Editing Encounter " & encNum
 End Sub
 
@@ -4550,7 +4553,7 @@ Public Sub SaveEditedEncounter()
 
     gEditingEncounter = 0
     If MsgBox("Encounter " & encNum & " updated in the Log and Tebra note." & vbCrLf & vbCrLf & _
-        "Reprint the corrected labels now (2 copies each)?", _
+        "Reprint the CHECKED labels now (2 copies each)?", _
         vbYesNo + vbQuestion, "Reprint?") = vbYes Then
         Call PrintEncounterLabelsNoLog
     Else
@@ -4581,7 +4584,7 @@ Private Sub PrintEncounterLabelsNoLog()
     done = 0
     Application.ScreenUpdating = False
     For r = MEDS_HDR_ROWS + 1 To lastRow
-        If Trim(ws.Cells(r, C_NAME).Value) <> "" Then
+        If Trim(ws.Cells(r, C_NAME).Value) <> "" And IsRowSelected(ws, r) Then   ' checked meds only
             If Trim(ws.Cells(r, C_EXP).Value) <> "" And Trim(ws.Cells(r, C_LOT).Value) <> "" Then
                 Call UpdateLabelPreviewForMedRow(r, False)
                 If PrintLabelSurfaceSafe(LABEL_COPIES) Then

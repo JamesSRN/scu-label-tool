@@ -6,6 +6,12 @@
 
 Work toward the V2 build, applied in blocks (see `IMPROVEMENT_REPORT_2026-07-09.md`).
 
+**Workflow simplification: one print path (2026-07-09)**
+- **Print is now done only from the gallery.** Removed **Print Checked Labels** from the Medications tab and **Print This Label** from the preview surface; the gallery's **Print Checked Labels** is the single print action (Preview ALL Labels -> Print Checked Labels).
+- Removed the **Reprint Last Batch** button (every print already does 2 copies).
+- Renamed the **Print?** column to **Check Med** (structure self-check + Start Here guide + prompts updated to match).
+- **Edit -> reprint prints only CHECKED meds.** Reopening an encounter now pre-checks every med; uncheck any you won't reprint before saving, and the reprint (2 copies each) prints just the checked ones.
+
 **Edit a past Encounter (2026-07-09)**
 - New **Edit Past Encounter** / **Save Edited Encounter** buttons on the Medications tab. Each print now saves a **full snapshot** of the patient's med list under its Encounter # (hidden `EncounterData` sheet). Reopening an encounter (pick from a list by number) restores the patient + every med exactly (all fields, incl. lot/exp/source), where you can add, remove, or fix meds.
 - **Save replaces** that encounter's Log rows and snapshot in place (same number, no duplicates) and **rebuilds the Tebra note** from the corrected Log. It then **asks whether to reprint** the corrected labels (2 copies each, no re-logging). Edited Log rows are marked "(edited)" in the Initials column; the dated CSV keeps history (append-only).
