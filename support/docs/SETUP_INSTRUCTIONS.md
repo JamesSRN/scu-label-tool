@@ -49,7 +49,10 @@ Use native Windows Git/GitHub Desktop for this repo. Avoid managing a OneDrive-b
 1. Plug in and power on the Brother QL-1100C.
 2. Install the Brother full driver/software package if Windows does not configure it correctly.
 3. Confirm the printer appears in Windows printer settings.
-4. Set the printer default media to DK-1202 / 62 x 100 mm.
+4. Set the printer default media to DK-1202 / 62 x 100 mm. In the Brother driver this
+   size is named **"Shipping Label"** (Width 2.44" x Length 3.93") - there is no entry
+   literally called "2.4 x 3.9". Setting *Printing Defaults* (below) needs **admin
+   rights**; without them the change silently reverts on Apply.
 
 Check both places if Windows exposes both:
 
@@ -113,9 +116,14 @@ Manual method:
 
 Important: `src/MedParser.bas` must remain ASCII with Windows CRLF line endings. This repo includes `.gitattributes` to help preserve CRLF for `.bas` files.
 
-## 8. Install worksheet event handlers once
+## 8. Worksheet event handlers
 
-`SetupWorkbook` no longer modifies the VBA project at runtime. The two sheet event handlers should be installed once in the workbook and then saved.
+**V2 note:** `SetupWorkbook` now **re-installs the Medications `Worksheet_BeforeDoubleClick`
+handler automatically at build time** (`InstallMedSheetEvents`), built from the `C_*`
+column constants so it tracks the current columns (# of Prints = 16, Print? = 17) after
+the V2 reorder. You normally do **not** need to paste it by hand. The **Label Previews**
+`Worksheet_Activate` handler is preinstalled in that sheet module. The steps below are the
+manual fallback if you are hand-building a fresh workbook.
 
 ### Medications sheet module
 
@@ -151,11 +159,11 @@ Private Sub Worksheet_Change(ByVal Target As Range)
 End Sub
 
 Private Sub Worksheet_BeforeDoubleClick(ByVal Target As Range, Cancel As Boolean)
-    If Target.Column = 15 Then        ' # of Prints - read-only
+    If Target.Column = 16 Then        ' # of Prints - read-only
         Cancel = True
         Exit Sub
     End If
-    If Target.Column = 16 And Target.Row > 3 Then   ' Print? - toggle the check
+    If Target.Column = 17 And Target.Row > 3 Then   ' Print? - toggle the check
         If Trim(Me.Cells(Target.Row, 2).Value) <> "" Then
             Cancel = True
             ToggleRowSelect Target.Row
@@ -164,13 +172,16 @@ Private Sub Worksheet_BeforeDoubleClick(ByVal Target As Range, Cancel As Boolean
 End Sub
 ```
 
-Current column layout:
+Current column layout (V2 - see HANDOFF §2 for the full map):
 
 ```text
-N = Printed?
-O = # of Prints
-P = Print?
+14 = Raw text (hidden)   15 = Printed? (hidden)
+16 = # of Prints         17 = Print?
 ```
+
+(The `Worksheet_SelectionChange` / `Worksheet_Change` guard above still references
+col 15; in V2 the "# of Prints" column is 16, so update those two `15` values to `16`
+if you hand-install. The auto-installed double-click handler already blocks editing 16.)
 
 ### Label Previews sheet module
 
@@ -217,11 +228,14 @@ Minimum test:
 1. Enter fake patient data.
 2. Paste sample medication text.
 3. Click `PARSE MEDICATIONS`.
-4. Review/correct rows.
-5. Enter fake Expiration and Lot.
-6. Double-click the `Print?` cell for one or more rows.
-7. Click `Print Checked Labels`.
-8. Confirm a physical test label prints correctly.
+4. Review/correct rows; pick a **Source** for each (yellow until set) and fill any
+   red Exp/Lot cells.
+5. Enter fake Expiration and Lot (the prompt after parse, or via **+ Add Medication**).
+6. Click `Review & Validate` - passing rows auto-check for printing.
+7. Double-click the `Print?` cell to toggle any row manually.
+8. Click `Print Checked Labels` (prints 2 copies of each).
+9. Confirm a physical test label prints correctly, **including the bottom Exp/Lot row**,
+   and that the Log shows one green-banded **Encounter** for the batch.
 
 Do not test with real patient data until setup and printing have been validated locally.
 

@@ -46,6 +46,15 @@ Latest releases: <https://github.com/JamesSRN/scu-label-tool/releases>
 Offline Excel + VBA tool for printing medication labels on a Brother QL-1100c (DK-1202 62 × 100 mm) for the Saturday Clinic for the Uninsured.
 
 **New in v2.0**
+- **2 copies per label** — Print Checked Labels (and Reprint / single Print) print two of each label; the Log still records one row per med.
+- **Source column** — a required DOH / IN HOUSE / RxAPS / Other dropdown, right of Lot #, mirrored into the Log and CSV.
+- **Auto-check on validate** — meds that pass Review & Validate are automatically checked for printing.
+- **Encounters** — each print is logged as one numbered Encounter, and its Log rows are shaded in one of three cycling greens.
+- **Add Medication prompts for Exp/Lot** — the manual add offers the same Expiration/Lot popup as parsing.
+- **TEBRA TEMPLATE sheet** — paste-ready session notes, one block per patient, grouped by source, name/DOB on the right.
+- **Clearer Medications tab** — full-width blue banner, boxed grid, centered columns, internal columns hidden, Refills default 0, and red (Exp/Lot) / yellow (Quantity/Source) missing-field highlights.
+- **Print reliability** — the label now fits to one page so the bottom Exp/Lot row can't clip on printers with a shorter printable area.
+- **Bullet-proof reset** — Reset / New Patient / on-open reset always clear the whole Medications area.
 - **Start Here guide** — the workbook opens to an in-app quick-start, plus a printable `SCU_QuickStart_Card.pdf`.
 - **Reprint Last Batch** — recover from a jam/misfeed without re-selecting.
 - **Named skips** — the print summary lists any label skipped for a missing Exp/Lot.

@@ -22,12 +22,24 @@ Dim hasForm, comp, frm, dsn, ctl, tw, twCode
 
 Set fso = CreateObject("Scripting.FileSystemObject")
 scriptDir = fso.GetParentFolderName(WScript.ScriptFullName)
-' Bootstrap template: prefer the tracked templates\ copy (after the V2 reorg), else fall
-' back to the original root filename, so the build works before OR after the reorg.
-bootstrapPath = fso.BuildPath(scriptDir, "templates\Template_MedicationDispensing.xlsm")
-If Not fso.FileExists(bootstrapPath) Then
-    bootstrapPath = fso.BuildPath(scriptDir, "Broken_PrettyPrint_MedicationDispensing.xlsm")
-End If
+' Bootstrap template (used ONLY if MedicationDispensing.xlsm is missing). Search several
+' locations so it works whether the template lives in support\, the root, or templates\,
+' and whether or not it has been renamed - the build never breaks on where it sits.
+Dim bootCandidates, bi
+bootCandidates = Array( _
+    "support\Template_MedicationDispensing.xlsm", _
+    "support\Broken_PrettyPrint_MedicationDispensing.xlsm", _
+    "templates\Template_MedicationDispensing.xlsm", _
+    "Broken_PrettyPrint_MedicationDispensing.xlsm")
+bootstrapPath = ""
+For bi = 0 To UBound(bootCandidates)
+    If bootstrapPath = "" Then
+        If fso.FileExists(fso.BuildPath(scriptDir, bootCandidates(bi))) Then
+            bootstrapPath = fso.BuildPath(scriptDir, bootCandidates(bi))
+        End If
+    End If
+Next
+If bootstrapPath = "" Then bootstrapPath = fso.BuildPath(scriptDir, "Broken_PrettyPrint_MedicationDispensing.xlsm")
 xlsmPath = fso.BuildPath(scriptDir, "MedicationDispensing.xlsm")
 basPath = fso.BuildPath(scriptDir, "MedParser.bas")
 

@@ -41,6 +41,27 @@ Private Const C_PRTD    As Integer = 15
 Private Const C_CNT     As Integer = 16
 Private Const C_SEL     As Integer = 17
 
+' Dispense Log column map (1-based). Encounter sits right after Timestamp; the rest follow
+' in reading order. Every Log read/write and the header row use these, so reordering the
+' Log is just a matter of changing these numbers.
+Private Const LG_TIME As Long = 1     ' Timestamp
+Private Const LG_ENC  As Long = 2     ' Encounter #
+Private Const LG_PT   As Long = 3     ' Patient
+Private Const LG_DOB  As Long = 4     ' DOB
+Private Const LG_NAME As Long = 5     ' Medication
+Private Const LG_STR  As Long = 6     ' Strength
+Private Const LG_SIG  As Long = 7     ' Directions
+Private Const LG_QTY  As Long = 8     ' Quantity
+Private Const LG_REF  As Long = 9     ' Refills
+Private Const LG_EXP  As Long = 10    ' Expiration
+Private Const LG_LOT  As Long = 11    ' Lot
+Private Const LG_SRC  As Long = 12    ' Source
+Private Const LG_DATE As Long = 13    ' Rx Date
+Private Const LG_INIT As Long = 14    ' Initials
+Private Const LG_FORM As Long = 15    ' Dosage Form
+Private Const LG_CNT  As Long = 16    ' Print #
+Private Const LG_LAST As Long = 16    ' rightmost Log column
+
 Private Const MEDS_HDR_ROWS As Integer = 3   ' rows before data begins
 Private Const LOG_HDR_ROWS  As Integer = 2
 
@@ -4134,26 +4155,26 @@ Private Sub LogPrint(ByVal medRow As Long, ByVal vol As String, ByVal encounter 
     nextLog = wsLg.Cells(wsLg.Rows.Count, 1).End(xlUp).Row + 1
     If nextLog <= LOG_HDR_ROWS Then nextLog = LOG_HDR_ROWS + 1
 
-    wsLg.Cells(nextLog, 1).Value = Format(Now(), "MM/DD/YYYY HH:MM:SS")
-    wsLg.Cells(nextLog, 2).Value = Trim(wsI.Range("C5").Value)
-    wsLg.Cells(nextLog, 3).Value = Trim(wsI.Range("C6").Value)
+    wsLg.Cells(nextLog, LG_TIME).Value = Format(Now(), "MM/DD/YYYY HH:MM:SS")
+    wsLg.Cells(nextLog, LG_ENC).Value = encounter                        ' Encounter #, right after Timestamp
+    wsLg.Cells(nextLog, LG_PT).Value = Trim(wsI.Range("C5").Value)
+    wsLg.Cells(nextLog, LG_DOB).Value = Trim(wsI.Range("C6").Value)
     If medRow > MEDS_HDR_ROWS Then
-        wsLg.Cells(nextLog, 4).Value = wsM.Cells(medRow, C_NAME).Value
-        wsLg.Cells(nextLog, 5).Value = wsM.Cells(medRow, C_STR).Value
-        wsLg.Cells(nextLog, 6).Value = wsM.Cells(medRow, C_SIG).Value
-        wsLg.Cells(nextLog, 7).Value = wsM.Cells(medRow, C_QTY).Value
-        wsLg.Cells(nextLog, 8).Value = wsM.Cells(medRow, C_REF).Value
-        wsLg.Cells(nextLog, 9).NumberFormat = "@"
-        wsLg.Cells(nextLog, 9).Value = wsM.Cells(medRow, C_EXP).Value
-        wsLg.Cells(nextLog, 10).NumberFormat = "@"
-        wsLg.Cells(nextLog, 10).Value = wsM.Cells(medRow, C_LOT).Value
-        wsLg.Cells(nextLog, 11).Value = wsM.Cells(medRow, C_SRC).Value    ' Source, right after Lot
-        wsLg.Cells(nextLog, 12).Value = wsM.Cells(medRow, C_DATE).Value   ' Rx Date
-        wsLg.Cells(nextLog, 14).Value = wsM.Cells(medRow, C_FORM).Value   ' Dosage Form
-        wsLg.Cells(nextLog, 15).Value = wsM.Cells(medRow, C_CNT).Value    ' Print #
+        wsLg.Cells(nextLog, LG_NAME).Value = wsM.Cells(medRow, C_NAME).Value
+        wsLg.Cells(nextLog, LG_STR).Value = wsM.Cells(medRow, C_STR).Value
+        wsLg.Cells(nextLog, LG_SIG).Value = wsM.Cells(medRow, C_SIG).Value
+        wsLg.Cells(nextLog, LG_QTY).Value = wsM.Cells(medRow, C_QTY).Value
+        wsLg.Cells(nextLog, LG_REF).Value = wsM.Cells(medRow, C_REF).Value
+        wsLg.Cells(nextLog, LG_EXP).NumberFormat = "@"
+        wsLg.Cells(nextLog, LG_EXP).Value = wsM.Cells(medRow, C_EXP).Value
+        wsLg.Cells(nextLog, LG_LOT).NumberFormat = "@"
+        wsLg.Cells(nextLog, LG_LOT).Value = wsM.Cells(medRow, C_LOT).Value
+        wsLg.Cells(nextLog, LG_SRC).Value = wsM.Cells(medRow, C_SRC).Value
+        wsLg.Cells(nextLog, LG_DATE).Value = wsM.Cells(medRow, C_DATE).Value
+        wsLg.Cells(nextLog, LG_FORM).Value = wsM.Cells(medRow, C_FORM).Value
+        wsLg.Cells(nextLog, LG_CNT).Value = wsM.Cells(medRow, C_CNT).Value
     End If
-    wsLg.Cells(nextLog, 13).Value = vol                                  ' Initials
-    wsLg.Cells(nextLog, 16).Value = encounter                            ' Encounter #
+    wsLg.Cells(nextLog, LG_INIT).Value = vol                             ' Initials
 
     ' Shade the whole row by encounter, cycling 3 greens, so each patient's print reads
     ' as one clearly-bounded block in the Log.
@@ -4165,15 +4186,15 @@ Private Sub LogPrint(ByVal medRow As Long, ByVal vol As String, ByVal encounter 
     End Select
 
     Dim c As Integer
-    For c = 1 To 16
+    For c = 1 To LG_LAST
         With wsLg.Cells(nextLog, c)
             .Font.Name = "Arial"
             .Font.Size = 9
             .Interior.Color = encColor
         End With
     Next c
-    wsLg.Cells(nextLog, 16).HorizontalAlignment = xlCenter
-    wsLg.Cells(nextLog, 16).Font.Bold = True
+    wsLg.Cells(nextLog, LG_ENC).HorizontalAlignment = xlCenter
+    wsLg.Cells(nextLog, LG_ENC).Font.Bold = True
 
     ' Mirror this row to the dated local CSV archive (best-effort; never blocks printing).
     Call ArchiveDispenseRow(wsLg, nextLog)

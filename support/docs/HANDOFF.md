@@ -1,6 +1,6 @@
 # SCU Label Printing Tool - Handoff
 
-Last updated: 2026-07-02 (Century Gothic three-zone header; centered emblem; refills on the qty line; gallery buttons reworked; **emblem-blank bug fixed**)
+Last updated: 2026-07-09 (**V2**: Source column (required) right of Lot #; Refills right of Rx Date + default 0; 2 copies per label; auto-check on validate; per-print **Encounters** (numbered + green-banded) in the Log; **TEBRA TEMPLATE** sheet; Medications banner/grid spruce-up + hidden internal columns; **fit-to-page** so Exp/Lot never clip; resilient `ClearMedArea`; Add Medication prompts for Exp/Lot; red/yellow missing-field highlights)
 
 An Excel + VBA tool for the **Saturday Clinic for the Uninsured (SCU)** free
 pharmacy. It turns pasted prescription text into a validated medication table and
@@ -43,11 +43,16 @@ Code/docs are version-controlled; the `.xlsm` (PHI) is local-only by design.
 
 - **Patient & Input** - patient name / DOB / Rx date + paste box. Buttons:
   `PARSE MEDICATIONS`, `Clear Paste Area`, `Reset Session`, `Start NEW Patient`.
-- **Medications** - the parsed table. Columns A-N: `#`, Name, Strength, Dosage
-  Form, SIG, Quantity, Refills, **Expiration**, **Lot**, Date of Rx, Confidence,
-  Warnings, Raw Text, **Printed?**; then **O = "# of Prints"** (auto-increments,
-  protected from manual edits) and **P = "Print?"** (double-click toggles a checkmark).
-  Buttons (col Q): `+ Add Medication`, `- Remove Selected`, `Review & Validate`,
+- **Medications** - the parsed table (**V2 column order**, all driven by `C_*`
+  constants). Columns A-Q: `#`(1), Name(2), Strength(3), Dosage Form(4), SIG(5),
+  Quantity(6), **Expiration**(7), **Lot**(8), **Source**(9), Rx Date(10),
+  Refills(11), Confidence(12), Warnings(13), Raw Text(14, **hidden**),
+  Printed?(15, **hidden**), **"# of Prints"**(16, auto-increments, edit-protected),
+  **"Print?"**(17, double-click toggles a checkmark). **Source** is a required
+  dropdown (DOH / IN HOUSE / RxAPS / Other), blank by default. A full-width blue
+  banner (row 1) and a light box-grid are drawn in code by `SetupWorkbook`.
+  Missing-field highlights: **red** = Exp/Lot, **yellow** = Quantity/Source.
+  Buttons (col S / 19): `+ Add Medication`, `- Remove Selected`, `Review & Validate`,
   `Preview ALL Labels`, `Print Checked Labels`.
 - **Label Previews** - auto-generated gallery, one card per medication (cards mirror
   the print label's three-zone header). **Top-right buttons** (code-created each
@@ -56,8 +61,15 @@ Code/docs are version-controlled; the `.xlsm` (PHI) is local-only by design.
   `Print?` checkbox on the Medications tab via `RowCheck` -> `ToggleRowSelect`),
   `Edit this med`, `Remove this med`. Rebuilds on tab activate; the rebuild sweeps
   stray/manually-placed buttons (deletes all `al_*` shapes and loose autoshapes).
-- **Log** - running dispense log.
-- **Setup & Help** - instructions.
+- **Log** - running dispense log. Columns 1-16: timestamp, patient, DOB, med,
+  strength, directions, qty, refills, expiration, lot, **source**, Rx date,
+  initials, dosage form, print #, **Encounter**. Each print is one **Encounter**
+  (numbered, and its rows shaded in one of three cycling greens). Mirrored to a
+  dated local CSV.
+- **TEBRA TEMPLATE** - paste-ready session notes built from the Log: one block per
+  patient, grouped by source (IN HOUSE / DOH & Outside / RxAPs), with name/DOB on
+  the right. Rebuilt by `FillTebraTemplate` (also has a "Refresh from session log" button).
+- **Start Here** - the in-app quick-start guide; the workbook opens here.
 - **Label Preview** (HIDDEN) - the internal print surface. Every label renders
   here and prints from here. Do NOT delete it.
 
@@ -68,12 +80,27 @@ Label Previews.
 
 ## 3. Feature set
 
+### V2 highlights (2026-07-09)
+- **Source** column (required): DOH / IN HOUSE / RxAPS / Other dropdown, blank by
+  default, right of Lot #; missing = yellow; `ApplySourceValidation` keeps it the
+  only dropdown in the grid. Mirrored into the Log (col 11) and CSV.
+- **Refills** sits right of Rx Date and **defaults to 0**.
+- **2 copies per label** via `LABEL_COPIES = 2` (one Log row per med regardless).
+- **Auto-check on validate**: passing meds get their Print? checkmark automatically.
+- **Add Medication** offers the same Exp/Lot popup the parse flow uses.
+- **Encounters**: each print action is one numbered Encounter (`NextEncounter`),
+  Log rows shaded in 3 cycling greens.
+- **Fit-to-page** label print so the bottom Exp/Lot row can't clip (see §4).
+- **`ClearMedArea`**: all clear paths wipe a fixed range, never miss unnamed rows.
+- Medications tab: code-drawn blue banner + box grid; internal columns hidden.
+
 ### Parsing & validation
 - Block splitter starts a new medication per drug-header line, even without blank
   lines between drugs.
 - Per-drug **Confidence** (High / Medium / Low / Manual) from how cleanly it parsed.
-- **Validation** flags missing strength/SIG/quantity/Exp/Lot, bad Exp format, and
-  possible duplicates -> Warnings column.
+- **Validation** flags missing strength/SIG/quantity/Exp/Lot/**Source**, bad Exp
+  format, and possible duplicates -> Warnings column. Missing-field cell highlights:
+  **red** = Exp/Lot, **yellow** = Quantity/Source.
 - Add / Remove / Renumber medications manually. **Remove Selected removes every
   checked (Print?) row**, not just the clicked one.
 - Exp/Lot forced to text.
@@ -222,9 +249,13 @@ it's repaired**, or it will blank the emblem again. Diagnostic if it recurs:
 Immediate window `?"[" & Dir(ThisWorkbook.Path & "\scu_emblem.png") & "]"` (path OK),
 then check the PNG actually has opaque pixels.
 
-**Print geometry:** `ApplyLabelPageSetup` sets `A1:H15`, `Zoom = 100`, no
-fit-to-page, **no `.PaperSize`** (Brother driver controls media), 0.04 in margins,
-landscape, no gridlines/headings.
+**Print geometry:** `ApplyLabelPageSetup` sets `A1:H15`, **fit-to-one-page**
+(`.Zoom = False`, `.FitToPagesWide = 1`, `.FitToPagesTall = 1`), **no `.PaperSize`**
+(Brother driver controls media), 0.04 in margins, landscape, no gridlines/headings.
+Fit-to-page (V2) replaced the old `Zoom = 100` / no-fit so the bottom **EXP/LOT row
+(row 15)** can't spill onto a never-printed page 2 on printers with a shorter
+printable area (the "Lot/Exp missing on print, fine in the gallery" bug). If a label
+looks slightly small, trim the spacer rows rather than disabling fit-to-page.
 
 **Blank label after each print (fixed):** Excel was sometimes sending **page 2**
 (empty). `PrintLabelSurfaceSafe` now calls `PrepareLabelSheetForPrint` (only
@@ -277,13 +308,12 @@ See `tools/BUILD_RELEASE_NOTES.md` for full detail.
 1. VBA editor (Alt+F11): remove the old `MedParser` module, **Import
    `MedParser.bas`**, run **`SetupWorkbook`**, save. (`SetupWorkbook` running is
    the compile check.)
-2. **One-time:** the two worksheet event handlers are PRE-installed in the sheet
-   modules (SetupWorkbook does not modify the VBProject). If setting up a fresh
-   workbook, paste them once:
-   - **Medications** sheet module: `Worksheet_SelectionChange` +
-     `Worksheet_Change` (protect "# of Prints") + `Worksheet_BeforeDoubleClick`
-     (toggle Print? on col 16, block col 15).
-   - **Label Previews** sheet module: `Worksheet_Activate` -> `PreviewAllLabels`.
+2. **Handlers:** the **Medications** `Worksheet_BeforeDoubleClick` (toggle Print? on
+   col **17**, block # of Prints on col **16**) is now **re-installed at build time**
+   by `SetupWorkbook` -> `InstallMedSheetEvents`, built from the `C_*` constants so it
+   stays correct after column reorders (needs VBA-project trust, which Build-Release
+   has). The **Label Previews** `Worksheet_Activate` -> `PreviewAllLabels` handler is
+   preinstalled in that sheet module.
 3. Keep `scu_emblem.png` beside the workbook so the logo embeds on SetupWorkbook.
 
 ### Problems solved (2026-06-30 session)
@@ -369,11 +399,14 @@ print (no blank follow-on label); logo/header layout on screen and print path
   `PrintObject = False`.
 - **`Font.Bold` only for bold headers.** Do not use `Font.Weight` or `xlBold` —
   they caused compile errors in this project.
-- **No runtime VBProject injection.** Event handlers are preinstalled in the sheet
-  modules; `SetupWorkbook` does not touch the VBProject (more robust, no trust
-  setting needed for that).
+- **VBProject injection at build only.** The Medications double-click handler is
+  re-installed by `SetupWorkbook` -> `InstallMedSheetEvents` at **build time** (where
+  Build-Release already has VBA-project trust), so it tracks the `C_*` columns after
+  a reorder. Volunteers still need no trust setting - they run the baked-in handler.
+  Do not call `InstallMedSheetEvents` from normal-use code paths.
 - **`PaperSize = xlPaperUser` throws 1004** on this Brother driver - never set it;
-  the driver's DK-1202 default is correct.
+  the driver's DK-1202 default is correct. The label sheet uses **fit-to-page**
+  (`.FitToPagesWide/Tall = 1`, `.Zoom = False`) so the bottom row can't clip.
 - **OneDrive dehydration:** OneDrive can mark files "cloud-only" (cloud icon).
   They re-download on open. Set the folder to "Always keep on this device" to stop
   it (helps automation/editing).
@@ -410,8 +443,11 @@ print (no blank follow-on label); logo/header layout on screen and print path
 | `BusyShow(pct, msg)` / `BusyHide` | "Please wait" progress popup (`frmBusy`) shown during the Print Checked Labels printer-lookup + page-setup delay; status-bar fallback if the form is missing. |
 | `MatchHeaderFormat` | Safe header format copy (PasteSpecial 1004 fix). |
 | `PrintLabel` / `PrintCheckedLabels` / `SelectBrotherPrinter` / `MarkPrinted` | Auto-select Brother, confirm, print, bump # of Prints. |
-| `LogPrint(medRow, vol)` / `AskInitials` | Full per-print Log row (single + batch). |
-| `StartNewPatient` | Clear patient + meds, keep the Log. |
+| `LogPrint(medRow, vol, encounter)` / `AskInitials` / `NextEncounter` | Full per-print Log row (single + batch), stamped with the Encounter # and shaded by one of 3 cycling greens. `NextEncounter` = highest Encounter in the Log + 1. |
+| `FillTebraTemplate` / `TebraPatientBlock` / `TebraLogSection` / `TebraLogMedLine` | Build the TEBRA TEMPLATE sheet from the Log: one block per patient, grouped by source. |
+| `ApplySourceValidation` / `ClearMedArea` | Source dropdown (only dropdown in the grid); fixed-range wipe of the med area used by every clear path + build. |
+| `InstallMedSheetEvents` | Re-inject the Medications double-click handler at build (uses `C_*` constants). |
+| `StartNewPatient` | Clear patient + meds (via `ClearMedArea`), keep the Log. |
 | `PreviewAllLabels` / `BuildAllLabelsPreview` / `EnsureAllLabelsSheet` | Label Previews gallery (three-zone cards mirroring the print label; top-right `Print Checked Labels` / `Refresh Previews` created each rebuild; rebuild sweeps stray autoshapes). |
 | `RowCheck` / `RowEdit` / `RowRemove` (`RowPrint` legacy) / `EditMedWithForm` | Per-card gallery actions. `RowCheck` -> `ToggleRowSelect` toggles the med's `Print?` selection; `RowEdit` -> `EditMedWithForm` opens the prefilled `frmMedEdit` editor (input-box fallback); both rebuild the gallery. |
 | `PromptExpLotPair` / `PromptExpiration` / `IsBadExpFormat` | Per-med Exp+Lot prompt via `frmExpLot` (two input-box fallback), with a forgiving `MM/YYYY` format check. |

@@ -36,7 +36,7 @@ if (-not $Workbook -or -not (Test-Path $Workbook)) {
 }
 
 $emblem = Join-Path $root 'scu_emblem.png'
-$card   = Join-Path $root 'docs\SCU_QuickStart_Card.pdf'
+$card   = Join-Path $root 'support\docs\SCU_QuickStart_Card.pdf'
 foreach ($f in @($emblem, $card)) {
     if (-not (Test-Path $f)) { Write-Host "Missing required file: $f" -ForegroundColor Red; exit 1 }
 }
@@ -91,5 +91,5 @@ Remove-Item -Recurse -Force $stage
 
 Write-Host ""
 Write-Host "Created: $zip" -ForegroundColor Green
-Write-Host "Next: create a GitHub Release (tag v$Version) and attach this ZIP. See docs\RELEASE.md." -ForegroundColor Green
+Write-Host "Next: create a GitHub Release (tag v$Version) and attach this ZIP. See support\docs\RELEASE.md." -ForegroundColor Green
 Write-Host ""

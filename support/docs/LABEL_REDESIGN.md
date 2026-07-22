@@ -93,7 +93,7 @@ Header row heights: **20 pt** (row 2) + **10 pt** (row 3).
 
 ## Print pipeline
 
-- `ApplyLabelPageSetup` — `A1:H15`, zoom 100, no fit-to-page, no `.PaperSize`, landscape.
+- `ApplyLabelPageSetup` — `A1:H15`, **fit-to-one-page** (`.Zoom = False`, `.FitToPagesWide = 1`, `.FitToPagesTall = 1`), no `.PaperSize`, landscape. (V2: fit-to-page replaced `zoom 100 / no-fit` so the bottom EXP/LOT row can't clip on a printer with a shorter printable area.)
 - `PrepareLabelSheetForPrint` — only `scuLogo` may print as a shape; preview buttons excluded.
 - `PrintLabelSurfaceSafe` — **`PrintOut From:=1, To:=1`** (fixes blank 2nd label).
 
