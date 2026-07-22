@@ -65,6 +65,7 @@ Private Const LG_LAST As Long = 16    ' rightmost Log column
 ' Encounter snapshot store (hidden sheet). One row per (encounter, med) capturing the FULL
 ' medication detail so a past encounter can be reopened and edited exactly as it was.
 Private Const SH_ENC As String = "EncounterData"
+Private Const SH_DEV As String = "Developer Test"
 Private Const ES_ENC    As Long = 1     ' Encounter #
 Private Const ES_PT     As Long = 2     ' Patient
 Private Const ES_DOB    As Long = 3     ' DOB
@@ -796,6 +797,9 @@ Public Sub SetupWorkbook()
     ' Ship a clean sheet: wipe any leftover/test medication rows so a freshly built
     ' workbook never opens with stale data in the Medications tab.
     Call ClearMedArea(ws2)
+
+    ' Developer Test panel (last tab): random-patient generator + testing buttons.
+    Call BuildDeveloperTestSheet
 
     ' Version stamp so the loaded build is visible at a glance (support / troubleshooting).
     On Error Resume Next
@@ -4597,6 +4601,137 @@ Private Sub PrintEncounterLabelsNoLog()
     Application.ScreenUpdating = True
     MsgBox done & " medication(s) reprinted, " & LABEL_COPIES & " copies each  (" & _
         (done * LABEL_COPIES) & " labels).", vbInformation, "Reprint Complete"
+End Sub
+
+' ============================================================
+'  DEVELOPER TEST SHEET
+'  A last-tab panel of testing buttons. "Generate Test Patient" fills a random name,
+'  DOB, and medication list in the paste box (Exp/Lot left blank), ready to Parse.
+' ============================================================
+Private Sub BuildDeveloperTestSheet()
+    Dim ws As Worksheet
+    On Error Resume Next
+    Set ws = ThisWorkbook.Sheets(SH_DEV)
+    On Error GoTo 0
+    If ws Is Nothing Then
+        Set ws = ThisWorkbook.Sheets.Add(After:=ThisWorkbook.Sheets(ThisWorkbook.Sheets.Count))
+        ws.Name = SH_DEV
+    Else
+        On Error Resume Next
+        ws.Move After:=ThisWorkbook.Sheets(ThisWorkbook.Sheets.Count)   ' keep it last
+        On Error GoTo 0
+    End If
+    ws.Cells.Clear
+    Dim shp As Shape
+    For Each shp In ws.Shapes
+        shp.Delete
+    Next shp
+    ws.Range("A1:F1").Merge
+    ws.Range("A1").Value = "Developer Test"
+    With ws.Range("A1")
+        .Interior.Color = RGB(55, 71, 79)
+        .Font.Color = RGB(255, 255, 255)
+        .Font.Bold = True
+        .Font.Size = 16
+        .HorizontalAlignment = xlCenter
+    End With
+    ws.Rows(1).RowHeight = 28
+    ws.Cells(3, 1).Value = "Testing only. 'Generate Test Patient' fills a random name, DOB, and med"
+    ws.Cells(4, 1).Value = "list in the paste box (Exp/Lot/Source left blank), ready to PARSE MEDICATIONS."
+    Call AddButtonToSheet(ws, "dev_genpt",  "1. Generate Test Patient",       "GenerateTestPatient", 6, 1, 220, 28, RGB(21, 101, 192))
+    Call AddButtonToSheet(ws, "dev_explot", "2. Fill Random Exp / Lot / Source", "FillRandomExpLot",  9, 1, 220, 24, RGB(0, 121, 107))
+    Call AddButtonToSheet(ws, "dev_tests",  "Run Parser Self-Tests",          "RunParserTests",     12, 1, 220, 24, RGB(84, 110, 122))
+    Call AddButtonToSheet(ws, "dev_reset",  "Reset Session (clear everything)", "ResetSession",      15, 1, 220, 24, RGB(191, 54, 12))
+    ws.Columns("A").ColumnWidth = 32
+    ws.Visible = xlSheetVisible
+End Sub
+
+' Fill the Input tab with a random patient + medication list (no Exp/Lot), ready to Parse.
+Public Sub GenerateTestPatient()
+    Randomize
+    Dim firsts As Variant, lasts As Variant
+    firsts = Array("James", "Maria", "Robert", "Linda", "Michael", "Patricia", "David", _
+                   "Jennifer", "William", "Sofia", "Carlos", "Aisha", "Wei", "Fatima", "John", "Elena")
+    lasts = Array("Smith", "Johnson", "Garcia", "Nguyen", "Patel", "Kim", "Brown", "Martinez", _
+                  "Davis", "Lopez", "Wilson", "Ali", "Chen", "Okafor", "Rossi", "Hernandez")
+    Dim nm As String
+    nm = lasts(Int(Rnd * (UBound(lasts) + 1))) & ", " & firsts(Int(Rnd * (UBound(firsts) + 1)))
+    Dim yr As Integer, mo As Integer, dy As Integer
+    yr = 1945 + Int(Rnd * 61)
+    mo = 1 + Int(Rnd * 12)
+    dy = 1 + Int(Rnd * 28)
+    Dim dob As String
+    dob = Format(mo, "00") & "/" & Format(dy, "00") & "/" & yr
+
+    Dim pool As Variant
+    pool = Array( _
+        "Lisinopril 10 mg tablet" & vbLf & "Take 1 tablet by mouth once daily" & vbLf & "30 tablet, 2 refills", _
+        "Metformin 500 mg tablet" & vbLf & "Take 1 tablet by mouth twice daily with meals" & vbLf & "60 tablet, 3 refills", _
+        "Atorvastatin 20 mg tablet" & vbLf & "Take 1 tablet by mouth at bedtime" & vbLf & "30 tablet, 5 refills", _
+        "Amlodipine 5 mg tablet" & vbLf & "Take 1 tablet by mouth once daily" & vbLf & "30 tablet, 2 refills", _
+        "Omeprazole 20 mg capsule" & vbLf & "Take 1 capsule by mouth before breakfast" & vbLf & "30 capsule, 1 refill", _
+        "Sertraline 50 mg tablet" & vbLf & "Take 1 tablet by mouth once daily" & vbLf & "30 tablet, 3 refills", _
+        "Albuterol HFA 90 mcg inhaler" & vbLf & "Inhale 2 puffs by mouth every 4 hours as needed" & vbLf & "1 inhaler, 2 refills", _
+        "Gabapentin 300 mg capsule" & vbLf & "Take 1 capsule by mouth three times daily" & vbLf & "90 capsule, 1 refill", _
+        "Hydrochlorothiazide 25 mg tablet" & vbLf & "Take 1 tablet by mouth every morning" & vbLf & "30 tablet, 2 refills", _
+        "Levothyroxine 50 mcg tablet" & vbLf & "Take 1 tablet by mouth every morning" & vbLf & "30 tablet, 5 refills")
+    Dim want As Integer, txt As String, used As String, idx As Integer, got As Integer
+    want = 3 + Int(Rnd * 3)
+    used = "|"
+    txt = ""
+    got = 0
+    Do While got < want
+        idx = Int(Rnd * (UBound(pool) + 1))
+        If InStr(used, "|" & idx & "|") = 0 Then
+            used = used & idx & "|"
+            If txt <> "" Then txt = txt & vbLf & vbLf
+            txt = txt & pool(idx)
+            got = got + 1
+        End If
+    Loop
+
+    Dim wsIn As Worksheet
+    Set wsIn = ThisWorkbook.Sheets(SH_INPUT)
+    wsIn.Range("C5").Value = nm
+    wsIn.Range("C6").Value = dob
+    wsIn.Range("C7").Value = Format(Now(), "MM/DD/YYYY")
+    On Error Resume Next
+    wsIn.Range("B12").Value = txt
+    On Error GoTo 0
+    wsIn.Activate
+    wsIn.Range("C5").Select
+    MsgBox "Test patient loaded:" & vbCrLf & vbCrLf & _
+        "   " & nm & "    DOB " & dob & vbCrLf & _
+        "   " & got & " medications in the paste box (Exp/Lot/Source blank)." & vbCrLf & vbCrLf & _
+        "Click PARSE MEDICATIONS to parse them.", vbInformation, "Developer Test - Test Patient"
+End Sub
+
+' Fill every current med with a random future Exp, a random Lot, and a random Source -
+' a fast way to reach a printable/validatable state during testing.
+Public Sub FillRandomExpLot()
+    Randomize
+    Dim ws As Worksheet
+    Set ws = ThisWorkbook.Sheets(SH_MEDS)
+    Dim srcs As Variant
+    srcs = Array("IN HOUSE", "DOH", "RxAPS", "Other")
+    Dim lastRow As Long, r As Long, n As Long, mo As Integer, yr As Integer
+    lastRow = ws.Cells(ws.Rows.Count, C_NAME).End(xlUp).Row
+    n = 0
+    For r = MEDS_HDR_ROWS + 1 To lastRow
+        If Trim(ws.Cells(r, C_NAME).Value) <> "" Then
+            mo = 1 + Int(Rnd * 12)
+            yr = 2027 + Int(Rnd * 4)
+            ws.Cells(r, C_EXP).NumberFormat = "@"
+            ws.Cells(r, C_EXP).Value = Format(mo, "00") & "/" & yr
+            ws.Cells(r, C_LOT).NumberFormat = "@"
+            ws.Cells(r, C_LOT).Value = "LOT" & Format(Int(Rnd * 900000) + 100000, "000000")
+            ws.Cells(r, C_SRC).Value = srcs(Int(Rnd * 4))
+            n = n + 1
+        End If
+    Next r
+    Call ValidateMedications(False)
+    MsgBox n & " medication(s) filled with random Exp / Lot / Source for testing.", _
+        vbInformation, "Developer Test"
 End Sub
 
 ' ============================================================

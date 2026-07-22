@@ -6,6 +6,9 @@
 
 Work toward the V2 build, applied in blocks (see `IMPROVEMENT_REPORT_2026-07-09.md`).
 
+**Developer Test panel (2026-07-09)**
+- New **Developer Test** sheet (last tab, rebuilt by `SetupWorkbook`) with testing buttons: **Generate Test Patient** (random name, DOB, and 3-5 realistic meds into the paste box - Exp/Lot/Source left blank - ready to Parse), **Fill Random Exp/Lot/Source** (fast path to a printable state), **Run Parser Self-Tests**, and **Reset Session**.
+
 **Workflow simplification: one print path (2026-07-09)**
 - **Print is now done only from the gallery.** Removed **Print Checked Labels** from the Medications tab and **Print This Label** from the preview surface; the gallery's **Print Checked Labels** is the single print action (Preview ALL Labels -> Print Checked Labels).
 - Removed the **Reprint Last Batch** button (every print already does 2 copies).
