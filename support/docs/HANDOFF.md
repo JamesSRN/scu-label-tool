@@ -1,6 +1,6 @@
 # SCU Label Printing Tool - Handoff
 
-Last updated: 2026-07-09 (**V2**: Source column (required) right of Lot #; Refills right of Rx Date + default 0; 2 copies per label; auto-check on validate; per-print **Encounters** (numbered + green-banded) in the Log; **TEBRA TEMPLATE** sheet; Medications banner/grid spruce-up + hidden internal columns; **fit-to-page** so Exp/Lot never clip; resilient `ClearMedArea`; Add Medication prompts for Exp/Lot; red/yellow missing-field highlights)
+Last updated: 2026-07-23 (**v2.1**: Check Med column moved left + frozen panes; Medications & Print Labels banners redesigned; readable `frmReview` list dialog reused for Review / Print confirm / Print complete / Remove; Add Medication uses the `frmMedEdit` form; **live yellow<->white highlighting** with a clear **white -> blue (reviewed) -> green (checked)** state and an `EnableEvents` guard invariant; Parse clears the previous list first (keeps name/DOB); removed the only clipboard `Copy`/`PasteSpecial`. Earlier **V2** (2026-07-09): Source column (required) right of Lot #; Refills right of Rx Date + default 0; 2 copies per label; auto-check on validate; per-print **Encounters** (numbered + green-banded) in the Log; **TEBRA TEMPLATE** sheet; Medications banner/grid spruce-up + hidden internal columns; **fit-to-page** so Exp/Lot never clip; resilient `ClearMedArea`; Add Medication prompts for Exp/Lot; red/yellow missing-field highlights)
 
 An Excel + VBA tool for the **Saturday Clinic for the Uninsured (SCU)** free
 pharmacy. It turns pasted prescription text into a validated medication table and
@@ -39,11 +39,18 @@ Code/docs are version-controlled; the `.xlsm` (PHI) is local-only by design.
 
 ---
 
-## 2. Workbook structure (5 visible tabs + 1 hidden)
+## 2. Workbook structure (5 visible tabs + hidden)
 
-- **Patient & Input** - patient name / DOB / Rx date + paste box. Buttons:
+The visible workflow tabs are **numbered and color-coded** (V2): **1. Patient & Input**
+(blue), **2. Medications** (green), **3. Print Labels** (orange, the gallery), **4. Log**
+(purple), **5. Tebra Notes** (teal); **Start Here** is slate. Names are driven by the
+`SH_*` constants and applied at build time by `EnsureSheetName` (idempotent rename, runs
+first in `SetupWorkbook`) + `ColorWorkflowTabs`. Hidden helper sheets: **Label Preview**
+(print surface), **EncounterData** (snapshots). **Developer Test** is the last tab.
+
+- **1. Patient & Input** - patient name / DOB / Rx date + paste box. Buttons:
   `PARSE MEDICATIONS`, `Clear Paste Area`, `Reset Session`, `Start NEW Patient`.
-- **Medications** - the parsed table (**V2 column order**, all driven by `C_*`
+- **2. Medications** - the parsed table (**V2 column order**, all driven by `C_*`
   constants). Columns A-Q: `#`(1), Name(2), Strength(3), Dosage Form(4), SIG(5),
   Quantity(6), **Expiration**(7), **Lot**(8), **Source**(9), Rx Date(10),
   Refills(11), Confidence(12), Warnings(13), Raw Text(14, **hidden**),
@@ -53,21 +60,22 @@ Code/docs are version-controlled; the `.xlsm` (PHI) is local-only by design.
   blue banner (row 1) and a light box-grid are drawn in code by `SetupWorkbook`.
   Missing-field highlights: **red** = Exp/Lot, **yellow** = Quantity/Source.
   Buttons (col S / 19): `+ Add Medication`, `- Remove Selected`, `Review & Validate`,
-  `Preview ALL Labels`, `Edit Past Encounter`, `Save Edited Encounter`. **Printing is
-  done only from the gallery** (Preview ALL Labels -> Print Checked Labels).
-- **Label Previews** - auto-generated gallery, one card per medication (cards mirror
+  `Preview ALL Labels`, `Save for Later (draft)`, `Edit Past Encounter`, `Save Edited
+  Encounter`. **Printing is done only from the gallery** (Preview ALL Labels -> Print
+  Checked Labels).
+- **3. Print Labels** - auto-generated gallery, one card per medication (cards mirror
   the print label's three-zone header). **Top-right buttons** (code-created each
   rebuild): `Print Checked Labels`, `Refresh Previews`. **Per-card buttons**:
   **`Check this label` / `Uncheck this label`** (state-aware; toggles the med's
   `Print?` checkbox on the Medications tab via `RowCheck` -> `ToggleRowSelect`),
   `Edit this med`, `Remove this med`. Rebuilds on tab activate; the rebuild sweeps
   stray/manually-placed buttons (deletes all `al_*` shapes and loose autoshapes).
-- **Log** - running dispense log. Columns 1-16: timestamp, patient, DOB, med,
+- **4. Log** - running dispense log. Columns 1-16: timestamp, patient, DOB, med,
   strength, directions, qty, refills, expiration, lot, **source**, Rx date,
   initials, dosage form, print #, **Encounter**. Each print is one **Encounter**
   (numbered, and its rows shaded in one of three cycling greens). Mirrored to a
   dated local CSV.
-- **TEBRA TEMPLATE** - paste-ready session notes built from the Log: one block per
+- **5. Tebra Notes** - paste-ready session notes built from the Log: one block per
   patient, grouped by source (IN HOUSE / DOH & Outside / RxAPs), with name/DOB on
   the right. Rebuilt by `FillTebraTemplate` (also has a "Refresh from session log" button).
 - **Start Here** - the in-app quick-start guide; the workbook opens here.
@@ -111,10 +119,22 @@ Label Previews.
 - Exp/Lot forced to text.
 
 ### Selection, color, printing (checkbox-driven)
-- **Double-click a Print? (col P) cell to toggle a checkmark.** A checkmark = "selected".
-- Row background by state: **Selected = green** (matches the gallery tint),
-  **Validated = blue**, **Non-validated = gray**. Confidence cell colored by its
-  own triad. (No printed/lavender state - printing no longer recolors rows.)
+- **Double-click the Check Med cell OR the Medication name to toggle a checkmark.** A checkmark = "selected".
+- Row background by state (priority **Selected > Reviewed > unreviewed**): **Selected
+  (checked) = green** (matches the gallery tint), **Reviewed OK = blue**, **not yet
+  reviewed = white**. Missing **Qty / Exp / Lot / Source** cells are **yellow**.
+  Confidence cell colored by its own triad. (No printed/lavender state - printing no
+  longer recolors rows.)
+- **Live highlighting:** the Medications `Worksheet_Change` handler calls `LiveRefreshRow`
+  on the edited row(s) so yellow clears to white the instant a value is entered (and
+  returns to yellow if cleared) - **without** turning the row blue. Blue is only set when
+  **Review** (`ValidateMedications`) runs; Review then auto-checks OK rows to green.
+- **Event-guard invariant:** anything that programmatically writes a Medications table
+  cell whose result must survive - `ValidateMedications` (Warnings "OK" + Exp normalize),
+  the Review auto-check, `ToggleRowSelect` (Check Med), `ClearMedArea` - runs with
+  `Application.EnableEvents = False`, because otherwise the write re-fires
+  `Worksheet_Change` -> `LiveRefreshRow`, which clears the "OK" (dropping the row to
+  white). Unchecking a reviewed med therefore goes green -> blue, not green -> white.
 - **Print Checked Labels** prints every checked med in sequence (skips any checked
   row missing Exp/Lot). Print confirmations list exactly what will print (single =
   full detail block; batch = numbered list flagging skips).
@@ -146,6 +166,29 @@ Label Previews.
   Strength bold at the top**, then Dosage form, Quantity, Directions (multi-line),
   Expiration, Lot (Refills excluded on purpose; edit it on the sheet). `RowEdit` ->
   `EditMedWithForm`, with a prefilled-input-box fallback.
+- **Add Medication** opens the **same `frmMedEdit`** form, blank and titled "Add
+  medication" (`AddMedicationRow` -> `AddMedWithForm`), so adding and editing look
+  identical. Falls back to a chain of input boxes if the form is unavailable. Exp/Lot are
+  written as text so `05/2028` isn't coerced to a date.
+- **Review** opens **`frmReview`** — a **scrolling review list** (replaces the old dense
+  MsgBox, which can't size or bold individual lines). Per medication it shows the **name +
+  strength large & bold (14pt)** with that med's **error(s) stacked underneath, one per
+  line, in a smaller 11pt font** (passing meds read green "Ready to print."; flagged meds
+  read dark with red error lines). A footer sums up how many still need attention.
+  `ReviewMedications` populates it via the form's `ResetList` / `AddMed` / `SetFooter` /
+  `FinishList` methods (`ReviewErrText` splits the period-separated warning string into
+  brief per-line issues); a **MsgBox fallback** is used if the form is unavailable.
+  Implementation note: the per-med labels are added to the scrolling frame **at run time**
+  with **fixed width + fixed height and `WordWrap`, never `AutoSize`** — a runtime-added
+  label with `AutoSize = True` collapses its width to one character.
+- **`frmReview` is a reusable list dialog.** Besides Review it also backs the **Print
+  Checked Labels** confirmation (Print/Cancel; each med Ready / SKIPPED-missing-Exp/Lot /
+  DOH), the **Print Complete** summary (OK; each med's outcome), and the **Remove Selected**
+  confirmation (Remove/Cancel; names only). API: `ResetList`, `AddMed(title, errText, isOK)`
+  (empty `errText` = compact name-only row), `SetHeader(title)`, `SetFooter(text)`,
+  `ConfigButtons(showCancel, okText, cancelText)`, `FinishList`, then `.Show` and read
+  `.Result` ("OK"/"CANCEL"). Every caller sets header + buttons because the default
+  instance persists between opens.
 - **Auto-reset (PHI hygiene):** on **open** the workbook clears patient + meds + paste
   (`ClearSessionSilent`, Log kept); on **close** it does a **full wipe** — patient +
   meds + paste **and the Log** (`ClearSessionSilent` + `ClearLogSilent`) — then saves,
@@ -153,10 +196,11 @@ Label Previews.
   (installed by Build-Release, which now **replaces** the ThisWorkbook module so a stale
   `Workbook_Open` can't block it). Note: **in-progress work is discarded on close by design.**
 
-Both UserForms and the auto-reset handlers are **generated by `Build-Release.vbs`**
-into the workbook (so volunteers need no VBA-project-trust setting). The forms are
-referenced **late-bound** in `MedParser.bas`, so the module compiles even without
-them. See §5 (build) and §7 (gotchas).
+All four UserForms (`frmExpLot`, `frmMedEdit`, `frmBusy`, `frmReview`) and the
+auto-reset handlers are **generated by `Build-Release.vbs`** into the workbook (so
+volunteers need no VBA-project-trust setting). The forms are referenced **late-bound**
+in `MedParser.bas`, so the module compiles even without them. See §5 (build) and §7
+(gotchas).
 
 ---
 
@@ -313,12 +357,14 @@ See `tools/BUILD_RELEASE_NOTES.md` for full detail.
 1. VBA editor (Alt+F11): remove the old `MedParser` module, **Import
    `MedParser.bas`**, run **`SetupWorkbook`**, save. (`SetupWorkbook` running is
    the compile check.)
-2. **Handlers:** the **Medications** `Worksheet_BeforeDoubleClick` (toggle Print? on
-   col **17**, block # of Prints on col **16**) is now **re-installed at build time**
-   by `SetupWorkbook` -> `InstallMedSheetEvents`, built from the `C_*` constants so it
-   stays correct after column reorders (needs VBA-project trust, which Build-Release
-   has). The **Label Previews** `Worksheet_Activate` -> `PreviewAllLabels` handler is
-   preinstalled in that sheet module.
+2. **Handlers:** the **Medications** `Worksheet_BeforeDoubleClick` (toggle Print? /
+   block # of Prints) **and** `Worksheet_Change` (live highlight refresh: any table-cell
+   edit re-runs `ValidateMedications`, guarded by `EnableEvents = False`) are both
+   **re-installed at build time** by `SetupWorkbook` -> `InstallMedSheetEvents`, built
+   from the `C_*` constants (injected as literals, since a sheet module can't see the
+   module's `Private Const`s) so they stay correct after column reorders (needs
+   VBA-project trust, which Build-Release has). The **Label Previews**
+   `Worksheet_Activate` -> `PreviewAllLabels` handler is preinstalled in that sheet module.
 3. Keep `scu_emblem.png` beside the workbook so the logo embeds on SetupWorkbook.
 
 ### Problems solved (2026-06-30 session)
@@ -435,8 +481,9 @@ print (no blank follow-on label); logo/header layout on screen and print path
 | Routine | Purpose |
 |---|---|
 | `SetupWorkbook` | Run after each import: rebuilds buttons, headers, colors, label layout; calls `PreviewAllLabels`. Uses `MatchHeaderFormat` for new columns. |
-| `ParseMedications` / `SplitMedBlocks` / `IsMedHeaderLine` / `ParseOneBlock` | Parse pasted text -> one row per med. |
-| `ValidateMedications` / `ReviewMedications` | Flag issues; summary. |
+| `ParseMedications` / `SplitMedBlocks` / `IsMedHeaderLine` / `ParseOneBlock` | Parse pasted text -> one row per med. **Clears the previous list first** (`ClearMedArea` + reset batch/encounter state; keeps name/DOB/paste), confirming when meds already exist. |
+| `LiveRefreshRow(r)` | Live recolor of one edited row (yellow<->white) without validating/bluing; clears a prior "OK" so an edited reviewed row returns to white. Called by the Medications `Worksheet_Change`. |
+| `ValidateMedications` / `ReviewMedications` / `ReviewErrText` | `ValidateMedications` flags issues and writes the `Warnings` cell; `ReviewMedications` shows the scrolling `frmReview` (name/strength bold + stacked errors) with a MsgBox fallback; `ReviewErrText` splits the warning string into brief per-line issues. |
 | `AddMedicationRow` / `RemoveSelectedMedication` / `RenumberMeds` | List editing. Remove Selected removes all checked rows. |
 | `ApplyRowState` / `ApplyAllRowStates` / `IsRowSelected` / `ToggleRowSelect` | Row color by state; confidence triad; selection checkmark. |
 | `PrintCheckedLabels` | Batch-print every checked med; logs each. |

@@ -36,16 +36,22 @@ toward correct labels and caught before mistakes reach a patient.
 2. **Parse** (one button / `Ctrl+Shift+P`): the text is split into one row per
    medication on the *Medications* tab - name, strength, form, directions (SIG),
    quantity, refills, expiration, and lot. **Refills default to 0** and a
-   **Source** dropdown (DOH / IN HOUSE / RxAPS / Other) starts blank. After
-   parsing (and from **+ Add Medication**) the tool offers to collect Expiration
-   and Lot right away.
+   **Source** dropdown (DOH / IN HOUSE / RxAPS / Other) starts blank. Parse
+   **clears the previous patient's list first** (keeping the name/DOB and Log) so a
+   new patient never mixes with old rows. After parsing the tool offers to collect
+   Expiration and Lot right away; **+ Add Medication** opens the same one-dialog
+   editor as **Edit this med**.
 3. **Review & fix**: every drug gets a **confidence** rating, and a validation
-   pass flags anything missing or suspicious. Cells are color-coded: **red** for
-   missing Expiration/Lot, **yellow** for missing Quantity/Source, plus bad-format
-   and duplicate warnings. Rows are fully editable; volunteers can add or remove
-   medications by hand. Meds that pass validation are **auto-checked** for printing.
-4. **Select what to print** with the *Print?* checkboxes (double-click to toggle) -
-   one med or many. Selected rows turn green, matching the preview gallery.
+   pass flags anything missing or suspicious. Highlights update **live as you type**:
+   a missing **Quantity / Expiration / Lot / Source** cell is **yellow** and clears to
+   **white** the moment you fill it (and back to yellow if you clear it). The **Review**
+   button opens a scrolling list showing each drug's **name + strength large & bold**
+   with its **error(s) stacked underneath**. On Review, complete rows validate to
+   **blue** and are then **auto-checked to green** for printing. Rows are fully editable;
+   volunteers can add or remove medications by hand.
+4. **Select what to print** with the *Check Med* boxes (double-click the box or the
+   medication name to toggle) - one med or many. **Checked = green; unchecking a
+   reviewed med returns it to blue.** The row color matches the preview gallery.
 5. **Preview** every label on the *Label Previews* tab (auto-refreshes), then
    **Print Checked Labels** - **2 copies of each label**. A confirmation lists
    exactly what's about to print and flags any rows skipped for missing
@@ -63,10 +69,14 @@ toward correct labels and caught before mistakes reach a patient.
 
 ## Key features
 
-- One-paste-to-labels parsing with per-drug confidence scoring.
+- One-paste-to-labels parsing with per-drug confidence scoring; Parse starts a
+  fresh list each time so patients never mix.
 - Validation that catches missing or malformed fields before printing, with
-  color-coded cells (red = Exp/Lot, yellow = Quantity/Source) and auto-check of
-  passing meds.
+  **live** color-coded cells (yellow = missing, clears to white as you fill it) and a
+  clear **white -> blue (reviewed) -> green (checked)** row state.
+- Readable pop-ups: **Review**, **Print**, and **Remove** all show each med's name +
+  strength large and bold with its status stacked underneath.
+- One-dialog medication editor shared by **Add Medication** and **Edit this med**.
 - **Source** dropdown (DOH / IN HOUSE / RxAPS / Other), required and logged.
 - Checkbox-driven selection that drives printing, row color, and removal alike.
 - Auto-refreshing gallery of all label previews.

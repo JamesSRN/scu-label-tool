@@ -251,6 +251,125 @@ Set dsn = frm.Designer
         "End Sub"
 On Error GoTo 0
 
+' Build the Medication Review UserForm (frmReview): a scrolling list where each med
+' shows its NAME + STRENGTH large & bold, with the error(s) for that med stacked
+' underneath in a smaller (but still readable) font. Labels are added at run time into
+' the scrolling frame by the form's own AddMed method; ReviewMedications populates it.
+On Error Resume Next
+Set frm = EnsureForm("frmReview", 470, 560, "Medication Review")
+Set dsn = frm.Designer
+    Set ctl = NewCtl("Forms.Label.1", "lblHdr", True)
+    ctl.Left = 12 : ctl.Top = 8 : ctl.Width = 440 : ctl.Height = 20 : ctl.Font.Bold = True : ctl.Font.Size = 11 : ctl.Caption = "Medication Review"
+    Set ctl = NewCtl("Forms.Frame.1", "fraList", True)
+    ctl.Left = 10 : ctl.Top = 32 : ctl.Width = 446 : ctl.Height = 450 : ctl.ScrollBars = 2 : ctl.Caption = ""
+    Set ctl = NewCtl("Forms.Label.1", "lblFoot", True)
+    ctl.Left = 12 : ctl.Top = 486 : ctl.Width = 258 : ctl.Height = 42 : ctl.WordWrap = True : ctl.Font.Size = 9
+    Set ctl = NewCtl("Forms.CommandButton.1", "btnCancel", True)
+    ctl.Left = 278 : ctl.Top = 490 : ctl.Width = 84 : ctl.Height = 28 : ctl.Caption = "Cancel" : ctl.Cancel = True : ctl.Visible = False
+    Set ctl = NewCtl("Forms.CommandButton.1", "btnOK", True)
+    ctl.Left = 372 : ctl.Top = 490 : ctl.Width = 84 : ctl.Height = 28 : ctl.Caption = "OK" : ctl.Default = True
+    HideExtras "[lblHdr][fraList][lblFoot][btnCancel][btnOK]"
+    frm.CodeModule.AddFromString _
+        "Public Result As String" & vbCrLf & _
+        "Private mY As Single" & vbCrLf & _
+        "Private mIdx As Long" & vbCrLf & _
+        "Private Sub UserForm_Initialize()" & vbCrLf & _
+        "    Me.Caption = ""Medication Review""" & vbCrLf & _
+        "    Me.Width = 470" & vbCrLf & _
+        "    Me.Height = 560" & vbCrLf & _
+        "End Sub" & vbCrLf & _
+        "Public Sub SetHeader(ByVal t As String)" & vbCrLf & _
+        "    Me.Caption = t" & vbCrLf & _
+        "    lblHdr.Caption = t" & vbCrLf & _
+        "End Sub" & vbCrLf & _
+        "Public Sub ConfigButtons(ByVal showCancel As Boolean, ByVal okText As String, ByVal cancelText As String)" & vbCrLf & _
+        "    btnOK.Caption = okText" & vbCrLf & _
+        "    btnOK.Left = 372" & vbCrLf & _
+        "    If showCancel Then" & vbCrLf & _
+        "        btnCancel.Caption = cancelText" & vbCrLf & _
+        "        btnCancel.Visible = True" & vbCrLf & _
+        "    Else" & vbCrLf & _
+        "        btnCancel.Visible = False" & vbCrLf & _
+        "    End If" & vbCrLf & _
+        "End Sub" & vbCrLf & _
+        "Public Sub ResetList()" & vbCrLf & _
+        "    Dim ct As Control" & vbCrLf & _
+        "    On Error Resume Next" & vbCrLf & _
+        "    For Each ct In fraList.Controls" & vbCrLf & _
+        "        ct.Visible = False" & vbCrLf & _
+        "    Next" & vbCrLf & _
+        "    On Error GoTo 0" & vbCrLf & _
+        "    mY = 6" & vbCrLf & _
+        "    mIdx = 0" & vbCrLf & _
+        "    Result = ""CANCEL""" & vbCrLf & _
+        "End Sub" & vbCrLf & _
+        "Public Sub AddMed(ByVal title As String, ByVal errText As String, ByVal isOK As Boolean)" & vbCrLf & _
+        "    Dim lblN As Object, lblE As Object" & vbCrLf & _
+        "    Dim nName As String, eName As String" & vbCrLf & _
+        "    mIdx = mIdx + 1" & vbCrLf & _
+        "    nName = ""n"" & mIdx" & vbCrLf & _
+        "    eName = ""e"" & mIdx" & vbCrLf & _
+        "    On Error Resume Next" & vbCrLf & _
+        "    Set lblN = fraList.Controls(nName)" & vbCrLf & _
+        "    Set lblE = fraList.Controls(eName)" & vbCrLf & _
+        "    On Error GoTo 0" & vbCrLf & _
+        "    If lblN Is Nothing Then Set lblN = fraList.Controls.Add(""Forms.Label.1"", nName, True)" & vbCrLf & _
+        "    If lblE Is Nothing Then Set lblE = fraList.Controls.Add(""Forms.Label.1"", eName, True)" & vbCrLf & _
+        "    lblN.AutoSize = False" & vbCrLf & _
+        "    lblN.WordWrap = True" & vbCrLf & _
+        "    lblN.Font.Size = 14" & vbCrLf & _
+        "    lblN.Font.Bold = True" & vbCrLf & _
+        "    lblN.Left = 6" & vbCrLf & _
+        "    lblN.Top = mY" & vbCrLf & _
+        "    lblN.Width = 408" & vbCrLf & _
+        "    lblN.Height = 22" & vbCrLf & _
+        "    lblN.Caption = title" & vbCrLf & _
+        "    If isOK Then" & vbCrLf & _
+        "        lblN.ForeColor = RGB(27, 94, 32)" & vbCrLf & _
+        "    Else" & vbCrLf & _
+        "        lblN.ForeColor = RGB(17, 17, 17)" & vbCrLf & _
+        "    End If" & vbCrLf & _
+        "    lblN.Visible = True" & vbCrLf & _
+        "    mY = mY + 24" & vbCrLf & _
+        "    If Len(Trim(errText)) = 0 Then" & vbCrLf & _
+        "        lblE.Visible = False" & vbCrLf & _
+        "        mY = mY + 6" & vbCrLf & _
+        "    Else" & vbCrLf & _
+        "        lblE.AutoSize = False" & vbCrLf & _
+        "        lblE.WordWrap = True" & vbCrLf & _
+        "        lblE.Font.Size = 11" & vbCrLf & _
+        "        lblE.Font.Bold = False" & vbCrLf & _
+        "        lblE.Left = 20" & vbCrLf & _
+        "        lblE.Top = mY" & vbCrLf & _
+        "        lblE.Width = 392" & vbCrLf & _
+        "        lblE.Height = (1 + Len(errText) - Len(Replace(errText, Chr(10), """"))) * 15 + 4" & vbCrLf & _
+        "        lblE.Caption = errText" & vbCrLf & _
+        "        If isOK Then" & vbCrLf & _
+        "            lblE.ForeColor = RGB(46, 125, 50)" & vbCrLf & _
+        "        Else" & vbCrLf & _
+        "            lblE.ForeColor = RGB(183, 28, 28)" & vbCrLf & _
+        "        End If" & vbCrLf & _
+        "        lblE.Visible = True" & vbCrLf & _
+        "        mY = mY + lblE.Height + 12" & vbCrLf & _
+        "    End If" & vbCrLf & _
+        "End Sub" & vbCrLf & _
+        "Public Sub SetFooter(ByVal s As String)" & vbCrLf & _
+        "    lblFoot.Caption = s" & vbCrLf & _
+        "End Sub" & vbCrLf & _
+        "Public Sub FinishList()" & vbCrLf & _
+        "    fraList.ScrollHeight = mY + 8" & vbCrLf & _
+        "    fraList.ScrollTop = 0" & vbCrLf & _
+        "End Sub" & vbCrLf & _
+        "Private Sub btnOK_Click()" & vbCrLf & _
+        "    Result = ""OK""" & vbCrLf & _
+        "    Me.Hide" & vbCrLf & _
+        "End Sub" & vbCrLf & _
+        "Private Sub btnCancel_Click()" & vbCrLf & _
+        "    Result = ""CANCEL""" & vbCrLf & _
+        "    Me.Hide" & vbCrLf & _
+        "End Sub"
+On Error GoTo 0
+
 ' Set ThisWorkbook auto-reset handlers: Open clears patient+meds (keeps Log) so it
 ' always opens empty; BeforeClose clears + saves so no PHI persists on disk. REPLACE the
 ' whole module each build so a stale/legacy Workbook_Open can't block the clear-on-open.

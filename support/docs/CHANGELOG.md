@@ -1,10 +1,97 @@
 # Changelog
 
-## Unreleased
+## v2.1 - 2026-07-23
 
-### V2 build
+UI/UX polish pass on top of V2 (`APP_VERSION = "2.1"`). Headline changes: readable
+`frmReview` list dialog (Review / Print confirm / Print complete / Remove), Add
+Medication uses the `frmMedEdit` form, live yellow<->white highlighting with a clear
+white -> blue -> green row state, Parse clears the previous list first, Medications &
+Print Labels banners redesigned, and the clipboard-popup source removed.
 
-Work toward the V2 build, applied in blocks (see `IMPROVEMENT_REPORT_2026-07-09.md`).
+**Divider line between encounters in the Log (2026-07-23)**
+- The Log now draws a **dark divider rule above each new encounter group** (in addition to the cycling green shading), so encounters are easy to tell apart. `ApplyLogEncounterBorders` recomputes the dividers from scratch (grouped by base encounter number, so versioned rows stay together) and is called after every Log change - print, reprint, save-edited-encounter, and rebuild - so it stays correct when rows are added, replaced, or reordered.
+
+**Edited encounters are versioned in the Log (2026-07-23)**
+- Re-saving an edited encounter now stamps its Log rows with a **version suffix**: the first log is plain (**1**, **2**, ...), the first edit becomes **1 (v2)**, the next **1 (v3)**, etc. The numeric identity is unchanged - matching, next-number, green-banding, and the Edit picker all read the **base number** (`Val`, and the snapshot store stays numeric), so nothing that keys on the encounter number breaks. New helpers `EncounterNextVersion` / `ParseEncVersion` / `EncLabel`; the label is carried to `LogPrint` via `gEncLabel`. Applies to both re-log paths (Save Edited Encounter and printing while editing).
+
+**Tebra emblem persists + Setup & Help blurb no longer stacks (2026-07-23)**
+- You can now **add a logo/emblem to the Tebra Notes page** and it survives refresh/rebuild: `FillTebraTemplate` deletes shapes back-to-front but **keeps pictures** (msoPicture / msoLinkedPicture), same as the Patient & Input page. The Refresh button is recreated as before.
+- **Fixed the Setup & Help sheet stacking copies of the "How this tool works / How the parser works" blurb** on every build. `PlaceSetupHelpSheet` now finds the first "HOW THIS TOOL WORKS" marker and clears from there down before re-appending, so exactly one copy remains (self-healing - the next build wipes all previously stacked copies).
+
+**Tebra Notes: Refresh button moved into the banner (2026-07-23)**
+- The **Refresh from session log** button now lives **in the teal banner** (row 2, right), styled like the other banner buttons (dark fill, white outline, white bold text). The banner spans the full A:L width with the title top-left and session date top-right; the copy instruction moved up to the freed row.
+
+**Tebra Notes: each patient's note is boxed for clearer copy/paste (2026-07-23)**
+- Every patient's note on the **5. Tebra Notes** sheet is now drawn as a **green outer card** (name/DOB band + the whole note) containing **two inner teal boxes**: **Medication Reconciliation** (copy into the reconciliation note) and **Medications Dispensed + Counseling** (copy into the visit note). Boxes span columns A:L so long med lines sit inside. The instruction line spells out the copy step: select a box's column-A lines, Ctrl+C, paste into the matching Tebra field. `TebraCardBorder(clr, wght)` draws each box; borders are a visual aid only (pasting cells into Tebra copies the text, not the box).
+
+**Tebra Notes tab sits right after 4. Log (2026-07-23)**
+- **5. Tebra Notes** now stays **right after 4. Log** (part of the numbered workflow), with **Setup & Help** and **Developer Test** after it. `EnsureTebraSheet` moves the sheet `After:` Log instead of to the very end, so it no longer jumps to last when `FillTebraTemplate` re-runs after a print.
+
+**Unchecking a reviewed med returns it to blue, not white (2026-07-23)**
+- Unchecking a med now goes **green -> blue** (keeps its reviewed "OK"), instead of green -> white. Cause was the same event re-entrancy: `ToggleRowSelect` writing the Check Med cell re-fired `Worksheet_Change` -> `LiveRefreshRow`, which cleared the "OK". `ToggleRowSelect` now toggles with `EnableEvents = False`. (A med that was checked without ever being reviewed still returns to white, since it has no "OK".)
+
+**Parse starts a fresh list (2026-07-23)**
+- **PARSE now clears the previous patient's medication list first**, so a new parse never mixes with leftover rows. It keeps the name/DOB/pasted text (Parse just used them) and the dispense Log - it's the "Start New Patient" clear applied to the med list + batch/encounter state only. When the list already has meds it **asks to confirm** first ("Parse - Start Fresh"), so an accidental re-parse can't silently wipe work; on an empty list it just parses. `ClearMedArea` now runs with `EnableEvents = False` so clearing 500 rows doesn't hammer the live-highlight handler.
+
+**Live highlighting on the Medications tab (2026-07-23)**
+- The missing-value highlights now update **as you type**: fill in Expiration / Lot / Quantity / Source and the cell clears to **white** immediately; clear one and it goes back to **yellow** - no need to click Review first. Done with a **`Worksheet_Change`** handler (injected by `InstallMedSheetEvents`) that recolors only the edited row(s) via **`LiveRefreshRow`**, guarded by `EnableEvents = False`. (Needs the same "Trust access to the VBA project object model" setting the double-click handler already uses.)
+- **Color states preserved deliberately:** live editing only toggles **yellow <-> white** and never turns a row blue - **blue is reserved for Review**. The flow stays: **white** (unreviewed) -> **Review** validates and sweeps good rows to **blue**, then auto-checks them to **green** row by row -> a manual check toggles **green**. Editing a previously-reviewed (blue) row clears its OK state back to white until Review is run again; the not-yet-reviewed row background is now **white** (was gray) so filled cells read as white.
+- **Fix (same day):** OK meds weren't turning blue and "OK" was missing from the Warnings column. Cause: `ValidateMedications` writing "OK" (and the Review auto-check writing the Check Med cell) re-fired `Worksheet_Change` -> `LiveRefreshRow`, which cleared the just-set "OK". Fixed by running both with `EnableEvents = False` so the review/validate writes stick.
+
+**Add Medication uses the pretty form; Print Labels banner cleaned up (2026-07-23)**
+- **Add Medication** now opens the same **`frmMedEdit`** form as **Edit this med** (titled "Add medication"), so a new drug is entered in one clean dialog - Medication, Strength, Dosage form, Quantity, Directions, Expiration, Lot - instead of a chain of input boxes. The old input-box chain remains as a fallback. Exp/Lot entered on the form are written as text (so `05/2028` isn't coerced to a date).
+- **Print Labels (gallery) banner** redesigned: the orange band now spans the **full width** (buttons no longer sit off the band on gray), the title is **vertically centered** with a lighter **DOB subtitle** underneath, and **Print Checked Labels / Refresh Previews** are **right-aligned, same height, vertically centered, with white outlines** to match the Medications toolbar.
+
+**Medication Review is now a readable form, not a cramped MsgBox (2026-07-23)**
+- The **Review** button now opens a scrolling **`frmReview`** UserForm instead of a single dense message box (a MsgBox can't size or bold individual lines). Each medication shows its **name + strength large & bold (14pt)**, with the error(s) for that med **stacked underneath, one per line, in a smaller-but-readable 11pt font**. Passing meds read green ("Ready to print."); flagged meds read dark with red error lines. A footer summarizes how many still need attention, and passing meds are still auto-checked for printing.
+- `frmReview` is built each run by `Build-Release.vbs` (scrolling frame + OK); `ReviewMedications` populates it via `ResetList`/`AddMed`/`SetFooter`/`FinishList`, with a **MsgBox fallback** if the form is unavailable. New `ReviewErrText` helper splits the period-separated warning string into brief per-line issues.
+- **Fix (same day):** first cut wrapped every line to one character. Cause: the per-med labels are added to the scrolling frame **at run time**, and a runtime-added label with **`AutoSize = True`** collapses its width to ~one character (and `InsideWidth` reads ~0 before the form is shown). Fixed by using the same pattern as `frmExpLot`: **fixed width + fixed height + `WordWrap`, no `AutoSize`** — the name is a fixed 408x22 line and the error label's height is computed from its line count.
+
+**Same readable list now used for the print + remove dialogs (2026-07-23)**
+- `frmReview` is now a **reusable list dialog**: it gained an optional **Cancel button**, a **`Result`** ("OK"/"CANCEL"), a **`SetHeader`** method (title + banner), a **`ConfigButtons(showCancel, okText, cancelText)`** method, and a **compact mode** (pass an empty error string to show just the bold name).
+- Three more popups now use it (each with a MsgBox fallback):
+  - **Print Checked Labels** confirmation - each checked med large/bold with its status: **Ready to print**, **SKIPPED - missing Exp/Lot** (red), or **DOH - logged; label optional**. Buttons **Print / Cancel**.
+  - **Print Complete** summary - each med's outcome (**Printed**, **SKIPPED - add Exp/Lot**, **Logged (DOH)**), with a one-line count footer.
+  - **Remove Selected** confirmation - the checked meds listed large/bold before deletion. Buttons **Remove / Cancel**.
+
+**Faster builds: fast-build mode in SetupWorkbook (2026-07-09)**
+- `SetupWorkbook` now turns **ScreenUpdating, EnableEvents, and Calculation off** for the whole rebuild (restored at the end), via a `gBuilding` flag. This stops the many sheet activations from repainting and - importantly - stops the gallery tab's `Worksheet_Activate` from re-rebuilding the gallery every time a sheet is activated during the build. Inner routines skip re-enabling ScreenUpdating while `gBuilding` is true.
+
+**Medications: Check Med moved left, frozen panes, all-yellow highlights (2026-07-09)**
+- **Check Med** column moved to **position 2 (left of Medication)**; **Confidence** moved to the **far right**; the rest shifted. All driven by the `C_*` constants + a new `C_LAST` (used everywhere "the last column" was needed). Headers/widths rewritten for the new order.
+- **Frozen panes:** the banner + header rows and the **#, Check Med, Medication** columns are frozen, so the checkbox and drug name stay visible when scrolling. The banner is now filled (not merged) so it freezes cleanly.
+- **Double-clicking the Medication name** now toggles the row's check (same as the Check Med box).
+- **All missing-info highlights are yellow** now (Quantity, Expiration, Lot, Source) - Exp/Lot were red before.
+
+**Medications toolbar redesign + encounter box (2026-07-09)**
+- Removed the **Preview** button from the Medications toolbar (open the **3. Print Labels** tab to preview/print). The toolbar is now two groups: **Add / Remove / Review on the left**, **Save Draft / Edit Enc. / Save Enc. on the right**.
+- Toolbar buttons restyled to **dark, aesthetic colors with white outlines** (via `PlaceBarBtn`).
+- New **dynamic encounter box** in the banner (right of Save Enc.) showing **"Editing Encounter #N"** (red) while editing/drafting a saved encounter, or **"New patient (not saved)"** (dark) otherwise. Kept in sync by routing every `gEditingEncounter` change through `SetEditingEncounter` -> `RefreshEncounterBox`.
+
+**Input STEP 3 polish + Setup & Help blurb (2026-07-09)**
+- **PARSE MEDICATIONS is now double-height** (the button people want to click); the other three match size. **Reset Session dropped near row 45**, apart from the everyday buttons. Added a blue **instruction line under "STEP 3"** congruent with the Step 2 text, and a little more room for the Step 2 instructions.
+- **Setup & Help** is auto-moved to the **right of the Tebra tab** each build (out of the workflow) and now has a **"How this tool works / How the parser works"** blurb appended at the bottom (plain-language, incl. how the block-splitter + confidence scoring work).
+
+**Input STEP 3 box, 85% zoom, gallery banner, button colors (2026-07-09)**
+- **Patient & Input**: removed the **old leftover button stack + "Buttons become active..." note** below the paste box (all stray shapes on the tab are cleared each build). The action buttons now live in a tidy **"STEP 3 - Parse & Actions" box to the right of Step 2**: Parse, Start NEW Patient, and Clear are the **same size**, evenly spaced; **Reset Session sits lower down, separated** (destructive).
+- **Every page opens at 85% zoom, top-left.** Moving to a new page (Start NEW Patient, Reset, Go to Input) lands at the top-left corner instead of scrolled off to the right (`ShowSheetTopLeft` / `ApplyZoom85AllSheets`).
+- **Print Labels gallery** now has an **orange banner** (matching its tab); its Print button is green and Refresh is charcoal so they stand out.
+- **Medications toolbar** recolored to a distinct palette that all contrasts on the green banner (the "+ Add" button no longer blends in).
+
+**Medications banner toolbar + banners match tab colors (2026-07-09)**
+- The Medications action buttons moved off the far right into a **small side-by-side toolbar inside the row-1 banner** (right-aligned, short captions), via `LayoutMedButtonBar`. The banner is a bit **taller**, its title is **left-aligned**, and it's now **green to match the Medications tab**.
+- Code-drawn page banners now **match their tab color**: Medications green, Start Here slate, Tebra Notes teal.
+
+**Numbered, color-coded tabs + rewritten Start Here (2026-07-09)**
+- Workflow tabs are **renamed with step numbers** and **color-coded** to match: **1. Patient & Input** (blue), **2. Medications** (green), **3. Print Labels** (orange), **4. Log** (purple), **5. Tebra Notes** (teal); Start Here is slate. Renames run first in `SetupWorkbook` (idempotent `EnsureSheetName`) before any sheet is accessed, and all references are via the `SH_*` constants, so nothing breaks. Tab colors set by `ColorWorkflowTabs`.
+- **Start Here** rewritten as a plain-language "how to" - 5 numbered steps whose badges match the tab colors, referencing each numbered tab, plus updated "Good to know" (DOH, Save for Later, New Patient, auto-clear on close).
+- Fixed: the label's patient Name/DOB/Rx formulas hardcoded `'Patient & Input'`, so renaming that tab triggered an Excel **"Update Values"** external-link pop-up. They now build from the `SH_INPUT` constant and resolve correctly.
+
+**DOH meds: record always, ask before printing labels (2026-07-09)**
+- Checked meds marked **DOH** (Health Dept / outside pharmacy) are now **always added to the Log and Tebra note**, even without Exp/Lot - but printing prompts **"Print LABELS for the DOH meds too?"** first. Non-DOH meds still skip when missing Exp/Lot. `PrintCheckedLabels` now also **refreshes the Tebra note** after each print, and the completion message reports meds recorded without a label.
+
+**Save an encounter as a draft before printing (2026-07-09)**
+- New **Save for Later (draft)** button snapshots the current patient + med list under an encounter number **without printing or logging**. Reopen it any time via **Edit Past Encounter**; when you finally print, it **reuses the same encounter number** (no orphan/duplicate). `NextEncounter` now also accounts for draft snapshots so numbers stay unique, and the working-encounter flag resets on Start NEW Patient / reset.
 
 **Developer Test panel (2026-07-09)**
 - New **Developer Test** sheet (last tab, rebuilt by `SetupWorkbook`) with testing buttons: **Generate Test Patient** (random name, DOB, and 3-5 realistic meds into the paste box - Exp/Lot/Source left blank - ready to Parse), **Fill Random Exp/Lot/Source** (fast path to a printable state), **Run Parser Self-Tests**, and **Reset Session**.

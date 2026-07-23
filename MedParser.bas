@@ -14,32 +14,33 @@ Attribute VB_Name = "MedParser"
 Option Explicit
 
 ' -- Sheet names ---------------------------------------------
-Private Const SH_INPUT  As String = "Patient & Input"
-Private Const SH_MEDS   As String = "Medications"
+Private Const SH_INPUT  As String = "1. Patient & Input"
+Private Const SH_MEDS   As String = "2. Medications"
 Private Const SH_LABEL  As String = "Label Preview"
-Private Const SH_LOG    As String = "Log"
-Private Const SH_ALL    As String = "Label Previews"
+Private Const SH_LOG    As String = "4. Log"
+Private Const SH_ALL    As String = "3. Print Labels"
 Private Const SH_GUIDE  As String = "Start Here"
-Private Const SH_TEBRA  As String = "TEBRA TEMPLATE"
+Private Const SH_TEBRA  As String = "5. Tebra Notes"
 
 ' -- Medications sheet column indices ------------------------
 Private Const C_NUM     As Integer = 1
-Private Const C_NAME    As Integer = 2
-Private Const C_STR     As Integer = 3
-Private Const C_FORM    As Integer = 4
-Private Const C_SIG     As Integer = 5
-Private Const C_QTY     As Integer = 6
-Private Const C_EXP     As Integer = 7
-Private Const C_LOT     As Integer = 8
-Private Const C_SRC     As Integer = 9    ' Source dropdown (DOH / IN HOUSE / RxAPS / Other), logged; right of Lot #
-Private Const C_DATE    As Integer = 10
-Private Const C_REF     As Integer = 11   ' Refills, right of Date of Rx
-Private Const C_CONF    As Integer = 12
+Private Const C_SEL     As Integer = 2    ' Check Med checkbox - left of the name, in the frozen area
+Private Const C_NAME    As Integer = 3
+Private Const C_STR     As Integer = 4
+Private Const C_FORM    As Integer = 5
+Private Const C_SIG     As Integer = 6
+Private Const C_QTY     As Integer = 7
+Private Const C_EXP     As Integer = 8
+Private Const C_LOT     As Integer = 9
+Private Const C_SRC     As Integer = 10   ' Source dropdown (DOH / IN HOUSE / RxAPS / Other), logged
+Private Const C_DATE    As Integer = 11
+Private Const C_REF     As Integer = 12   ' Refills
 Private Const C_WARN    As Integer = 13
-Private Const C_RAW     As Integer = 14
-Private Const C_PRTD    As Integer = 15
-Private Const C_CNT     As Integer = 16
-Private Const C_SEL     As Integer = 17
+Private Const C_CNT     As Integer = 14   ' # of Prints
+Private Const C_RAW     As Integer = 15   ' hidden (internal parse text)
+Private Const C_PRTD    As Integer = 16   ' hidden (printed flag)
+Private Const C_CONF    As Integer = 17   ' Confidence - far right
+Private Const C_LAST    As Integer = 17   ' rightmost table column (used where "the last column" is needed)
 
 ' Dispense Log column map (1-based). Encounter sits right after Timestamp; the rest follow
 ' in reading order. Every Log read/write and the header row use these, so reordering the
@@ -142,6 +143,8 @@ Private busyFrm As Object
 Private gLastBatchRows As String
 Private gLastBatchVol As String
 Private gEditingEncounter As Long   ' >0 while a past encounter is loaded for editing; 0 otherwise
+Private gEncLabel As String         ' Encounter-column display label ("1" or "1 (v2)"); "" = use the number
+Private gBuilding As Boolean        ' True only while SetupWorkbook runs (fast-build mode)
 
 ' V2: append each print to a dated local CSV archive (PHI - stays on this machine,
 ' git-ignored) so the day's dispensing record survives the on-close Log wipe.
@@ -149,7 +152,7 @@ Private gEditingEncounter As Long   ' >0 while a past encounter is loaded for ed
 Private Const DISPENSE_CSV_ENABLED As Boolean = True
 
 ' V2 app version - stamped into the workbook by SetupWorkbook so the loaded build is visible.
-Public Const APP_VERSION As String = "2.0"
+Public Const APP_VERSION As String = "2.1"
 
 ' V2 debug switch: when True, Dbg() writes a timestamped trace to the VBE Immediate
 ' window (Ctrl+G). Leave False for production (Dbg is then a no-op).
@@ -202,24 +205,23 @@ End Sub
 '  WORKBOOK SETUP  (run once after importing this module)
 ' ============================================================
 Private Sub MatchHeaderFormat(ByVal src As Range, ByVal dest As Range)
-    ' Copy header styling without fragile multi-cell PasteSpecial calls.
+    ' Copy header styling by setting each property directly. Deliberately NO Copy /
+    ' PasteSpecial: with ScreenUpdating off during the build, a clipboard paste can raise
+    ' the modal "Cannot use the information in the clipboard..." popup, which On Error does
+    ' not suppress (it is an interactive prompt, not a trappable error).
     On Error Resume Next
-    src.Copy
-    dest.PasteSpecial xlPasteFormats
-    Application.CutCopyMode = False
-    If Err.Number <> 0 Then
-        Err.Clear
-        With dest
-            .Font.Name = src.Font.Name
-            .Font.Size = src.Font.Size
-            .Font.Bold = src.Font.Bold
-            .Font.Color = src.Font.Color
-            .Interior.Color = src.Interior.Color
-            .HorizontalAlignment = src.HorizontalAlignment
-            .VerticalAlignment = src.VerticalAlignment
-            .WrapText = src.WrapText
-        End With
-    End If
+    With dest
+        .Font.Name = src.Font.Name
+        .Font.Size = src.Font.Size
+        .Font.Bold = src.Font.Bold
+        .Font.Italic = src.Font.Italic
+        .Font.Color = src.Font.Color
+        .Interior.Color = src.Interior.Color
+        .Interior.Pattern = src.Interior.Pattern
+        .HorizontalAlignment = src.HorizontalAlignment
+        .VerticalAlignment = src.VerticalAlignment
+        .WrapText = src.WrapText
+    End With
     On Error GoTo 0
 End Sub
 
@@ -267,9 +269,45 @@ End Sub
 
 ' Jump from the guide to the working tab (wired to the guide's button).
 Public Sub GoToInput()
+    Call ShowSheetTopLeft(ThisWorkbook.Sheets(SH_INPUT), "C5")
+End Sub
+
+' Bring a sheet to the front showing the TOP-LEFT at a comfortable zoom (used whenever we
+' move to a new page, so the view never opens scrolled off to the right).
+Private Sub ShowSheetTopLeft(ws As Worksheet, Optional ByVal firstCell As String = "A1")
     On Error Resume Next
-    ThisWorkbook.Sheets(SH_INPUT).Activate
-    ThisWorkbook.Sheets(SH_INPUT).Range("C5").Select
+    ws.Activate
+    ActiveWindow.Zoom = 85
+    ActiveWindow.ScrollRow = 1
+    ActiveWindow.ScrollColumn = 1
+    ws.Range(firstCell).Select
+    On Error GoTo 0
+End Sub
+
+' Freeze the Medications banner + header rows AND the #/Check Med/Name columns, so the
+' checkbox and drug name stay visible when you scroll right or down.
+Private Sub FreezeMedPanes()
+    On Error Resume Next
+    Dim ws As Worksheet
+    Set ws = ThisWorkbook.Sheets(SH_MEDS)
+    ws.Activate
+    ActiveWindow.FreezePanes = False
+    ActiveWindow.Zoom = 85
+    ActiveWindow.ScrollRow = 1
+    ActiveWindow.ScrollColumn = 1
+    ws.Cells(MEDS_HDR_ROWS + 1, C_NAME + 1).Select   ' first cell below header + right of Name
+    ActiveWindow.FreezePanes = True
+    ws.Cells(MEDS_HDR_ROWS + 1, C_NAME).Select
+    On Error GoTo 0
+End Sub
+
+' Set every visible sheet to 85% zoom, showing the top-left (run once at build time).
+Private Sub ApplyZoom85AllSheets()
+    On Error Resume Next
+    Dim ws As Worksheet
+    For Each ws In ThisWorkbook.Worksheets
+        If ws.Visible = xlSheetVisible Then Call ShowSheetTopLeft(ws, "A1")
+    Next ws
     On Error GoTo 0
 End Sub
 
@@ -307,6 +345,32 @@ Private Sub GuideStep(ws As Worksheet, ByVal topRow As Long, ByVal num As Intege
     On Error GoTo 0
 End Sub
 
+' Rename a workflow sheet to its new (numbered) name. Idempotent: if a sheet already has
+' newName, nothing happens; else if oldName exists it is renamed. Safe if neither exists.
+Private Sub EnsureSheetName(ByVal oldName As String, ByVal newName As String)
+    On Error Resume Next
+    Dim ws As Worksheet
+    Set ws = Nothing
+    Set ws = ThisWorkbook.Sheets(newName)
+    If Not ws Is Nothing Then Exit Sub          ' already the new name
+    Set ws = Nothing
+    Set ws = ThisWorkbook.Sheets(oldName)
+    If Not ws Is Nothing Then ws.Name = newName
+    On Error GoTo 0
+End Sub
+
+' Color-code the workflow tabs to match the numbered Start Here steps.
+Private Sub ColorWorkflowTabs()
+    On Error Resume Next
+    ThisWorkbook.Sheets(SH_GUIDE).Tab.Color = RGB(55, 71, 79)     ' Start Here  - slate
+    ThisWorkbook.Sheets(SH_INPUT).Tab.Color = RGB(21, 101, 192)   ' 1 - blue
+    ThisWorkbook.Sheets(SH_MEDS).Tab.Color = RGB(46, 125, 50)     ' 2 - green
+    ThisWorkbook.Sheets(SH_ALL).Tab.Color = RGB(216, 67, 21)      ' 3 - orange
+    ThisWorkbook.Sheets(SH_LOG).Tab.Color = RGB(106, 27, 154)     ' 4 - purple
+    ThisWorkbook.Sheets(SH_TEBRA).Tab.Color = RGB(0, 131, 143)    ' 5 - teal
+    On Error GoTo 0
+End Sub
+
 ' Build (or rebuild) the "Start Here" quick-start sheet and make it the FIRST sheet, so
 ' the workbook opens to it. Best-effort/cosmetic - never fails the build.
 Private Sub BuildQuickStartSheet()
@@ -332,8 +396,8 @@ Private Sub BuildQuickStartSheet()
     ws.Columns("B").ColumnWidth = 6
     ws.Columns("C:H").ColumnWidth = 15
 
-    ' Header band
-    ws.Range("A1:H3").Interior.Color = RGB(0, 121, 107)
+    ' Header band - slate, matching the Start Here tab color
+    ws.Range("A1:H3").Interior.Color = RGB(55, 71, 79)
     ws.Range(ws.Cells(2, 1), ws.Cells(2, 8)).Merge
     With ws.Cells(2, 1)
         .Value = "   SCU Label Printing"
@@ -344,23 +408,25 @@ Private Sub BuildQuickStartSheet()
     End With
     ws.Range(ws.Cells(3, 1), ws.Cells(3, 8)).Merge
     With ws.Cells(3, 1)
-        .Value = "   Quick-Start Guide   -   print a medication label in 4 steps        v" & APP_VERSION
+        .Value = "   How to make medication labels  -  follow the numbered, colored tabs        v" & APP_VERSION
         .Font.Color = RGB(255, 255, 255)
         .Font.Size = 11
         .VerticalAlignment = xlCenter
     End With
 
-    Call GuideStep(ws, 5, 1, RGB(21, 101, 192), "Enter & paste", _
-        "On the 'Patient & Input' tab, type the patient Name and DOB, paste the medication list into the box, then click PARSE MEDICATIONS.")
-    Call GuideStep(ws, 10, 2, RGB(0, 121, 107), "Review & add Exp / Lot", _
-        "On the 'Medications' tab click Review & Validate and fix anything flagged (an amber Expiration cell means check the date). When prompted, enter Expiration (MM/YYYY) and Lot. For a med split across two bottles, separate values with commas.")
-    Call GuideStep(ws, 15, 3, RGB(216, 67, 21), "Check what to print", _
-        "Double-click the 'Check Med' cell next to each medication you want (or use 'Check this label' in the gallery). A green row means it is selected.")
-    Call GuideStep(ws, 20, 4, RGB(46, 125, 50), "Print", _
-        "Click 'Preview ALL Labels' to open the gallery, then click 'Print Checked Labels', confirm the list, and enter your initials. Any label missing Exp/Lot is skipped and named. When done you land on the Log.")
+    Call GuideStep(ws, 5, 1, RGB(21, 101, 192), "Patient & Input   (blue tab)", _
+        "Open the '1. Patient & Input' tab. Type the patient's NAME and DOB, paste the medication list into the big box, then click PARSE MEDICATIONS.")
+    Call GuideStep(ws, 10, 2, RGB(46, 125, 50), "Medications   (green tab)", _
+        "On the '2. Medications' tab, fill any RED cell (Expiration / Lot) and pick a SOURCE for any YELLOW cell. Click 'Review & Validate'. Passing meds are checked automatically - double-click a 'Check Med' cell to add or remove one (a green row will print).")
+    Call GuideStep(ws, 15, 3, RGB(216, 67, 21), "Print Labels   (orange tab)", _
+        "Click 'Preview ALL Labels' to open the '3. Print Labels' tab. Check that the labels look right, then click 'Print Checked Labels' and enter your initials. TWO labels print for each checked med.")
+    Call GuideStep(ws, 20, 4, RGB(106, 27, 154), "Log   (purple tab)", _
+        "Everything you print is recorded on the '4. Log' tab automatically, grouped by patient visit ('Encounter') in cycling green. Nothing to do here - it is your record.")
+    Call GuideStep(ws, 25, 5, RGB(0, 131, 143), "Tebra Notes   (teal tab)", _
+        "The '5. Tebra Notes' tab builds a ready-to-paste note for each patient, grouped by source. Copy it into Tebra.")
 
-    ws.Range(ws.Cells(26, 2), ws.Cells(26, 8)).Merge
-    With ws.Cells(26, 2)
+    ws.Range(ws.Cells(31, 2), ws.Cells(31, 8)).Merge
+    With ws.Cells(31, 2)
         .Value = "Good to know"
         .Font.Bold = True
         .Font.Size = 11
@@ -368,14 +434,15 @@ Private Sub BuildQuickStartSheet()
     End With
     Dim gk As Variant
     gk = Array( _
-        "-   Reprint Last Batch:  reprints the last set after a paper jam or misfeed.", _
-        "-   Start NEW Patient:  clears the screen for the next patient (the Log is kept).", _
-        "-   Closing the file clears patient info and the Log; a dated CSV backup is saved.", _
+        "-   DOH meds are always recorded in the Log & Tebra note - you're asked whether to print their labels.", _
+        "-   'Save for Later' stores a patient to finish later; reopen it with 'Edit Past Encounter'.", _
+        "-   'Start NEW Patient' clears the screen for the next patient (the Log is kept).", _
+        "-   Closing the file clears patient info and the Log; a dated CSV backup is saved next to the workbook.", _
         "-   Labels print on the Brother QL-1100c with the DK-1202 (62 x 100 mm) roll.")
     Dim gi As Integer
     For gi = 0 To UBound(gk)
-        ws.Range(ws.Cells(27 + gi, 2), ws.Cells(27 + gi, 8)).Merge
-        With ws.Cells(27 + gi, 2)
+        ws.Range(ws.Cells(32 + gi, 2), ws.Cells(32 + gi, 8)).Merge
+        With ws.Cells(32 + gi, 2)
             .Value = gk(gi)
             .Font.Size = 10
             .Font.Color = RGB(38, 50, 56)
@@ -390,8 +457,8 @@ Private Sub BuildQuickStartSheet()
     ws.Rows(3).RowHeight = 20
     ws.Rows(4).RowHeight = 10
     Dim tops As Variant, ti As Integer, s As Long
-    tops = Array(5, 10, 15, 20)
-    For ti = 0 To 3
+    tops = Array(5, 10, 15, 20, 25)
+    For ti = 0 To 4
         s = tops(ti)
         ws.Rows(s).RowHeight = 16
         ws.Rows(s + 1).RowHeight = 15
@@ -399,23 +466,25 @@ Private Sub BuildQuickStartSheet()
         ws.Rows(s + 3).RowHeight = 15
         ws.Rows(s + 4).RowHeight = 6
     Next ti
-    ws.Rows(25).RowHeight = 8
-    ws.Rows(26).RowHeight = 20
-    For gi = 0 To 3
-        ws.Rows(27 + gi).RowHeight = 16
+    ws.Rows(30).RowHeight = 8
+    ws.Rows(31).RowHeight = 20
+    For gi = 0 To 4
+        ws.Rows(32 + gi).RowHeight = 16
     Next gi
-    ws.Rows(31).RowHeight = 10
+    ws.Rows(37).RowHeight = 10
 
-    Call AddButtonToSheet(ws, "btnGuideStart", "Go to Patient & Input  >", "GoToInput", 32, 2, 240, 30, RGB(21, 101, 192))
+    Call AddButtonToSheet(ws, "btnGuideStart", "Start here:  go to  1. Patient & Input   >", "GoToInput", 38, 2, 290, 30, RGB(21, 101, 192))
 
     ws.Activate
     ActiveWindow.DisplayGridlines = False
     ws.Cells(1, 1).Select
-    Application.ScreenUpdating = True
+    If Not gBuilding Then Application.ScreenUpdating = True
     On Error GoTo 0
 End Sub
 
-' Ensure the Tebra Template sheet exists and sits at the very end of the workbook.
+' Ensure the Tebra Template sheet exists and sits right after "4. Log" (part of the
+' numbered workflow), so it stays in place even when FillTebraTemplate re-runs after a
+' print. Setup & Help / Developer Test are moved after it later in SetupWorkbook.
 Private Function EnsureTebraSheet() As Worksheet
     Dim ws As Worksheet
     Set ws = Nothing
@@ -427,7 +496,7 @@ Private Function EnsureTebraSheet() As Worksheet
         ws.Name = SH_TEBRA
     End If
     On Error Resume Next
-    ws.Move After:=ThisWorkbook.Sheets(ThisWorkbook.Sheets.Count)
+    ws.Move After:=ThisWorkbook.Sheets(SH_LOG)     ' right after 4. Log
     On Error GoTo 0
     Set EnsureTebraSheet = ws
 End Function
@@ -496,14 +565,15 @@ Private Sub TebraLogSection(ws As Worksheet, ByRef r As Long, wsLg As Worksheet,
             End If
         End If
     Next lg
-    If cnt = 0 Then Call TebraLine(ws, r, "[copy & paste from weekly med list]", False)
+    ' If this source has no meds for the patient, leave the section title over nothing -
+    ' do NOT drop in placeholder text, which would get copied into the Tebra note.
     Call TebraLine(ws, r, "", False)
 End Sub
 
 ' A patient sub-header band: name on the left, DOB on the right (light teal).
 Private Sub TebraPatientHeader(ws As Worksheet, ByRef r As Long, ByVal pn As String, ByVal pdob As String)
-    ws.Range(ws.Cells(r, 1), ws.Cells(r, 8)).Interior.Color = RGB(224, 242, 235)
-    ws.Range(ws.Cells(r, 1), ws.Cells(r, 4)).Merge
+    ws.Range(ws.Cells(r, 1), ws.Cells(r, 12)).Interior.Color = RGB(224, 242, 235)
+    ws.Range(ws.Cells(r, 1), ws.Cells(r, 6)).Merge
     With ws.Cells(r, 1)
         .Value = "  " & IIf(pn <> "", pn, "[Patient]")
         .Font.Bold = True
@@ -511,8 +581,8 @@ Private Sub TebraPatientHeader(ws As Worksheet, ByRef r As Long, ByVal pn As Str
         .Font.Color = RGB(15, 110, 86)
         .VerticalAlignment = xlCenter
     End With
-    ws.Range(ws.Cells(r, 5), ws.Cells(r, 8)).Merge
-    With ws.Cells(r, 5)
+    ws.Range(ws.Cells(r, 7), ws.Cells(r, 12)).Merge
+    With ws.Cells(r, 7)
         .Value = "DOB  " & IIf(pdob <> "", pdob, "--") & "  "
         .Font.Bold = True
         .Font.Size = 11
@@ -524,10 +594,17 @@ Private Sub TebraPatientHeader(ws As Worksheet, ByRef r As Long, ByVal pn As Str
     r = r + 1
 End Sub
 
-' One patient's full pasteable Tebra note block (from the session Log).
+' One patient's full pasteable Tebra note block (from the session Log). The whole note is
+' boxed as a card so a volunteer can see exactly which lines belong to this patient.
 Private Sub TebraPatientBlock(ws As Worksheet, ByRef r As Long, wsLg As Worksheet, ByVal pn As String, ByVal pdob As String)
+    Dim pStart As Long
+    pStart = r
     Call TebraPatientHeader(ws, r, pn, pdob)
     Call TebraLine(ws, r, "", False)
+
+    ' --- Inner box 1: Medication Reconciliation (copy this into the reconciliation note) ---
+    Dim box1 As Long
+    box1 = r
     Call TebraLine(ws, r, "Medication Reconciliation", True)
     Call TebraLine(ws, r, "Medication reconciliation completed by [Clinical Pharmacy Student name] on " & Format(Date, "MM/DD/YYYY") & ".", False)
     Call TebraLine(ws, r, "Medications added:", False)
@@ -535,12 +612,38 @@ Private Sub TebraPatientBlock(ws As Worksheet, ByRef r As Long, wsLg As Workshee
     Call TebraLine(ws, r, "Medications removed:", False)
     Call TebraLine(ws, r, "Refills needed:", False)
     Call TebraLine(ws, r, "", False)
+    Call TebraCardBorder(ws, box1, r - 1, RGB(0, 131, 143), xlThin)
+
+    Call TebraLine(ws, r, "", False)     ' gap between the two boxes
+
+    ' --- Inner box 2: Dispensed meds + Counseling (copy this into the visit note) ---
+    Dim box2 As Long
+    box2 = r
     Call TebraLogSection(ws, r, wsLg, pn, pdob, "Medications Dispensed in Clinic:", "IN HOUSE")
     Call TebraLogSection(ws, r, wsLg, pn, pdob, "DOH & Outside Pharmacy Medications Prescribed:", "DOH|OTHER")
     Call TebraLogSection(ws, r, wsLg, pn, pdob, "RxAPs Medications Prescribed:", "RXAPS")
     Call TebraLine(ws, r, "Medication Counseling Note", True)
     Call TebraLine(ws, r, "", False)
+    Call TebraCardBorder(ws, box2, r - 1, RGB(0, 131, 143), xlThin)
+
+    ' --- Outer patient card: green border around the name + both boxes ---
+    Call TebraCardBorder(ws, pStart, r - 1, RGB(15, 110, 86), xlMedium)
+
+    ' Gap between patient cards.
     Call TebraLine(ws, r, "", False)
+    Call TebraLine(ws, r, "", False)
+End Sub
+
+' Draw an outline around a range of note rows (columns A:L, so long medication lines sit
+' inside the box). Used for both the two inner section boxes and the outer patient card.
+' Borders are a visual aid only - pasting the cells into a Tebra text field copies the
+' text, not the box.
+Private Sub TebraCardBorder(ws As Worksheet, ByVal r1 As Long, ByVal r2 As Long, ByVal clr As Long, ByVal wght As Long)
+    On Error Resume Next
+    If r2 < r1 Then Exit Sub
+    ws.Range(ws.Cells(r1, 1), ws.Cells(r2, 12)).BorderAround _
+        LineStyle:=xlContinuous, Weight:=wght, Color:=clr
+    On Error GoTo 0
 End Sub
 
 ' Build/refresh the Tebra Template sheet: patient name + DOB on the right, the pasteable
@@ -554,10 +657,13 @@ Public Sub FillTebraTemplate()
 
     Application.ScreenUpdating = False
     ws.Cells.Clear
-    Dim shp As Shape
-    For Each shp In ws.Shapes
-        shp.Delete
-    Next shp
+    ' Delete shapes back-to-front, but KEEP pictures so an emblem/logo you add to this page
+    ' by hand is not wiped when the note is refreshed/rebuilt (the button is recreated below).
+    Dim si As Long
+    For si = ws.Shapes.Count To 1 Step -1
+        If ws.Shapes(si).Type <> msoPicture And ws.Shapes(si).Type <> msoLinkedPicture Then _
+            ws.Shapes(si).Delete
+    Next si
     Dim ci As Integer
     For ci = 1 To 8
         ws.Columns(ci).ColumnWidth = 14
@@ -567,9 +673,10 @@ Public Sub FillTebraTemplate()
     ws.Activate
     ActiveWindow.DisplayGridlines = False
 
-    ' Session header band: title on the left, session date on the right.
-    ws.Range("A1:H2").Interior.Color = RGB(0, 121, 107)
-    ws.Range("A1:D1").Merge
+    ' Session header band (teal, matches the Tebra Notes tab, full A:L width): title top-left,
+    ' date top-right, and the Refresh button floated into the banner (row 2, right).
+    ws.Range("A1:L2").Interior.Color = RGB(0, 131, 143)
+    ws.Range("A1:F1").Merge
     With ws.Cells(1, 1)
         .Value = "   Tebra Session Notes"
         .Font.Color = RGB(255, 255, 255)
@@ -577,15 +684,15 @@ Public Sub FillTebraTemplate()
         .Font.Size = 16
         .VerticalAlignment = xlCenter
     End With
-    ws.Range("A2:D2").Merge
+    ws.Range("A2:F2").Merge
     With ws.Cells(2, 1)
         .Value = "   One note per patient - copy each into that patient's chart"
         .Font.Color = RGB(255, 255, 255)
         .Font.Size = 10
         .VerticalAlignment = xlCenter
     End With
-    ws.Range("E1:H2").Merge
-    With ws.Cells(1, 5)
+    ws.Range("G1:L1").Merge
+    With ws.Cells(1, 7)
         .Value = "Session  " & Format(Date, "MM/DD/YYYY") & "   "
         .Font.Color = RGB(255, 255, 255)
         .Font.Bold = True
@@ -593,17 +700,32 @@ Public Sub FillTebraTemplate()
         .HorizontalAlignment = xlRight
         .VerticalAlignment = xlCenter
     End With
-    ws.Rows(1).RowHeight = 26
-    ws.Rows(2).RowHeight = 18
+    ws.Rows(1).RowHeight = 24
+    ws.Rows(2).RowHeight = 24
     ws.Rows(3).RowHeight = 8
 
-    Call AddButtonToSheet(ws, "btnTebraFill", "Refresh from session log", "FillTebraTemplate", 4, 1, 230, 24, RGB(21, 101, 192))
-    ws.Rows(4).RowHeight = 30
-    ws.Cells(5, 1).Value = "Each patient below is a full note - select its lines and copy them into that patient's Tebra chart."
-    ws.Cells(5, 1).Font.Italic = True
-    ws.Cells(5, 1).Font.Color = RGB(120, 120, 120)
-    ws.Cells(5, 1).Font.Size = 9
-    ws.Rows(5).RowHeight = 14
+    ' Refresh button floated into the banner (row 2, right), styled like the other banner
+    ' buttons: dark fill, white outline, white bold text.
+    Call AddButtonToSheet(ws, "btnTebraFill", "Refresh from session log", "FillTebraTemplate", 1, 1, 210, 22, RGB(38, 50, 56))
+    On Error Resume Next
+    Dim tb As Shape
+    Set tb = ws.Shapes("btnTebraFill")
+    If Not tb Is Nothing Then
+        tb.Width = 210
+        tb.Height = 22
+        tb.Top = ws.Rows(2).Top + (ws.Rows(2).Height - tb.Height) / 2
+        tb.Left = (ws.Columns(12).Left + ws.Columns(12).Width) - 8 - tb.Width
+        tb.Line.Visible = msoTrue
+        tb.Line.ForeColor.RGB = RGB(255, 255, 255)
+        tb.Line.Weight = 1
+    End If
+    On Error GoTo 0
+
+    ws.Cells(4, 1).Value = "Each boxed note below = one patient. Select that box's lines in column A (top to bottom), press Ctrl+C, and paste into that patient's Tebra chart."
+    ws.Cells(4, 1).Font.Italic = True
+    ws.Cells(4, 1).Font.Color = RGB(120, 120, 120)
+    ws.Cells(4, 1).Font.Size = 9
+    ws.Rows(4).RowHeight = 16
 
     Dim r As Long: r = 7
     Dim lastLog As Long
@@ -627,14 +749,36 @@ Public Sub FillTebraTemplate()
     End If
 
     ws.Cells(1, 1).Select
-    Application.ScreenUpdating = True
+    If Not gBuilding Then Application.ScreenUpdating = True
     On Error GoTo 0
 End Sub
 
 Public Sub SetupWorkbook()
+    ' --- FAST BUILD: turn off rendering, events, and recalc for the whole rebuild. Every
+    ' sheet activation would otherwise repaint, and activating the gallery tab would fire its
+    ' Worksheet_Activate (rebuilding the gallery) again and again. Restored at the end.
+    Dim savedSU As Boolean, savedEE As Boolean, savedCalc As Long
+    On Error Resume Next
+    savedSU = Application.ScreenUpdating
+    savedEE = Application.EnableEvents
+    savedCalc = Application.Calculation
+    Application.ScreenUpdating = False
+    Application.EnableEvents = False
+    Application.Calculation = xlCalculationManual
+    On Error GoTo 0
+    gBuilding = True
+
     Application.OnKey "^+P", "ParseMedications"
     Application.OnKey "^+R", "ResetSession"
     Application.OnKey "^+L", "PreviewAllLabels"
+
+    ' Number the workflow tabs (run FIRST, before any sheet is accessed by its new name).
+    Call EnsureSheetName("Patient & Input", SH_INPUT)
+    Call EnsureSheetName("Medications", SH_MEDS)
+    Call EnsureSheetName("Label Previews", SH_ALL)    ' gallery (current name)
+    Call EnsureSheetName("All Labels", SH_ALL)        ' gallery (legacy name)
+    Call EnsureSheetName("Log", SH_LOG)
+    Call EnsureSheetName("TEBRA TEMPLATE", SH_TEBRA)
 
     Dim ws1 As Worksheet, ws2 As Worksheet, ws3 As Worksheet
     Set ws1 = ThisWorkbook.Sheets(SH_INPUT)
@@ -642,10 +786,54 @@ Public Sub SetupWorkbook()
     Set ws3 = ThisWorkbook.Sheets(SH_LABEL)
     ws3.Visible = xlSheetVisible   ' show while we rebuild it; re-hidden at the end
 
-    Call AddButtonToSheet(ws1, "btnParse",  "PARSE MEDICATIONS",  "ParseMedications",   48, 2, 240, 26, RGB(21, 101, 192))
-    Call AddButtonToSheet(ws1, "btnClear",  "Clear Paste Area",    "ClearPasteArea",     50, 2, 150, 20, RGB(84, 110, 122))
-    Call AddButtonToSheet(ws1, "btnReset",  "Reset Session",       "ResetSession",       50, 3, 150, 20, RGB(191, 54, 12))
-    Call AddButtonToSheet(ws1, "btnNewPt",  "Start NEW Patient",   "StartNewPatient",    53, 2, 230, 28, RGB(0, 121, 107))
+    ' Remove the OLD template button stack + "Buttons become active..." note that sat below
+    ' the paste box (delete back-to-front). KEEP pictures, so a logo/emblem you add to this
+    ' page by hand is NOT wiped on rebuild.
+    Dim si As Long
+    For si = ws1.Shapes.Count To 1 Step -1
+        If ws1.Shapes(si).Type <> msoPicture And ws1.Shapes(si).Type <> msoLinkedPicture Then
+            ws1.Shapes(si).Delete
+        End If
+    Next si
+    ws1.Range(ws1.Cells(48, 1), ws1.Cells(57, 13)).ClearContents   ' clear the old bottom area
+
+    ' STEP 3 box header, aligned with the Step 2 header (row 9). Just a label + buttons - no
+    ' instruction text. Row heights are left ALONE so the rows shared with Step 2 are never
+    ' cramped and any manual row-height fix persists across rebuilds.
+    On Error Resume Next
+    ws1.Range(ws1.Cells(9, 6), ws1.Cells(13, 11)).UnMerge      ' drop old header/instruction merges
+    ws1.Range(ws1.Cells(9, 6), ws1.Cells(13, 11)).ClearContents
+    On Error GoTo 0
+    ws1.Range(ws1.Cells(9, 6), ws1.Cells(9, 11)).Merge
+    With ws1.Cells(9, 6)
+        .Value = "STEP 3  -  Send to Medications Tab"
+        .Interior.Color = RGB(232, 234, 246)
+        .Font.Bold = True
+        .Font.Size = 11
+        .Font.Color = RGB(31, 73, 125)
+        .HorizontalAlignment = xlLeft
+        .IndentLevel = 1
+        .VerticalAlignment = xlCenter
+    End With
+
+    ' Action buttons: PARSE is DOUBLE height (the primary one to click); the rest match size.
+    Call AddButtonToSheet(ws1, "btnParse", "PARSE MEDICATIONS", "ParseMedications", 14, 6, 240, 64, RGB(21, 101, 192))
+    Call AddButtonToSheet(ws1, "btnNewPt", "Start NEW Patient", "StartNewPatient",  18, 6, 240, 32, RGB(0, 121, 107))
+    Call AddButtonToSheet(ws1, "btnClear", "Clear Paste Area",  "ClearPasteArea",   21, 6, 240, 32, RGB(84, 110, 122))
+    Call AddButtonToSheet(ws1, "btnReset", "Reset Session (clear all)", "ResetSession", 45, 6, 240, 32, RGB(191, 54, 12))
+    ' Exact positions: tall PARSE on top, two same-size buttons under it, Reset near row 45.
+    Dim ix As Double
+    ix = ws1.Columns(6).Left + 6
+    On Error Resume Next
+    ws1.Shapes("btnParse").Left = ix
+    ws1.Shapes("btnParse").Top = ws1.Rows(11).Top + 18
+    ws1.Shapes("btnNewPt").Left = ix
+    ws1.Shapes("btnNewPt").Top = ws1.Rows(11).Top + 18 + 74
+    ws1.Shapes("btnClear").Left = ix
+    ws1.Shapes("btnClear").Top = ws1.Rows(11).Top + 18 + 116
+    ws1.Shapes("btnReset").Left = ix
+    ws1.Shapes("btnReset").Top = ws1.Rows(45).Top
+    On Error GoTo 0
     Call BuildLabelPreviewLayout(ws3)
     Call PreviewAllLabels
     Call AddButtonToSheet(ws3, "btnUpd",    "Update Label Preview", "UpdateLabelPreviewFromSelection", 20, 1, 220, 24, RGB(21, 101, 192))
@@ -656,45 +844,58 @@ Public Sub SetupWorkbook()
     Call AddButtonToSheet(ws2, "btnAddMed", "+ Add Medication",   "AddMedicationRow",         1, 19, 150, 22, RGB(46, 125, 50))
     Call AddButtonToSheet(ws2, "btnRemMed", "- Remove Selected",  "RemoveSelectedMedication", 3, 19, 150, 22, RGB(191, 54, 12))
     Call AddButtonToSheet(ws2, "btnRevMed", "Review & Validate",  "ReviewMedications",        5, 19, 150, 22, RGB(21, 101, 192))
-    Call AddButtonToSheet(ws2, "btnPrvAll", "Preview ALL Labels",   "PreviewAllLabels",         7, 19, 150, 22, RGB(0, 121, 107))
-    Call AddButtonToSheet(ws2, "btnEditEnc", "Edit Past Encounter",  "EditEncounter",           10, 19, 190, 22, RGB(84, 110, 122))
-    Call AddButtonToSheet(ws2, "btnSaveEnc", "Save Edited Encounter", "SaveEditedEncounter",    12, 19, 190, 22, RGB(0, 121, 107))
+    Call AddButtonToSheet(ws2, "btnSaveDraft", "Save for Later (draft)", "SaveEncounterDraft",   9, 19, 190, 22, RGB(255, 143, 0))
+    Call AddButtonToSheet(ws2, "btnEditEnc", "Edit Past Encounter",  "EditEncounter",           11, 19, 190, 22, RGB(84, 110, 122))
+    Call AddButtonToSheet(ws2, "btnSaveEnc", "Save Edited Encounter", "SaveEditedEncounter",    13, 19, 190, 22, RGB(0, 121, 107))
     Call EncStore   ' make sure the hidden encounter-snapshot sheet exists
-    ' Print is now done ONLY from the gallery (Preview ALL Labels -> Print Checked Labels).
+    ' Print is done from the gallery (open the "3. Print Labels" tab). No Preview button here.
     On Error Resume Next
     ws2.Shapes("btnPrnMed").Delete
     ws2.Shapes("btnPrnChk").Delete     ' removed from Medications: print from the gallery instead
+    ws2.Shapes("btnPrvAll").Delete     ' removed: click the "3. Print Labels" tab to preview/print
     On Error GoTo 0
     ' Medications header row (row 2), written by code so the column ORDER is authoritative
     ' regardless of the template: Source sits right of Lot #, Refills right of Date of Rx.
     ' Every column whose position the reorder changed is (re)labelled here so headers can
     ' never drift from the data.
+    ws2.Cells(2, C_NUM).Value = "#"
+    ws2.Cells(2, C_SEL).Value = "Check Med"
+    ws2.Cells(2, C_NAME).Value = "Medication"
+    ws2.Cells(2, C_STR).Value = "Strength"
+    ws2.Cells(2, C_FORM).Value = "Dosage Form"
+    ws2.Cells(2, C_SIG).Value = "Directions (SIG)"
+    ws2.Cells(2, C_QTY).Value = "Quantity"
     ws2.Cells(2, C_EXP).Value = "Expiration"
     ws2.Cells(2, C_LOT).Value = "Lot #"
     ws2.Cells(2, C_SRC).Value = "Source"
     ws2.Cells(2, C_DATE).Value = "Date of Rx"
     ws2.Cells(2, C_REF).Value = "Refills"
-    ws2.Cells(2, C_CONF).Value = "Confidence"
     ws2.Cells(2, C_WARN).Value = "Warnings"
+    ws2.Cells(2, C_CNT).Value = "# of Prints"
     ws2.Cells(2, C_RAW).Value = "Raw text"
     ws2.Cells(2, C_PRTD).Value = "Printed?"
-    ws2.Cells(2, C_CNT).Value = "# of Prints"
-    ws2.Cells(2, C_SEL).Value = "Check Med"
+    ws2.Cells(2, C_CONF).Value = "Confidence"
     Dim hc As Variant
-    For Each hc In Array(C_EXP, C_LOT, C_SRC, C_DATE, C_REF, C_CONF, C_WARN, C_RAW, C_PRTD, C_CNT, C_SEL)
-        Call MatchHeaderFormat(ws2.Cells(2, C_QTY), ws2.Cells(2, CLng(hc)))
+    For Each hc In Array(C_SEL, C_NAME, C_STR, C_FORM, C_SIG, C_QTY, C_EXP, C_LOT, C_SRC, _
+                         C_DATE, C_REF, C_WARN, C_CNT, C_RAW, C_PRTD, C_CONF)
+        Call MatchHeaderFormat(ws2.Cells(2, C_NUM), ws2.Cells(2, CLng(hc)))
     Next hc
     ws2.Columns(C_EXP).NumberFormat = "@"    ' keep Expiration as text
     ws2.Columns(C_LOT).NumberFormat = "@"    ' keep Lot as text
+    ws2.Columns(C_SEL).ColumnWidth = 9
+    ws2.Columns(C_NAME).ColumnWidth = 22
+    ws2.Columns(C_STR).ColumnWidth = 11
+    ws2.Columns(C_FORM).ColumnWidth = 12
+    ws2.Columns(C_SIG).ColumnWidth = 38
+    ws2.Columns(C_QTY).ColumnWidth = 8
     ws2.Columns(C_EXP).ColumnWidth = 10
     ws2.Columns(C_LOT).ColumnWidth = 11
     ws2.Columns(C_SRC).ColumnWidth = 12
     ws2.Columns(C_DATE).ColumnWidth = 12
     ws2.Columns(C_REF).ColumnWidth = 8
-    ws2.Columns(C_CNT).ColumnWidth = 7
-    ws2.Columns(C_SEL).ColumnWidth = 8
-    ws2.Columns(C_CONF).ColumnWidth = 11
     ws2.Columns(C_WARN).ColumnWidth = 26
+    ws2.Columns(C_CNT).ColumnWidth = 7
+    ws2.Columns(C_CONF).ColumnWidth = 11
 
     ' --- Spruce up the Medications header area (code-controlled = resilient regardless of
     ' the template): a blue title banner and the header row both span the FULL table (A:Q),
@@ -704,23 +905,31 @@ Public Sub SetupWorkbook()
     On Error Resume Next
     ws2.Rows(1).UnMerge
     On Error GoTo 0
-    medTitle = Trim(CStr(ws2.Cells(1, 1).Value))
-    If medTitle = "" Then medTitle = "MEDICATIONS"
-    ws2.Range(ws2.Cells(1, 1), ws2.Cells(1, C_SEL)).ClearContents
-    With ws2.Range(ws2.Cells(1, 1), ws2.Cells(1, C_SEL))
-        .Merge
-        .Interior.Color = RGB(21, 101, 192)     ' app blue, matches the buttons
+    ' Keep the title SHORT: it lives in the frozen #/Check Med/Medication columns, and a
+    ' frozen cell cannot overflow its text past the freeze line, so a long title gets clipped.
+    medTitle = "SCU Medications"
+    ws2.Range(ws2.Cells(1, 1), ws2.Cells(1, C_LAST)).ClearContents
+    ' Fill the banner row WITHOUT merging (a merged cell crossing the frozen columns glitches).
+    ' The title lives in A1, left-aligned, and overflows over the green fill.
+    With ws2.Range(ws2.Cells(1, 1), ws2.Cells(1, C_LAST))
+        .Interior.Color = RGB(46, 125, 50)      ' green - matches the Medications tab
         .Font.Name = "Arial"
         .Font.Bold = True
-        .Font.Size = 14
+        .Font.Size = 13
         .Font.Color = RGB(255, 255, 255)
-        .HorizontalAlignment = xlCenter
         .VerticalAlignment = xlCenter
+        .WrapText = False                        ' let the title flow, don't stack it in col A
     End With
-    ws2.Cells(1, 1).Value = medTitle
-    ws2.Rows(1).RowHeight = 26
+    With ws2.Cells(1, 1)
+        .Value = medTitle
+        .HorizontalAlignment = xlLeft            ' title at the top-left
+        .IndentLevel = 1
+        .WrapText = False
+    End With
+    ws2.Rows(1).RowHeight = 34                    ' a bit taller to hold the button toolbar
+    Call LayoutMedButtonBar(ws2)                  ' put the action buttons in the banner, right-aligned
     ' Header row (row 2): uniform, wrapped, centered, with a divider under it
-    With ws2.Range(ws2.Cells(2, 1), ws2.Cells(2, C_SEL))
+    With ws2.Range(ws2.Cells(2, 1), ws2.Cells(2, C_LAST))
         .Font.Name = "Arial"
         .Font.Bold = True
         .WrapText = True
@@ -732,7 +941,7 @@ Public Sub SetupWorkbook()
     ws2.Rows(2).RowHeight = 30
     ' Light-gray grid across the data area so the whole table reads as a set of boxes,
     ' outlined all the way to the right edge (Print?), even before any meds are entered.
-    With ws2.Range(ws2.Cells(MEDS_HDR_ROWS + 1, 1), ws2.Cells(MEDS_HDR_ROWS + 40, C_SEL)).Borders
+    With ws2.Range(ws2.Cells(MEDS_HDR_ROWS + 1, 1), ws2.Cells(MEDS_HDR_ROWS + 40, C_LAST)).Borders
         .LineStyle = xlContinuous
         .Weight = xlThin
         .Color = RGB(208, 208, 208)
@@ -778,6 +987,7 @@ Public Sub SetupWorkbook()
     wsLog.Columns(LG_FORM).ColumnWidth = 13  ' Dosage Form
     wsLog.Columns(LG_CNT).ColumnWidth = 7    ' Print #
     wsLog.Cells(2, LG_ENC).HorizontalAlignment = xlCenter
+    Call ApplyLogEncounterBorders            ' dividers between encounters (if the Log has rows)
 
     ' Default Date of Rx to today
     If Trim(ws1.Range("C7").Value) = "" Then
@@ -798,8 +1008,18 @@ Public Sub SetupWorkbook()
     ' workbook never opens with stale data in the Medications tab.
     Call ClearMedArea(ws2)
 
+    ' Move Setup & Help to the right of Tebra (out of the workflow) + add the how-it-works blurb.
+    Call PlaceSetupHelpSheet
+
     ' Developer Test panel (last tab): random-patient generator + testing buttons.
     Call BuildDeveloperTestSheet
+
+    ' Color-code the workflow tabs to match the numbered Start Here steps.
+    Call ColorWorkflowTabs
+
+    ' Every page opens at 85% zoom, showing the top-left.
+    Call ApplyZoom85AllSheets
+    Call FreezeMedPanes
 
     ' Version stamp so the loaded build is visible at a glance (support / troubleshooting).
     On Error Resume Next
@@ -811,6 +1031,14 @@ Public Sub SetupWorkbook()
     On Error Resume Next
     ThisWorkbook.Sheets(SH_GUIDE).Activate    ' end on the Start Here guide (opens here)
     ws3.Visible = xlSheetHidden
+    On Error GoTo 0
+
+    ' --- Restore normal Excel behavior (end of fast build).
+    gBuilding = False
+    On Error Resume Next
+    Application.Calculation = savedCalc
+    Application.EnableEvents = savedEE
+    Application.ScreenUpdating = savedSU
     On Error GoTo 0
 
     MsgBox "Setup complete!  (v" & APP_VERSION & ")" & vbCrLf & _
@@ -1181,9 +1409,11 @@ Private Sub BuildLabelPreviewLayout(ws As Worksheet)
         .Interior.Pattern = xlNone
     End With
 
-    ws.Cells(5, 1).Formula = "=IF('Patient & Input'!C5<>"""",'Patient & Input'!C5,""[Patient Name]"")"
-    ws.Cells(5, 5).Formula = "=IF('Patient & Input'!C6<>"""",""DOB  ""&'Patient & Input'!C6,""DOB  --"")"
-    ws.Cells(8, 6).Formula = "=IF('Patient & Input'!C7<>"""",""Rx  ""&TEXT('Patient & Input'!C7,""m/d/yyyy""),""Rx  --"")"
+    ' Reference the Input sheet by its current name (SH_INPUT) so renaming the tab never
+    ' turns these into broken external links (the "Update Values" pop-up).
+    ws.Cells(5, 1).Formula = "=IF('" & SH_INPUT & "'!C5<>"""",'" & SH_INPUT & "'!C5,""[Patient Name]"")"
+    ws.Cells(5, 5).Formula = "=IF('" & SH_INPUT & "'!C6<>"""",""DOB  ""&'" & SH_INPUT & "'!C6,""DOB  --"")"
+    ws.Cells(8, 6).Formula = "=IF('" & SH_INPUT & "'!C7<>"""",""Rx  ""&TEXT('" & SH_INPUT & "'!C7,""m/d/yyyy""),""Rx  --"")"
 
     If Trim(ws.Cells(7, 1).Value) = "" Then _
         ws.Cells(7, 1).Value = "[Select a medication row, then Update]"
@@ -1237,7 +1467,7 @@ Private Sub BuildLabelPreviewLayout(ws As Worksheet)
 
     Call ApplyLabelPageSetup(ws)
 
-    Application.ScreenUpdating = True
+    If Not gBuilding Then Application.ScreenUpdating = True
     On Error GoTo 0
 End Sub
 
@@ -1534,10 +1764,26 @@ Private Sub BuildAllLabelsPreview()
     patName = Trim(wsI.Range("C5").Value)
     dob = Trim(wsI.Range("C6").Value)
 
-    ws.Cells(1, 1).Value = "ALL MEDICATION LABELS" & IIf(patName <> "", "   -   " & patName, "")
-    ws.Cells(1, 1).Font.Bold = True
-    ws.Cells(1, 1).Font.Size = 14
-    ws.Cells(1, 1).Font.name = "Arial"
+    ' Orange banner (matches the "3. Print Labels" tab) as one clean band across the full
+    ' button zone. Title vertically centered at the left; buttons centered on the band.
+    ws.Range(ws.Cells(1, 1), ws.Cells(2, 13)).Interior.Color = RGB(216, 67, 21)
+    With ws.Cells(1, 1)
+        .Value = "PRINT LABELS" & IIf(patName <> "", "   -   " & patName, "")
+        .Font.Bold = True
+        .Font.Size = 15
+        .Font.name = "Arial"
+        .Font.Color = RGB(255, 255, 255)
+        .VerticalAlignment = xlCenter
+    End With
+    ' Patient DOB as a lighter subtitle line just under the title (row 2), if present.
+    With ws.Cells(2, 1)
+        If dob <> "" Then .Value = "DOB " & dob Else .Value = ""
+        .Font.Bold = False
+        .Font.Size = 10
+        .Font.name = "Arial"
+        .Font.Color = RGB(255, 224, 210)
+        .VerticalAlignment = xlCenter
+    End With
 
     Dim logoPath As String
     logoPath = LogoFilePath()
@@ -1549,9 +1795,9 @@ Private Sub BuildAllLabelsPreview()
 
     ' Header band (rows 1-3) sized BEFORE the card loop so each card's logo is placed
     ' against the correct row tops (the logo is positioned relative to its base row).
-    ' Two rows tall so Print Checked Labels + Reprint Last Batch stack one above the other.
-    ws.Rows(1).RowHeight = 34
-    ws.Rows(2).RowHeight = 34
+    ' Rows 1-2 are the orange band (title + DOB); row 3 is a thin white spacer.
+    ws.Rows(1).RowHeight = 38
+    ws.Rows(2).RowHeight = 22
     ws.Rows(3).RowHeight = 8
 
     Dim n As Integer, base As Long, r As Long
@@ -1718,15 +1964,16 @@ NextR:
         ws.Cells(4, 1).Value = "No medications to preview yet. Parse or add medications first."
     End If
 
-    Call AddButtonToSheet(ws, "galtop_prnchk", "Print Checked Labels", "PrintCheckedLabels", 1, 8, 176, 30, RGB(216, 67, 21))
-    Call AddButtonToSheet(ws, "galtop_refresh", "Refresh Previews", "PreviewAllLabels", 1, 11, 150, 24, RGB(0, 121, 107))
+    Call AddButtonToSheet(ws, "galtop_prnchk", "Print Checked Labels", "PrintCheckedLabels", 1, 8, 176, 30, RGB(46, 125, 50))
+    Call AddButtonToSheet(ws, "galtop_refresh", "Refresh Previews", "PreviewAllLabels", 1, 11, 150, 30, RGB(38, 50, 56))
+    Call StyleGalBannerBtns(ws)          ' right-align + white outline + vertical-center on the band
     On Error Resume Next
     ws.Shapes("galtop_reprint").Delete   ' removed "Reprint Last Batch" (every print already does 2 copies)
     On Error GoTo 0
 
     ws.Activate
     ws.Cells(1, 1).Select
-    Application.ScreenUpdating = True
+    If Not gBuilding Then Application.ScreenUpdating = True
 End Sub
 
 Private Sub AddRowButton(ws As Worksheet, nm As String, caption As String, macro As String, atRow As Long, bg As Long)
@@ -1792,13 +2039,32 @@ Public Sub RowRemove()
     If nm = "" Then Exit Sub
 
     ' Confirm before removing THIS specific medication (named), so an accidental click
-    ' on the gallery can't silently delete a row.
-    If MsgBox("Remove this medication?" & vbCrLf & vbCrLf & "   " & nm & vbCrLf & vbCrLf & _
-              "(This cannot be undone.)", vbYesNo + vbExclamation, "Remove Medication") = vbNo Then Exit Sub
+    ' on the gallery can't silently delete a row. Use the same readable frmReview list
+    ' as the Medications-tab "Remove Selected", with a MsgBox fallback.
+    Dim useFormR As Boolean
+    useFormR = False
+    On Error Resume Next
+    frmReview.ResetList
+    useFormR = (Err.Number = 0)
+    Err.Clear
+    On Error GoTo 0
 
-    ' Delete the table columns (1..C_SEL, the full row incl. Source) and shift up; side buttons stay.
+    If useFormR Then
+        frmReview.AddMed "1.  " & nm, "", False
+        frmReview.SetHeader "Remove Selected"
+        frmReview.SetFooter "This cannot be undone."
+        frmReview.ConfigButtons True, "Remove", "Cancel"
+        frmReview.FinishList
+        frmReview.Show
+        If frmReview.Result <> "OK" Then Exit Sub
+    Else
+        If MsgBox("Remove this medication?" & vbCrLf & vbCrLf & "   " & nm & vbCrLf & vbCrLf & _
+                  "(This cannot be undone.)", vbYesNo + vbExclamation, "Remove Selected") = vbNo Then Exit Sub
+    End If
+
+    ' Delete the table columns (1..C_LAST, the full row) and shift up; side buttons stay.
     Application.EnableEvents = False
-    wsM.Range(wsM.Cells(r, 1), wsM.Cells(r, C_SEL)).Delete Shift:=xlUp
+    wsM.Range(wsM.Cells(r, 1), wsM.Cells(r, C_LAST)).Delete Shift:=xlUp
     Application.EnableEvents = True
 
     Call RenumberMeds
@@ -1900,6 +2166,129 @@ Private Sub AddButtonToSheet(ws As Worksheet, btnName As String, _
     End With
 End Sub
 
+' Right-align the two gallery banner buttons (Print Checked Labels + Refresh Previews),
+' vertically center them on the orange band, and give them white outlines so they match
+' the Medications toolbar look.
+Private Sub StyleGalBannerBtns(ws As Worksheet)
+    On Error Resume Next
+    Dim bandTop As Double, bandH As Double, rightEdge As Double, gp As Double
+    bandTop = ws.Rows(1).Top
+    bandH = ws.Rows(1).Height + ws.Rows(2).Height
+    rightEdge = ws.Cells(1, 13).Left + ws.Cells(1, 13).Width
+    gp = 8
+
+    Dim sRef As Shape, sPrn As Shape
+    Set sRef = ws.Shapes("galtop_refresh")
+    Set sPrn = ws.Shapes("galtop_prnchk")
+
+    If Not sRef Is Nothing Then
+        sRef.Top = bandTop + (bandH - sRef.Height) / 2
+        sRef.Left = rightEdge - 10 - sRef.Width
+        sRef.Line.Visible = msoTrue
+        sRef.Line.ForeColor.RGB = RGB(255, 255, 255)
+        sRef.Line.Weight = 1
+    End If
+    If Not sPrn Is Nothing Then
+        sPrn.Top = bandTop + (bandH - sPrn.Height) / 2
+        If Not sRef Is Nothing Then sPrn.Left = sRef.Left - gp - sPrn.Width
+        sPrn.Line.Visible = msoTrue
+        sPrn.Line.ForeColor.RGB = RGB(255, 255, 255)
+        sPrn.Line.Weight = 1
+    End If
+    On Error GoTo 0
+End Sub
+
+' Reposition the Medications action buttons as one small, side-by-side toolbar inside the
+' row-1 banner (right-aligned), with short captions, instead of a tall stack off to the right.
+Private Sub LayoutMedButtonBar(ws As Worksheet)
+    On Error Resume Next
+    Dim bw As Double, bh As Double, gp As Double
+    bw = 84: bh = 24: gp = 4
+    Dim bannerLeft As Double, bannerRight As Double
+    bannerLeft = ws.Columns(1).Left
+    bannerRight = ws.Columns(C_LAST).Left + ws.Columns(C_LAST).Width
+    Dim y As Double
+    y = ws.Rows(1).Top + (ws.Rows(1).Height - bh) / 2       ' vertically centered in the banner
+
+    ' LEFT group: Add / Remove / Review (just right of the title).
+    Dim x As Double
+    x = bannerLeft + 300
+    Call PlaceBarBtn(ws, "btnAddMed", "+ Add",    x, y, bw, bh, RGB(21, 67, 96)):  x = x + bw + gp
+    Call PlaceBarBtn(ws, "btnRemMed", "- Remove", x, y, bw, bh, RGB(127, 29, 29)): x = x + bw + gp
+    Call PlaceBarBtn(ws, "btnRevMed", "Review",   x, y, bw, bh, RGB(38, 50, 56))
+
+    ' Encounter status box at the far right of the banner (dynamic - see RefreshEncounterBox).
+    Dim boxW As Double, bx As Double
+    boxW = 168
+    bx = bannerRight - 8 - boxW
+    On Error Resume Next
+    ws.Shapes("medEncBox").Delete
+    On Error GoTo 0
+    Dim ebox As Shape
+    Set ebox = ws.Shapes.AddShape(msoShapeRoundedRectangle, bx, y, boxW, bh)
+    ebox.name = "medEncBox"
+    ebox.Line.ForeColor.RGB = RGB(255, 255, 255)
+    ebox.Line.Weight = 1
+    ebox.TextFrame2.VerticalAnchor = msoAnchorMiddle
+    ebox.TextFrame2.TextRange.ParagraphFormat.Alignment = msoAlignCenter
+    ebox.TextFrame2.TextRange.Font.Size = 9
+    ebox.TextFrame2.TextRange.Font.Bold = msoTrue
+    ebox.TextFrame2.TextRange.Font.Fill.ForeColor.RGB = RGB(255, 255, 255)
+
+    ' RIGHT group: Save Draft / Edit Enc. / Save Enc. (just left of the encounter box).
+    Dim rgW As Double
+    rgW = 3 * bw + 2 * gp
+    x = bx - 12 - rgW
+    Call PlaceBarBtn(ws, "btnSaveDraft", "Save Draft", x, y, bw, bh, RGB(74, 20, 140)): x = x + bw + gp
+    Call PlaceBarBtn(ws, "btnEditEnc",  "Edit Enc.",  x, y, bw, bh, RGB(55, 71, 79)):  x = x + bw + gp
+    Call PlaceBarBtn(ws, "btnSaveEnc",  "Save Enc.",  x, y, bw, bh, RGB(0, 77, 64))
+
+    Call RefreshEncounterBox
+    On Error GoTo 0
+End Sub
+
+' Position + style one toolbar button: dark fill, white outline, white text.
+Private Sub PlaceBarBtn(ws As Worksheet, ByVal nm As String, ByVal cap As String, _
+                        ByVal x As Double, ByVal y As Double, ByVal w As Double, ByVal h As Double, ByVal fillClr As Long)
+    On Error Resume Next
+    Dim shp As Shape
+    Set shp = ws.Shapes(nm)
+    If shp Is Nothing Then Exit Sub
+    shp.Left = x
+    shp.Top = y
+    shp.Width = w
+    shp.Height = h
+    shp.Fill.ForeColor.RGB = fillClr
+    shp.Line.Visible = msoTrue
+    shp.Line.ForeColor.RGB = RGB(255, 255, 255)
+    shp.Line.Weight = 1
+    shp.TextFrame2.TextRange.Text = cap
+    shp.TextFrame2.TextRange.Font.Size = 9
+    On Error GoTo 0
+End Sub
+
+' Update the banner's encounter box to show which encounter is being edited (dynamic).
+Private Sub RefreshEncounterBox()
+    On Error Resume Next
+    Dim ebox As Shape
+    Set ebox = ThisWorkbook.Sheets(SH_MEDS).Shapes("medEncBox")
+    If ebox Is Nothing Then Exit Sub
+    If gEditingEncounter > 0 Then
+        ebox.TextFrame2.TextRange.Text = "Editing Encounter #" & gEditingEncounter
+        ebox.Fill.ForeColor.RGB = RGB(198, 40, 40)
+    Else
+        ebox.TextFrame2.TextRange.Text = "New patient (not saved)"
+        ebox.Fill.ForeColor.RGB = RGB(38, 50, 56)
+    End If
+    On Error GoTo 0
+End Sub
+
+' Change the editing-encounter state AND refresh the banner box in one place.
+Private Sub SetEditingEncounter(ByVal n As Long)
+    gEditingEncounter = n
+    Call RefreshEncounterBox
+End Sub
+
 ' ============================================================
 '  PUBLIC ENTRY POINTS
 ' ============================================================
@@ -1967,6 +2356,21 @@ Public Sub ParseMedications()
         Exit Sub
     End If
 
+    ' -- Start fresh: clear the previous patient's list so a new parse never mixes with it
+    '    (like Start New Patient, but the name/DOB/paste above are kept - Parse just used
+    '    them). Confirm only when there are already meds, so an accidental re-parse can't
+    '    silently wipe work in progress.
+    If wsMed.Cells(wsMed.Rows.Count, C_NAME).End(xlUp).Row > MEDS_HDR_ROWS Then
+        If MsgBox("Parse will clear the current medication list and load the pasted text as a fresh list." & vbCrLf & vbCrLf & _
+                  "The patient name/DOB and the dispense Log are kept." & vbCrLf & _
+                  "(This cannot be undone.)", _
+                  vbYesNo + vbQuestion, "Parse - Start Fresh") = vbNo Then Exit Sub
+    End If
+    Call ClearMedArea(wsMed)
+    gLastBatchRows = ""
+    gLastBatchVol = ""
+    Call SetEditingEncounter(0)
+
     ' -- Find first empty data row -----------------------------
     Dim nextRow As Long
     nextRow = FirstEmptyRow(wsMed)
@@ -1991,7 +2395,7 @@ Public Sub ParseMedications()
         End If
     Next i
 
-    Application.ScreenUpdating = True
+    If Not gBuilding Then Application.ScreenUpdating = True
 
     If added = 0 Then
         MsgBox "Could not extract any medications. Please check the pasted text.", _
@@ -2083,8 +2487,7 @@ Public Sub ResetSession()
     wsLbl.Cells(8, 1).Value = ""
     wsLbl.Cells(9, 1).Value = ""
 
-    wsIn.Activate
-    wsIn.Range("C5").Select
+    Call ShowSheetTopLeft(wsIn, "C5")
     MsgBox "Full reset complete - patient, medications, and Log cleared." & vbCrLf & _
            "Ready for a fresh session.", vbInformation, "Reset Complete"
 End Sub
@@ -2114,9 +2517,9 @@ Public Sub StartNewPatient()
     ' Forget the remembered batch (belongs to the previous patient).
     gLastBatchRows = ""
     gLastBatchVol = ""
+    Call SetEditingEncounter(0)
 
-    wsIn.Activate
-    wsIn.Range("C5").Select
+    Call ShowSheetTopLeft(wsIn, "C5")
     MsgBox "Ready for the next patient." & vbCrLf & "The dispense Log was kept.", _
            vbInformation, "New Patient"
 End Sub
@@ -2139,6 +2542,7 @@ Public Sub ClearSessionSilent()
     ' patient's labels after the session resets.
     gLastBatchRows = ""
     gLastBatchVol = ""
+    Call SetEditingEncounter(0)
     On Error GoTo 0
 End Sub
 
@@ -2149,13 +2553,19 @@ End Sub
 ' why Reset Session could leave rows behind. A fixed range always clears them.
 Private Sub ClearMedArea(wsMed As Worksheet)
     On Error Resume Next
+    ' Events off so clearing 500 rows does not fire the Medications Worksheet_Change once
+    ' per cleared cell (the live-highlight handler).
+    Dim savedEE As Boolean
+    savedEE = Application.EnableEvents
+    Application.EnableEvents = False
     Dim rng As Range
-    Set rng = wsMed.Range(wsMed.Cells(MEDS_HDR_ROWS + 1, 1), wsMed.Cells(MEDS_HDR_ROWS + 500, C_SEL))
+    Set rng = wsMed.Range(wsMed.Cells(MEDS_HDR_ROWS + 1, 1), wsMed.Cells(MEDS_HDR_ROWS + 500, C_LAST))
     rng.ClearContents
     rng.Interior.ColorIndex = xlNone
     wsMed.Columns(C_EXP).NumberFormat = "@"
     wsMed.Columns(C_LOT).NumberFormat = "@"
     Call ApplySourceValidation(wsMed)
+    Application.EnableEvents = savedEE
     On Error GoTo 0
 End Sub
 
@@ -3088,7 +3498,7 @@ Private Sub ApplySourceValidation(ws As Worksheet)
     ' Strip any stray dropdowns from the whole table first so the Source list is the ONLY
     ' data-validation in the Medications grid (guards against a pre-reorder build that had
     ' the dropdown on the old far-right column).
-    ws.Range(ws.Cells(MEDS_HDR_ROWS + 1, 1), ws.Cells(MEDS_HDR_ROWS + 500, C_SEL)).Validation.Delete
+    ws.Range(ws.Cells(MEDS_HDR_ROWS + 1, 1), ws.Cells(MEDS_HDR_ROWS + 500, C_LAST)).Validation.Delete
     Dim rng As Range
     Set rng = ws.Range(ws.Cells(MEDS_HDR_ROWS + 1, C_SRC), ws.Cells(MEDS_HDR_ROWS + 500, C_SRC))
     rng.Validation.Delete
@@ -3107,22 +3517,22 @@ Private Sub ApplyRowState(ws As Worksheet, r As Long)
 
     ' Row background state - priority: Selected > Validated > Non-validated
     If IsRowSelected(ws, r) Then
-        bg = RGB(212, 237, 218)        ' Selected  - green (matches Label Previews tint)
+        bg = RGB(212, 237, 218)        ' Selected (checked) - green (matches Label Previews tint)
     ElseIf UCase(warn) = "OK" Then
-        bg = RGB(187, 222, 251)        ' Validated  - blue
+        bg = RGB(187, 222, 251)        ' Reviewed OK - blue (only set when Review is run)
     Else
-        bg = RGB(239, 239, 239)        ' Non-validated - gray
+        bg = RGB(255, 255, 255)        ' Not yet reviewed - white (filled cells blend to white)
     End If
 
     Dim c As Integer
-    For c = 1 To C_SEL
+    For c = 1 To C_LAST
         With ws.Cells(r, c)
             .Font.Name = "Arial"
             .Font.Size = 10
             If c = C_EXP Or c = C_LOT Then
                 .NumberFormat = "@"
                 If Trim(.Value) = "" Then
-                    .Interior.Color = RGB(255, 205, 210)    ' missing - red
+                    .Interior.Color = RGB(255, 241, 118)    ' missing - yellow (same as Qty/Source)
                 ElseIf c = C_EXP And IsBadExpFormat(CStr(.Value)) Then
                     .Interior.Color = RGB(255, 224, 130)    ' filled but wrong format - amber
                 Else
@@ -3171,7 +3581,7 @@ Private Sub ApplyRowState(ws As Worksheet, r As Long)
     For Each ac In Array(C_NAME, C_STR, C_FORM, C_SIG)
         ws.Cells(r, CLng(ac)).HorizontalAlignment = xlLeft
     Next ac
-    ws.Range(ws.Cells(r, 1), ws.Cells(r, C_SEL)).VerticalAlignment = xlCenter
+    ws.Range(ws.Cells(r, 1), ws.Cells(r, C_LAST)).VerticalAlignment = xlCenter
 
     If warn <> "" And UCase(warn) <> "OK" Then
         ws.Cells(r, C_WARN).Font.Color = RGB(191, 54, 12)
@@ -3191,12 +3601,19 @@ Public Sub ToggleRowSelect(ByVal r As Long)
     Set ws = ThisWorkbook.Sheets(SH_MEDS)
     If r <= MEDS_HDR_ROWS Then Exit Sub
     If Trim(ws.Cells(r, C_NAME).Value) = "" Then Exit Sub
+    ' Events off so writing the Check Med cell does not re-fire Worksheet_Change ->
+    ' LiveRefreshRow (which would clear the row's "OK" and drop it to white). Checking /
+    ' unchecking should only toggle green <-> its reviewed state (blue if still OK).
+    Dim savedEE As Boolean
+    savedEE = Application.EnableEvents
+    Application.EnableEvents = False
     If Trim(ws.Cells(r, C_SEL).Value) = "" Then
         ws.Cells(r, C_SEL).Value = ChrW(10003)
     Else
         ws.Cells(r, C_SEL).Value = ""
     End If
     Call ApplyRowState(ws, r)
+    Application.EnableEvents = savedEE
 End Sub
 
 Private Sub ApplyAllRowStates(ws As Worksheet)
@@ -3206,6 +3623,20 @@ Private Sub ApplyAllRowStates(ws As Worksheet)
         If Trim(ws.Cells(r, C_NAME).Value) <> "" Then Call ApplyRowState(ws, r)
     Next r
     Call ApplySourceValidation(ws)   ' keep the Source dropdown present after any refresh
+End Sub
+
+' Live recolor for a single row as a volunteer edits it (called by Worksheet_Change).
+' Updates ONLY the yellow/white cell highlights via ApplyRowState. It deliberately does
+' NOT validate or turn the row blue - blue is reserved for when Review is run. Editing a
+' row that was previously reviewed (blue) clears that OK state so it returns to white until
+' Review is run again. Checked (green) rows stay green.
+Public Sub LiveRefreshRow(ByVal r As Long)
+    Dim ws As Worksheet
+    Set ws = ThisWorkbook.Sheets(SH_MEDS)
+    If r <= MEDS_HDR_ROWS Then Exit Sub
+    If Trim(ws.Cells(r, C_NAME).Value) = "" Then Exit Sub
+    If UCase(Trim(ws.Cells(r, C_WARN).Value)) = "OK" Then ws.Cells(r, C_WARN).Value = ""
+    Call ApplyRowState(ws, r)
 End Sub
 
 Private Sub InstallMedSheetEvents(ws As Worksheet)
@@ -3229,13 +3660,42 @@ Private Sub InstallMedSheetEvents(ws As Worksheet)
         "        Cancel = True" & vbCrLf & _
         "        Exit Sub" & vbCrLf & _
         "    End If" & vbCrLf & _
-        "    ' Print? column - toggle the selection check" & vbCrLf & _
-        "    If Target.Column = " & C_SEL & " And Target.Row > " & MEDS_HDR_ROWS & " Then" & vbCrLf & _
+        "    ' Double-click the Check Med box OR the Medication name to toggle the check" & vbCrLf & _
+        "    If (Target.Column = " & C_SEL & " Or Target.Column = " & C_NAME & ") And Target.Row > " & MEDS_HDR_ROWS & " Then" & vbCrLf & _
         "        If Trim(Me.Cells(Target.Row, " & C_NAME & ").Value) <> """" Then" & vbCrLf & _
         "            Cancel = True" & vbCrLf & _
         "            ToggleRowSelect Target.Row" & vbCrLf & _
         "        End If" & vbCrLf & _
         "    End If" & vbCrLf & _
+        "End Sub"
+
+    ' Inject Worksheet_Change so the missing-value highlights update LIVE as a volunteer
+    ' edits the table: fill in Expiration/Lot/Quantity/Source and the cell clears to white
+    ' right away; clear one and it goes back to yellow. Only the edited row(s) are
+    ' recolored (yellow/white) - the row is NOT turned blue here; blue is reserved for
+    ' Review. Guarded by EnableEvents = False so the recolor writes don't re-fire this.
+    startLine = cm.ProcStartLine("Worksheet_Change", 0)
+    If startLine > 0 Then
+        numLines = cm.ProcCountLines("Worksheet_Change", 0)
+        cm.DeleteLines startLine, numLines
+    End If
+    cm.AddFromString _
+        "Private Sub Worksheet_Change(ByVal Target As Range)" & vbCrLf & _
+        "    On Error GoTo done" & vbCrLf & _
+        "    Dim rng As Range" & vbCrLf & _
+        "    Set rng = Application.Intersect(Target, Me.Range(Me.Cells(" & (MEDS_HDR_ROWS + 1) & ", 1), Me.Cells(Me.Rows.Count, " & C_LAST & ")))" & vbCrLf & _
+        "    If rng Is Nothing Then Exit Sub" & vbCrLf & _
+        "    Application.EnableEvents = False" & vbCrLf & _
+        "    Dim c As Range, seen As String" & vbCrLf & _
+        "    seen = ""|""" & vbCrLf & _
+        "    For Each c In rng.Cells" & vbCrLf & _
+        "        If InStr(seen, ""|"" & c.Row & ""|"") = 0 Then" & vbCrLf & _
+        "            LiveRefreshRow c.Row" & vbCrLf & _
+        "            seen = seen & c.Row & ""|""" & vbCrLf & _
+        "        End If" & vbCrLf & _
+        "    Next c" & vbCrLf & _
+        "done:" & vbCrLf & _
+        "    Application.EnableEvents = True" & vbCrLf & _
         "End Sub"
     On Error GoTo 0
 End Sub
@@ -3257,24 +3717,68 @@ Public Sub PrintCheckedLabels()
                vbExclamation, "Nothing Selected"
         Exit Sub
     End If
-    Dim listMsg As String, idx As Integer
+    ' Confirmation: prefer the readable frmReview list (each med large/bold with its
+    ' print status); fall back to a plain MsgBox summary if the form is unavailable.
+    Dim useForm As Boolean
+    useForm = False
+    On Error Resume Next
+    frmReview.ResetList
+    useForm = (Err.Number = 0)
+    Err.Clear
+    On Error GoTo 0
+
+    Dim listMsg As String, idx As Integer, dohCnt As Integer
+    Dim cttl As String, ctxt As String, cOK As Boolean
     listMsg = ""
     idx = 0
+    dohCnt = 0
     For r = MEDS_HDR_ROWS + 1 To lastRow
         If Trim(ws.Cells(r, C_NAME).Value) <> "" And IsRowSelected(ws, r) Then
             idx = idx + 1
             listMsg = listMsg & "   " & idx & ".  " & MedConfirmLine(ws, r)
-            If Trim(ws.Cells(r, C_EXP).Value) = "" Or Trim(ws.Cells(r, C_LOT).Value) = "" Then
+            cttl = idx & ".  " & Trim(ws.Cells(r, C_NAME).Value & "  " & _
+                   ws.Cells(r, C_STR).Value)
+            If UCase(Trim(ws.Cells(r, C_SRC).Value)) = "DOH" Then
+                dohCnt = dohCnt + 1
+                listMsg = listMsg & "   [DOH - logged; label optional]"
+                ctxt = "DOH - logged; label optional."
+                cOK = True
+            ElseIf Trim(ws.Cells(r, C_EXP).Value) = "" Or Trim(ws.Cells(r, C_LOT).Value) = "" Then
                 listMsg = listMsg & "   [SKIPPED - missing Exp/Lot]"
+                ctxt = "SKIPPED - missing Exp/Lot."
+                cOK = False
+            Else
+                ctxt = "Ready to print (" & LABEL_COPIES & " copies)."
+                cOK = True
             End If
             listMsg = listMsg & vbCrLf
+            If useForm Then frmReview.AddMed cttl, ctxt, cOK
         End If
     Next r
-    If MsgBox("About to print these " & cnt & " medication(s), " & LABEL_COPIES & " copies each, on the Brother QL-1100c:" & vbCrLf & vbCrLf & _
-              listMsg & vbCrLf & _
-              "Make sure the DK-1202 (62 x 100 mm) roll is loaded." & vbCrLf & vbCrLf & _
-              "YES = print all       NO = cancel", _
-              vbYesNo + vbQuestion, "Print Checked Labels") = vbNo Then Exit Sub
+    If useForm Then
+        frmReview.SetHeader "Print Checked Labels"
+        frmReview.SetFooter "Load the DK-1202 (62 x 100 mm) roll. Each label prints " & _
+                            LABEL_COPIES & " copies."
+        frmReview.ConfigButtons True, "Print", "Cancel"
+        frmReview.FinishList
+        frmReview.Show
+        If frmReview.Result <> "OK" Then Exit Sub
+    Else
+        If MsgBox("Ready to process these " & cnt & " checked medication(s) (labels print " & LABEL_COPIES & " copies each) on the Brother QL-1100c:" & vbCrLf & vbCrLf & _
+                  listMsg & vbCrLf & _
+                  "Make sure the DK-1202 (62 x 100 mm) roll is loaded." & vbCrLf & vbCrLf & _
+                  "YES = continue       NO = cancel", _
+                  vbYesNo + vbQuestion, "Print Checked Labels") = vbNo Then Exit Sub
+    End If
+
+    ' DOH meds are always recorded (Log + Tebra note); ask whether to print their labels too.
+    Dim printDOH As Boolean
+    printDOH = True
+    If dohCnt > 0 Then
+        printDOH = (MsgBox(dohCnt & " checked medication(s) are marked DOH (Health Dept / outside pharmacy)." & vbCrLf & vbCrLf & _
+            "They will be added to the Log and Tebra note either way." & vbCrLf & vbCrLf & _
+            "Print LABELS for them too?", vbYesNo + vbQuestion, "DOH Medications - Print Labels?") = vbYes)
+    End If
 
     Call BusyShow(15, "Locating the Brother QL-1100c...")
     Dim brother As String
@@ -3296,18 +3800,46 @@ Public Sub PrintCheckedLabels()
 
     Dim batchVol As String
     batchVol = AskInitials()
+
+    ' Encounter number: reuse the one being edited / saved as a draft (replacing its prior
+    ' rows), otherwise start a new encounter.
+    Dim wsLg As Worksheet
+    Set wsLg = ThisWorkbook.Sheets(SH_LOG)
     Dim encNum As Long
-    encNum = NextEncounter()          ' this whole batch = one patient encounter
-    Dim done As Integer, skipped As Integer
-    Dim skippedNames As String, printedRows As String
+    If gEditingEncounter > 0 Then
+        encNum = gEditingEncounter
+        ' Version the re-logged rows (compute BEFORE deleting the old ones).
+        gEncLabel = EncLabel(encNum, EncounterNextVersion(encNum))
+        Call DeleteRowsByEncounter(wsLg, LG_ENC, encNum, LOG_HDR_ROWS + 1)
+    Else
+        encNum = NextEncounter()
+        gEncLabel = ""                      ' brand-new encounter -> plain number
+    End If
+
+    Dim done As Integer, logged As Integer, skipped As Integer
+    Dim skippedNames As String, printedRows As String, isDOH As Boolean
     done = 0
+    logged = 0
     skipped = 0
     skippedNames = ""
     printedRows = ""
     Application.ScreenUpdating = False
     For r = MEDS_HDR_ROWS + 1 To lastRow
         If Trim(ws.Cells(r, C_NAME).Value) <> "" And IsRowSelected(ws, r) Then
-            If Trim(ws.Cells(r, C_EXP).Value) = "" Or Trim(ws.Cells(r, C_LOT).Value) = "" Then
+            isDOH = (UCase(Trim(ws.Cells(r, C_SRC).Value)) = "DOH")
+            If isDOH Then
+                If printDOH Then
+                    Call UpdateLabelPreviewForMedRow(r, False)
+                    If PrintLabelSurfaceSafe(LABEL_COPIES) Then
+                        Call MarkPrinted(r)
+                        done = done + 1
+                        printedRows = printedRows & r & ","
+                    End If
+                End If
+                Call LogPrint(r, batchVol, encNum)   ' DOH: recorded whether or not a label prints
+                Call ApplyRowState(ws, r)
+                logged = logged + 1
+            ElseIf Trim(ws.Cells(r, C_EXP).Value) = "" Or Trim(ws.Cells(r, C_LOT).Value) = "" Then
                 skipped = skipped + 1
                 skippedNames = skippedNames & "   - " & _
                     Trim(Trim(ws.Cells(r, C_NAME).Value) & " " & Trim(ws.Cells(r, C_STR).Value)) & vbCrLf
@@ -3318,33 +3850,97 @@ Public Sub PrintCheckedLabels()
                     Call LogPrint(r, batchVol, encNum)
                     Call ApplyRowState(ws, r)
                     done = done + 1
+                    logged = logged + 1
                     printedRows = printedRows & r & ","
                 End If
             End If
         End If
     Next r
-    Application.ScreenUpdating = True
+    If Not gBuilding Then Application.ScreenUpdating = True
+    gEncLabel = ""                                                 ' done logging; clear the version label
+    Call ApplyLogEncounterBorders                                  ' redraw dividers between encounters
 
-    ' Snapshot this encounter's full med list so it can be reopened + edited later.
-    If done > 0 Then Call SaveEncounterSnapshot(encNum)
+    If logged > 0 Then Call SaveEncounterSnapshot(encNum)   ' snapshot so it can be reopened/edited
+    Call SetEditingEncounter(0)                                    ' this encounter is now committed
 
-    ' Remember this batch so "Reprint Last Batch" can re-run it after a jam/misfeed.
+    On Error Resume Next
+    Call FillTebraTemplate                                   ' refresh the note (DOH meds included)
+    On Error GoTo 0
+
     gLastBatchRows = printedRows
     gLastBatchVol = batchVol
-    Dbg "PrintCheckedLabels: done=" & done & " skipped=" & skipped
+    Dbg "PrintCheckedLabels: done=" & done & " logged=" & logged & " skipped=" & skipped
 
     Call ShowLogSheet      ' land on the dispense Log after printing
 
     Dim msg As String, icon As Integer
-    msg = done & " medication(s) sent to the Brother, " & LABEL_COPIES & " copies each  (" & (done * LABEL_COPIES) & " labels)."
+    msg = done & " label set(s) printed  (" & (done * LABEL_COPIES) & " labels, " & LABEL_COPIES & " each)."
+    If (logged - done) > 0 Then _
+        msg = msg & vbCrLf & (logged - done) & " medication(s) recorded in the Log without a label (DOH / not printed)."
     icon = vbInformation
-    If skipped > 0 Then
-        msg = msg & vbCrLf & vbCrLf & skipped & " SKIPPED (missing Expiration or Lot):" & vbCrLf & _
-              skippedNames & vbCrLf & _
-              "Add the missing Exp/Lot on the Medications tab, then reprint."
-        icon = vbExclamation
+    If skipped > 0 Then icon = vbExclamation
+
+    ' Prefer the readable frmReview list (each med large/bold with its outcome);
+    ' fall back to the plain MsgBox summary if the form is unavailable.
+    Dim useForm2 As Boolean
+    useForm2 = False
+    On Error Resume Next
+    frmReview.ResetList
+    useForm2 = (Err.Number = 0)
+    Err.Clear
+    On Error GoTo 0
+
+    If useForm2 Then
+        Dim r3 As Long, i3 As Integer, t3 As String, x3 As String, ok3 As Boolean
+        Dim doh3 As Boolean, skip3 As Boolean, prn3 As Boolean
+        i3 = 0
+        For r3 = MEDS_HDR_ROWS + 1 To lastRow
+            If Trim(ws.Cells(r3, C_NAME).Value) <> "" And IsRowSelected(ws, r3) Then
+                i3 = i3 + 1
+                t3 = i3 & ".  " & Trim(ws.Cells(r3, C_NAME).Value & "  " & _
+                     ws.Cells(r3, C_STR).Value)
+                doh3 = (UCase(Trim(ws.Cells(r3, C_SRC).Value)) = "DOH")
+                skip3 = (Not doh3) And (Trim(ws.Cells(r3, C_EXP).Value) = "" Or _
+                        Trim(ws.Cells(r3, C_LOT).Value) = "")
+                prn3 = (InStr("," & printedRows, "," & r3 & ",") > 0)
+                If skip3 Then
+                    x3 = "SKIPPED - add Exp/Lot, then print again."
+                    ok3 = False
+                ElseIf doh3 Then
+                    If prn3 Then
+                        x3 = "Printed (DOH, " & LABEL_COPIES & " copies)."
+                    Else
+                        x3 = "Logged (DOH); no label printed."
+                    End If
+                    ok3 = True
+                ElseIf prn3 Then
+                    x3 = "Printed (" & LABEL_COPIES & " copies)."
+                    ok3 = True
+                Else
+                    x3 = "Not printed - check the printer, then try again."
+                    ok3 = False
+                End If
+                frmReview.AddMed t3, x3, ok3
+            End If
+        Next r3
+        Dim foot2 As String
+        foot2 = done & " printed"
+        If skipped > 0 Then foot2 = foot2 & ", " & skipped & " skipped (missing Exp/Lot)"
+        If (logged - done) > 0 Then foot2 = foot2 & ", " & (logged - done) & " logged without a label"
+        foot2 = foot2 & "."
+        frmReview.SetHeader "Print Complete"
+        frmReview.SetFooter foot2
+        frmReview.ConfigButtons False, "OK", ""
+        frmReview.FinishList
+        frmReview.Show
+    Else
+        If skipped > 0 Then
+            msg = msg & vbCrLf & vbCrLf & skipped & " SKIPPED (missing Expiration or Lot):" & vbCrLf & _
+                  skippedNames & vbCrLf & _
+                  "Add the missing Exp/Lot on the Medications tab, then print again."
+        End If
+        MsgBox msg, icon, "Print Complete"
     End If
-    MsgBox msg, icon, "Print Complete"
 End Sub
 
 ' Reprint the last successfully-printed batch (for paper jams / misfeeds). Reuses the
@@ -3409,10 +4005,11 @@ Public Sub ReprintLastBatch()
             End If
         End If
     Next i
-    Application.ScreenUpdating = True
+    If Not gBuilding Then Application.ScreenUpdating = True
 
     If done > 0 Then Call SaveEncounterSnapshot(encNum)   ' snapshot the reprint as its own encounter
 
+    Call ApplyLogEncounterBorders                         ' redraw dividers between encounters
     Call ShowLogSheet      ' land on the dispense Log after printing
     MsgBox done & " medication(s) reprinted, " & LABEL_COPIES & " copies each  (" & (done * LABEL_COPIES) & " labels).", vbInformation, "Reprint Complete"
 End Sub
@@ -3583,6 +4180,13 @@ Public Sub ValidateMedications(ByVal showSummary As Boolean)
         Exit Sub
     End If
 
+    ' Turn events off while we write the Warnings cell / normalize Expiration, so the
+    ' Medications Worksheet_Change handler does not re-fire and clear the "OK" we just set.
+    Dim savedEE As Boolean
+    savedEE = Application.EnableEvents
+    Application.EnableEvents = False
+    On Error GoTo cleanup
+
     Dim rowsWithIssues As Long
     rowsWithIssues = 0
 
@@ -3626,6 +4230,10 @@ Public Sub ValidateMedications(ByVal showSummary As Boolean)
 NextR:
     Next r
 
+cleanup:
+    Application.EnableEvents = savedEE
+    On Error GoTo 0
+
     If showSummary Then
         If rowsWithIssues = 0 Then
             MsgBox "All medications look complete. No issues found.", _
@@ -3659,59 +4267,105 @@ Public Sub ReviewMedications()
         Exit Sub
     End If
 
-    Dim summary As String, n As Integer, flagged As Integer
-    summary = "" : n = 0 : flagged = 0
-    Dim r As Long
+    Dim n As Integer, flagged As Integer
+    n = 0 : flagged = 0
+
+    ' Prefer the rich UserForm (large bold name/strength, smaller stacked errors).
+    ' If it is unavailable for any reason, fall back to a plain MsgBox summary.
+    Dim usedForm As Boolean
+    usedForm = False
+    On Error Resume Next
+    frmReview.ResetList
+    usedForm = (Err.Number = 0)
+    Err.Clear
+    On Error GoTo 0
+
+    Dim summary As String
+    summary = ""
+
+    ' Events off while we auto-check OK rows (writing the Check Med cell would otherwise
+    ' re-fire Worksheet_Change and clear the "OK" state we are relying on here).
+    Dim savedEE2 As Boolean
+    savedEE2 = Application.EnableEvents
+    Application.EnableEvents = False
+
+    Dim r As Long, ttl As String, errTxt As String, isOK As Boolean
     For r = MEDS_HDR_ROWS + 1 To lastRow
         If Trim(ws.Cells(r, C_NAME).Value) <> "" Then
             n = n + 1
-            Dim mark As String
+            ttl = n & ".  " & Trim(ws.Cells(r, C_NAME).Value & "  " & _
+                  ws.Cells(r, C_STR).Value)
             If Trim(ws.Cells(r, C_WARN).Value) = "OK" Then
-                mark = "   [OK]"
-                ws.Cells(r, C_SEL).Value = ChrW(10003)   ' auto-check passing meds for printing
+                isOK = True
+                errTxt = "Ready to print."
+                ws.Cells(r, C_SEL).Value = ChrW(10003)   ' auto-check passing meds
                 Call ApplyRowState(ws, r)
             Else
-                mark = "   << " & ws.Cells(r, C_WARN).Value
+                isOK = False
+                errTxt = ReviewErrText(CStr(ws.Cells(r, C_WARN).Value))
                 flagged = flagged + 1
             End If
-            summary = summary & n & ". " & Trim(ws.Cells(r, C_NAME).Value & " " & _
-                      ws.Cells(r, C_STR).Value) & mark & vbCrLf
+            If usedForm Then
+                On Error Resume Next
+                frmReview.AddMed ttl, errTxt, isOK
+                On Error GoTo 0
+            Else
+                summary = summary & ttl & vbCrLf & "     " & _
+                          Replace(errTxt, vbCrLf, " ") & vbCrLf & vbCrLf
+            End If
         End If
     Next r
+    Application.EnableEvents = savedEE2
 
-    Dim head As String
-    head = n & " medication(s) on the list:" & vbCrLf & vbCrLf
     Dim foot As String
     If flagged = 0 Then
-        foot = vbCrLf & "All rows look complete - checked and ready to print."
+        foot = "All " & n & " look complete - checked and ready to print. " & _
+               "Uncheck any you don't want."
     Else
-        foot = vbCrLf & flagged & " row(s) still need attention (red / orange cells)."
+        foot = flagged & " of " & n & " still need attention (highlighted cells). " & _
+               "Passing meds are auto-checked for printing."
     End If
-    foot = foot & vbCrLf & "Passing meds are auto-checked for printing (uncheck any you don't want)."
-    foot = foot & vbCrLf & vbCrLf & _
-        "ADD a medication:  click 'Add Medication'." & vbCrLf & _
-        "REMOVE one:  click its row, then 'Remove Selected'." & vbCrLf & _
-        "Re-check anytime:  click 'Review & Validate'."
 
-    MsgBox head & summary & foot, vbInformation, "Medication Review"
+    If usedForm Then
+        On Error Resume Next
+        frmReview.SetHeader "Medication Review"
+        frmReview.ConfigButtons False, "OK", ""
+        frmReview.SetFooter foot
+        frmReview.FinishList
+        frmReview.Show
+        On Error GoTo 0
+    Else
+        Dim head As String
+        head = n & " medication(s) on the list:" & vbCrLf & vbCrLf
+        MsgBox head & summary & vbCrLf & foot, vbInformation, "Medication Review"
+    End If
 End Sub
+
+' Turn the raw period-separated warning string (e.g. "EXPIRATION missing. LOT
+' missing.") into brief lines, one issue per line, for the review form.
+Private Function ReviewErrText(ByVal warn As String) As String
+    Dim s As String
+    s = Trim(warn)
+    If s = "" Then
+        ReviewErrText = "Needs review."
+        Exit Function
+    End If
+    s = Replace(s, ". ", "." & vbCrLf)
+    ReviewErrText = Trim(s)
+End Function
 
 ' Manually add a medication row.
 Public Sub AddMedicationRow()
     Dim ws As Worksheet
     Set ws = ThisWorkbook.Sheets(SH_MEDS)
-
-    Dim nm As String
-    nm = Trim(InputBox("Enter the MEDICATION NAME to add:", "Add Medication", ""))
-    If nm = "" Then Exit Sub
+    Dim wsI As Worksheet
+    Set wsI = ThisWorkbook.Sheets(SH_INPUT)
 
     Dim rec As MedRecord
-    rec.MedName = nm
-    rec.Strength = Trim(InputBox("Strength for " & nm & "  (e.g. 10 mg)" & vbCrLf & _
-                    "Leave blank if unknown:", "Add Medication - Strength", ""))
+    rec.MedName = ""
+    rec.Strength = ""
     rec.DosageForm = ""
-    rec.SIG = Trim(InputBox("Instructions (SIG) for " & nm & vbCrLf & _
-                    "Leave blank if unknown:", "Add Medication - Instructions", ""))
+    rec.SIG = ""
     rec.Quantity = ""
     rec.Refills = ""
     rec.Expiration = ""
@@ -3720,35 +4374,98 @@ Public Sub AddMedicationRow()
     rec.Warnings = ""
     rec.RawText = "[manually added]"
 
-    Dim wsI As Worksheet
-    Set wsI = ThisWorkbook.Sheets(SH_INPUT)
+    ' Prefer the pretty form (same layout as "Edit medication"); fall back to a chain
+    ' of input boxes if the form is unavailable.
+    Dim gotForm As Boolean, nm As String
+    gotForm = AddMedWithForm(rec)
+    If gotForm Then
+        If Trim(rec.MedName) = "" Then Exit Sub     ' cancelled or no name entered
+    Else
+        nm = Trim(InputBox("Enter the MEDICATION NAME to add:", "Add medication", ""))
+        If nm = "" Then Exit Sub
+        rec.MedName = nm
+        rec.Strength = Trim(InputBox("Strength for " & nm & "  (e.g. 10 mg)" & vbCrLf & _
+                        "Leave blank if unknown:", "Add medication - Strength", ""))
+        rec.SIG = Trim(InputBox("Instructions (SIG) for " & nm & vbCrLf & _
+                        "Leave blank if unknown:", "Add medication - Instructions", ""))
+    End If
+
     Dim rr As Long
     rr = FirstEmptyRow(ws)
     WriteMedRow ws, rr, rec, Trim(wsI.Range("C5").Value), Trim(wsI.Range("C6").Value), _
                 Trim(wsI.Range("C7").Value), 0
 
-    ' Offer to collect Expiration + Lot now, exactly like the Parse flow does.
+    ' Keep Exp/Lot as text. The form path already collected them; re-write as text so a
+    ' value like 05/2028 is not coerced to a date.
     ws.Cells(rr, C_EXP).NumberFormat = "@"
     ws.Cells(rr, C_LOT).NumberFormat = "@"
-    If MsgBox("Enter EXPIRATION and LOT for " & nm & " now?" & vbCrLf & _
-              "(No = fill the highlighted cells on the sheet later.)", _
-              vbYesNo + vbQuestion, "Enter Exp / Lot?") = vbYes Then
-        Dim eVal As String, lVal As String
-        eVal = ""
-        lVal = ""
-        Call PromptExpLotPair(Trim(nm & " " & rec.Strength), eVal, lVal)
-        ws.Cells(rr, C_EXP).Value = eVal
-        ws.Cells(rr, C_LOT).Value = lVal
+    If gotForm Then
+        ws.Cells(rr, C_EXP).Value = rec.Expiration
+        ws.Cells(rr, C_LOT).Value = rec.LotNumber
+    Else
+        ' Input-box fallback: offer to collect Expiration + Lot now, like the Parse flow.
+        If MsgBox("Enter EXPIRATION and LOT for " & rec.MedName & " now?" & vbCrLf & _
+                  "(No = fill the highlighted cells on the sheet later.)", _
+                  vbYesNo + vbQuestion, "Enter Exp / Lot?") = vbYes Then
+            Dim eVal As String, lVal As String
+            eVal = ""
+            lVal = ""
+            Call PromptExpLotPair(Trim(rec.MedName & " " & rec.Strength), eVal, lVal)
+            ws.Cells(rr, C_EXP).Value = eVal
+            ws.Cells(rr, C_LOT).Value = lVal
+        End If
     End If
 
     Call RenumberMeds
     Call ValidateMedications(False)
     ws.Activate
     ws.Cells(rr, C_NAME).Select
-    MsgBox nm & " added." & vbCrLf & _
+    MsgBox rec.MedName & " added." & vbCrLf & _
            "Fill in any missing details - they are highlighted.", _
            vbInformation, "Medication Added"
 End Sub
+
+' Collect a new medication via the frmMedEdit form (opened blank, titled "Add
+' medication"). Returns True if the form was shown (rec filled on OK, rec.MedName
+' cleared on Cancel); False if the form could not be created (caller uses input boxes).
+Private Function AddMedWithForm(ByRef rec As MedRecord) As Boolean
+    AddMedWithForm = False
+    Dim f As Object
+    On Error GoTo Done
+    Set f = VBA.UserForms.Add("frmMedEdit")
+    If f Is Nothing Then Exit Function
+    f.Caption = "Add medication"
+    f.txtName.Value = ""
+    f.txtStr.Value = ""
+    f.txtForm.Value = ""
+    f.txtQty.Value = ""
+    f.txtSig.Value = ""
+    f.txtExp.Value = ""
+    f.txtLot.Value = ""
+    f.Result = ""
+    On Error Resume Next
+    f.txtName.SetFocus
+    On Error GoTo Done
+    f.Show
+    If f.Result = "OK" Then
+        rec.MedName = Trim(f.txtName.Value)
+        rec.Strength = Trim(f.txtStr.Value)
+        rec.DosageForm = Trim(f.txtForm.Value)
+        rec.Quantity = Trim(f.txtQty.Value)
+        rec.SIG = Trim(f.txtSig.Value)
+        rec.Expiration = Trim(f.txtExp.Value)
+        rec.LotNumber = Trim(f.txtLot.Value)
+    Else
+        rec.MedName = ""      ' signal cancel to the caller
+    End If
+    AddMedWithForm = True
+    Unload f
+    Exit Function
+Done:
+    On Error Resume Next
+    Unload f
+    AddMedWithForm = False
+End Function
 
 ' Remove the medication on the currently selected row.
 Public Sub RemoveSelectedMedication()
@@ -3757,6 +4474,15 @@ Public Sub RemoveSelectedMedication()
 
     Dim lastRow As Long, r As Long, cnt As Integer, names As String
     lastRow = ws.Cells(ws.Rows.Count, C_NAME).End(xlUp).Row
+
+    Dim useFormR As Boolean
+    useFormR = False
+    On Error Resume Next
+    frmReview.ResetList
+    useFormR = (Err.Number = 0)
+    Err.Clear
+    On Error GoTo 0
+
     cnt = 0
     names = ""
     For r = MEDS_HDR_ROWS + 1 To lastRow
@@ -3764,6 +4490,8 @@ Public Sub RemoveSelectedMedication()
             cnt = cnt + 1
             names = names & "   - " & Trim(ws.Cells(r, C_NAME).Value & " " & _
                     ws.Cells(r, C_STR).Value) & vbCrLf
+            If useFormR Then frmReview.AddMed cnt & ".  " & Trim(ws.Cells(r, C_NAME).Value & _
+                "  " & ws.Cells(r, C_STR).Value), "", False
         End If
     Next r
 
@@ -3774,17 +4502,26 @@ Public Sub RemoveSelectedMedication()
         Exit Sub
     End If
 
-    If MsgBox("Remove these " & cnt & " checked medication(s)?" & vbCrLf & vbCrLf & _
-              names & vbCrLf & "(This cannot be undone.)", _
-              vbYesNo + vbExclamation, "Remove Selected") = vbNo Then Exit Sub
+    If useFormR Then
+        frmReview.SetHeader "Remove Selected"
+        frmReview.SetFooter "This cannot be undone."
+        frmReview.ConfigButtons True, "Remove", "Cancel"
+        frmReview.FinishList
+        frmReview.Show
+        If frmReview.Result <> "OK" Then Exit Sub
+    Else
+        If MsgBox("Remove these " & cnt & " checked medication(s)?" & vbCrLf & vbCrLf & _
+                  names & vbCrLf & "(This cannot be undone.)", _
+                  vbYesNo + vbExclamation, "Remove Selected") = vbNo Then Exit Sub
+    End If
 
     ' Delete bottom-to-top so row indexes stay valid. Delete the table columns
-    ' (1..C_SEL, the full row incl. Source) and shift up, so the side buttons (col 19+)
+    ' (1..C_LAST, the full row) and shift up, so the side buttons (col 19+)
     ' do not move.
     Application.EnableEvents = False
     For r = lastRow To MEDS_HDR_ROWS + 1 Step -1
         If Trim(ws.Cells(r, C_NAME).Value) <> "" And IsRowSelected(ws, r) Then
-            ws.Range(ws.Cells(r, 1), ws.Cells(r, C_SEL)).Delete Shift:=xlUp
+            ws.Range(ws.Cells(r, 1), ws.Cells(r, C_LAST)).Delete Shift:=xlUp
         End If
     Next r
     Application.EnableEvents = True
@@ -4178,16 +4915,69 @@ End Function
 ' macro reset, and every med in one print batch is stamped with the same value.
 Private Function NextEncounter() As Long
     On Error Resume Next
-    Dim wsLg As Worksheet, lastLog As Long, r As Long, mx As Long
+    Dim wsLg As Worksheet, wsE As Worksheet, lastLog As Long, r As Long, mx As Long
     Set wsLg = ThisWorkbook.Sheets(SH_LOG)
     lastLog = wsLg.Cells(wsLg.Rows.Count, 1).End(xlUp).Row
     mx = 0
+    ' Val() reads the base number even from a versioned label like "1 (v2)".
     For r = LOG_HDR_ROWS + 1 To lastLog
-        If IsNumeric(wsLg.Cells(r, LG_ENC).Value) Then
-            If CLng(wsLg.Cells(r, LG_ENC).Value) > mx Then mx = CLng(wsLg.Cells(r, LG_ENC).Value)
-        End If
+        If Val(wsLg.Cells(r, LG_ENC).Value) > mx Then mx = Val(wsLg.Cells(r, LG_ENC).Value)
+    Next r
+    ' Also consider saved drafts (snapshots may exist for encounters never printed/logged),
+    ' so a draft encounter number is never reused.
+    Set wsE = EncStore()
+    Dim lastE As Long
+    lastE = wsE.Cells(wsE.Rows.Count, ES_ENC).End(xlUp).Row
+    For r = 2 To lastE
+        If Val(wsE.Cells(r, ES_ENC).Value) > mx Then mx = Val(wsE.Cells(r, ES_ENC).Value)
     Next r
     NextEncounter = mx + 1
+End Function
+
+' Parse the version from an Encounter label: "1" -> 1, "1 (v2)" -> 2.
+Private Function ParseEncVersion(ByVal s As String) As Long
+    Dim p As Long, q As Long, num As String
+    ParseEncVersion = 1
+    p = InStr(s, "(v")
+    If p = 0 Then Exit Function
+    q = InStr(p, s, ")")
+    If q = 0 Then q = Len(s) + 1
+    num = Mid(s, p + 2, q - (p + 2))
+    If IsNumeric(num) Then ParseEncVersion = CLng(num)
+End Function
+
+' Version to use for the NEXT save of an encounter. First time it appears in the Log = v1
+' (plain number); each later edit/save increments (v2, v3, ...). Call BEFORE deleting the
+' encounter's old Log rows.
+Private Function EncounterNextVersion(ByVal encNum As Long) As Long
+    On Error Resume Next
+    Dim wsLg As Worksheet, last As Long, r As Long, mx As Long, v As Long
+    Dim found As Boolean
+    Set wsLg = ThisWorkbook.Sheets(SH_LOG)
+    last = wsLg.Cells(wsLg.Rows.Count, 1).End(xlUp).Row
+    found = False
+    mx = 1
+    For r = LOG_HDR_ROWS + 1 To last
+        If Val(wsLg.Cells(r, LG_ENC).Value) = encNum And Trim(wsLg.Cells(r, LG_ENC).Value) <> "" Then
+            found = True
+            v = ParseEncVersion(CStr(wsLg.Cells(r, LG_ENC).Value))
+            If v > mx Then mx = v
+        End If
+    Next r
+    If found Then
+        EncounterNextVersion = mx + 1     ' this is an edit of a logged encounter
+    Else
+        EncounterNextVersion = 1          ' first time this encounter is logged
+    End If
+End Function
+
+' Encounter-column display label: v1 shows the plain number, later versions add "(vN)".
+Private Function EncLabel(ByVal encNum As Long, ByVal ver As Long) As String
+    If ver <= 1 Then
+        EncLabel = CStr(encNum)
+    Else
+        EncLabel = encNum & " (v" & ver & ")"
+    End If
 End Function
 
 Private Sub LogPrint(ByVal medRow As Long, ByVal vol As String, ByVal encounter As Long)
@@ -4202,7 +4992,13 @@ Private Sub LogPrint(ByVal medRow As Long, ByVal vol As String, ByVal encounter 
     If nextLog <= LOG_HDR_ROWS Then nextLog = LOG_HDR_ROWS + 1
 
     wsLg.Cells(nextLog, LG_TIME).Value = Format(Now(), "MM/DD/YYYY HH:MM:SS")
-    wsLg.Cells(nextLog, LG_ENC).Value = encounter                        ' Encounter #, right after Timestamp
+    ' Encounter #, right after Timestamp. When re-logging an EDITED encounter, gEncLabel
+    ' carries a version suffix (e.g. "1 (v2)"); otherwise show the plain number.
+    If gEncLabel <> "" Then
+        wsLg.Cells(nextLog, LG_ENC).Value = gEncLabel
+    Else
+        wsLg.Cells(nextLog, LG_ENC).Value = encounter
+    End If
     wsLg.Cells(nextLog, LG_PT).Value = Trim(wsI.Range("C5").Value)
     wsLg.Cells(nextLog, LG_DOB).Value = Trim(wsI.Range("C6").Value)
     If medRow > MEDS_HDR_ROWS Then
@@ -4332,11 +5128,49 @@ End Function
 Private Sub DeleteRowsByEncounter(ws As Worksheet, ByVal encCol As Long, ByVal encNum As Long, ByVal firstDataRow As Long)
     Dim last As Long, r As Long
     last = ws.Cells(ws.Rows.Count, encCol).End(xlUp).Row
+    ' Match by base number so a versioned label ("1 (v2)") is still recognized as enc 1.
     For r = last To firstDataRow Step -1
-        If IsNumeric(ws.Cells(r, encCol).Value) Then
-            If CLng(ws.Cells(r, encCol).Value) = encNum Then ws.Rows(r).Delete
-        End If
+        If Trim(ws.Cells(r, encCol).Value) <> "" And Val(ws.Cells(r, encCol).Value) = encNum Then ws.Rows(r).Delete
     Next r
+End Sub
+
+' Draw a divider line in the Log above each new encounter group (grouped by base number,
+' so "1 (v2)" rows stay with encounter 1). Recomputed from scratch each call, so it stays
+' correct whenever the Log gains, loses, or reorders rows. Call after any Log change.
+Private Sub ApplyLogEncounterBorders()
+    On Error Resume Next
+    Dim wsLg As Worksheet, last As Long
+    Set wsLg = ThisWorkbook.Sheets(SH_LOG)
+    last = wsLg.Cells(wsLg.Rows.Count, 1).End(xlUp).Row
+    If last <= LOG_HDR_ROWS Then Exit Sub
+
+    ' Clear any prior horizontal lines in the data area, then redraw only the dividers.
+    Dim dataRng As Range
+    Set dataRng = wsLg.Range(wsLg.Cells(LOG_HDR_ROWS + 1, 1), wsLg.Cells(last, LG_LAST))
+    dataRng.Borders(xlEdgeTop).LineStyle = xlNone
+    dataRng.Borders(xlEdgeBottom).LineStyle = xlNone
+    dataRng.Borders(xlInsideHorizontal).LineStyle = xlNone
+
+    Dim r As Long, prevEnc As Double, curEnc As Double
+    prevEnc = -1
+    For r = LOG_HDR_ROWS + 1 To last
+        curEnc = Val(wsLg.Cells(r, LG_ENC).Value)
+        If r = LOG_HDR_ROWS + 1 Or curEnc <> prevEnc Then
+            With wsLg.Range(wsLg.Cells(r, 1), wsLg.Cells(r, LG_LAST)).Borders(xlEdgeTop)
+                .LineStyle = xlContinuous
+                .Weight = xlMedium
+                .Color = RGB(55, 71, 79)
+            End With
+        End If
+        prevEnc = curEnc
+    Next r
+    ' Close the last group with a bottom rule.
+    With wsLg.Range(wsLg.Cells(last, 1), wsLg.Cells(last, LG_LAST)).Borders(xlEdgeBottom)
+        .LineStyle = xlContinuous
+        .Weight = xlMedium
+        .Color = RGB(55, 71, 79)
+    End With
+    On Error GoTo 0
 End Sub
 
 ' Snapshot the CURRENT patient + every named medication row under encounter encNum.
@@ -4387,7 +5221,7 @@ Private Sub ClearEncounterStore()
         last = wsE.Cells(wsE.Rows.Count, ES_ENC).End(xlUp).Row
         If last >= 2 Then wsE.Range(wsE.Rows(2), wsE.Rows(last)).ClearContents
     End If
-    gEditingEncounter = 0
+    Call SetEditingEncounter(0)
     On Error GoTo 0
 End Sub
 
@@ -4502,8 +5336,8 @@ Private Sub LoadEncounter(ByVal encNum As Long)
     Next r
     Call RenumberMeds
     Call ValidateMedications(False)
-    gEditingEncounter = encNum
-    Application.ScreenUpdating = True
+    Call SetEditingEncounter(encNum)
+    If Not gBuilding Then Application.ScreenUpdating = True
     wsM.Activate
     MsgBox "Editing encounter " & encNum & "." & vbCrLf & vbCrLf & _
         "Add, remove, or fix medications as needed. Every med is checked -" & vbCrLf & _
@@ -4542,6 +5376,8 @@ Public Sub SaveEditedEncounter()
     vol = AskInitials()
 
     Application.ScreenUpdating = False
+    ' Version the re-logged rows (compute BEFORE deleting the old ones): 1 -> "1 (v2)" -> ...
+    gEncLabel = EncLabel(encNum, EncounterNextVersion(encNum))
     Call DeleteRowsByEncounter(wsLg, LG_ENC, encNum, LOG_HDR_ROWS + 1)   ' drop old Log rows
     Call SaveEncounterSnapshot(encNum)                                    ' refresh snapshot
     For r = MEDS_HDR_ROWS + 1 To lastMed                                  ' re-log under same #
@@ -4549,13 +5385,15 @@ Public Sub SaveEditedEncounter()
             Call LogPrint(r, Trim(vol & " (edited)"), encNum)
         End If
     Next r
-    Application.ScreenUpdating = True
+    gEncLabel = ""                                                        ' done logging; clear the label
+    Call ApplyLogEncounterBorders                                         ' redraw dividers between encounters
+    If Not gBuilding Then Application.ScreenUpdating = True
 
     On Error Resume Next
     Call FillTebraTemplate                                                ' rebuild note from Log
     On Error GoTo 0
 
-    gEditingEncounter = 0
+    Call SetEditingEncounter(0)
     If MsgBox("Encounter " & encNum & " updated in the Log and Tebra note." & vbCrLf & vbCrLf & _
         "Reprint the CHECKED labels now (2 copies each)?", _
         vbYesNo + vbQuestion, "Reprint?") = vbYes Then
@@ -4563,6 +5401,43 @@ Public Sub SaveEditedEncounter()
     Else
         Call ShowLogSheet
     End If
+End Sub
+
+' Save the current patient + med list as a DRAFT encounter to finish/print later. Nothing
+' prints and nothing is logged yet - it just snapshots the work so "Edit Past Encounter"
+' can reopen it. Printing it later reuses the same encounter number.
+Public Sub SaveEncounterDraft()
+    Dim wsM As Worksheet, wsI As Worksheet
+    Set wsM = ThisWorkbook.Sheets(SH_MEDS)
+    Set wsI = ThisWorkbook.Sheets(SH_INPUT)
+    If Trim(wsI.Range("C5").Value) = "" Then
+        MsgBox "Enter the patient name (and DOB) on the Patient & Input tab first.", _
+               vbExclamation, "Save for Later"
+        Exit Sub
+    End If
+    Dim lastMed As Long, r As Long, medCount As Long
+    lastMed = wsM.Cells(wsM.Rows.Count, C_NAME).End(xlUp).Row
+    medCount = 0
+    For r = MEDS_HDR_ROWS + 1 To lastMed
+        If Trim(wsM.Cells(r, C_NAME).Value) <> "" Then medCount = medCount + 1
+    Next r
+    If medCount = 0 Then
+        MsgBox "There are no medications to save. Parse or add medications first.", _
+               vbExclamation, "Save for Later"
+        Exit Sub
+    End If
+    Dim encNum As Long
+    If gEditingEncounter > 0 Then
+        encNum = gEditingEncounter
+    Else
+        encNum = NextEncounter()
+    End If
+    Call SaveEncounterSnapshot(encNum)
+    Call SetEditingEncounter(encNum)   ' keep working on this encounter (print later reuses the number)
+    MsgBox "Saved as encounter " & encNum & " (draft - nothing printed or logged yet)." & vbCrLf & vbCrLf & _
+        medCount & " medication(s) for " & Trim(wsI.Range("C5").Value) & "." & vbCrLf & vbCrLf & _
+        "Reopen it any time with ""Edit Past Encounter"", then print or keep editing.", _
+        vbInformation, "Saved for Later"
 End Sub
 
 ' Print every named med that has Exp + Lot (2 copies each) WITHOUT logging - used by the
@@ -4598,7 +5473,7 @@ Private Sub PrintEncounterLabelsNoLog()
             End If
         End If
     Next r
-    Application.ScreenUpdating = True
+    If Not gBuilding Then Application.ScreenUpdating = True
     MsgBox done & " medication(s) reprinted, " & LABEL_COPIES & " copies each  (" & _
         (done * LABEL_COPIES) & " labels).", vbInformation, "Reprint Complete"
 End Sub
@@ -4608,6 +5483,97 @@ End Sub
 '  A last-tab panel of testing buttons. "Generate Test Patient" fills a random name,
 '  DOB, and medication list in the paste box (Exp/Lot left blank), ready to Parse.
 ' ============================================================
+' Move the template's "Setup & Help" sheet to the right of the Tebra tab (out of the way)
+' and append a plain-language "how the tool + parser work" blurb below any existing content.
+Private Sub PlaceSetupHelpSheet()
+    On Error Resume Next
+    Dim ws As Worksheet, target As Worksheet
+    Set target = Nothing
+    For Each ws In ThisWorkbook.Worksheets
+        If ws.name <> SH_GUIDE Then
+            If InStr(LCase(ws.name), "setup") > 0 Or InStr(LCase(ws.name), "help") > 0 Then
+                Set target = ws
+                Exit For
+            End If
+        End If
+    Next ws
+    If target Is Nothing Then Exit Sub
+
+    target.Visible = xlSheetVisible
+    target.Move After:=ThisWorkbook.Sheets(SH_TEBRA)
+
+    ' Remove any blurb appended by a PREVIOUS build so copies don't stack up. Find the first
+    ' "HOW THIS TOOL WORKS" marker and clear from just above it to the bottom of the sheet.
+    Dim clearFrom As Long, rr As Long, lastUsed As Long
+    lastUsed = target.Cells(target.Rows.Count, 2).End(xlUp).Row
+    clearFrom = 0
+    For rr = 1 To lastUsed
+        If Trim(target.Cells(rr, 2).Value) = "HOW THIS TOOL WORKS" Then
+            clearFrom = rr
+            Exit For
+        End If
+    Next rr
+    If clearFrom > 0 Then
+        Dim topRow As Long
+        topRow = clearFrom - 2
+        If topRow < 1 Then topRow = 1
+        target.Range(target.Cells(topRow, 1), target.Cells(target.Rows.Count, 26)).Clear
+    End If
+
+    Dim r As Long, r2 As Long
+    r = target.Cells(target.Rows.Count, 1).End(xlUp).Row
+    r2 = target.Cells(target.Rows.Count, 2).End(xlUp).Row
+    If r2 > r Then r = r2
+    If r < 3 Then r = 3
+    r = r + 3
+
+    Dim lines As Variant
+    lines = Array( _
+        "|HOW THIS TOOL WORKS", _
+        "This tool turns pasted prescription text into printed medication labels and keeps a", _
+        "dispense log for the Saturday Clinic for the Uninsured (SCU) free pharmacy.", _
+        "Follow the numbered, colored tabs:", _
+        "", _
+        "   1. Patient & Input  -  enter name + DOB, paste the med list, click PARSE MEDICATIONS.", _
+        "   2. Medications  -  fill red Exp/Lot and yellow Source cells; check the meds to print.", _
+        "   3. Print Labels  -  preview, then print the checked labels (2 copies each).", _
+        "   4. Log  -  every printed med is recorded automatically, grouped by patient 'encounter'.", _
+        "   5. Tebra Notes  -  a ready-to-paste note per patient, grouped by source.", _
+        "", _
+        "|HOW THE PARSER WORKS", _
+        "Clicking PARSE MEDICATIONS splits the pasted text into one medication per row. A new", _
+        "medication begins at each 'drug header' line - a line that looks like a drug name +", _
+        "strength + form (e.g., 'Metformin 1,000 mg tablet') - even without blank lines between", _
+        "drugs. For each drug it pulls out the name, strength, dosage form, directions (SIG),", _
+        "quantity, and refills, and rates its Confidence (High / Medium / Low) by how cleanly it", _
+        "parsed. Expiration and Lot are entered by the volunteer (they are not in the pasted", _
+        "text). A validation pass then flags anything missing or suspicious so mistakes are", _
+        "caught before a label reaches a patient.", _
+        "", _
+        "DOH meds are logged and added to the Tebra note, but you're asked whether to print", _
+        "their labels. 'Save for Later' stores a patient to finish later; 'Edit Past Encounter'", _
+        "reopens a past one to fix or reprint.")
+    Dim i As Long, ln As String
+    For i = 0 To UBound(lines)
+        ln = CStr(lines(i))
+        With target.Cells(r + i, 2)
+            If Left(ln, 1) = "|" Then
+                .Value = Mid(ln, 2)
+                .Font.Bold = True
+                .Font.Size = 13
+                .Font.Color = RGB(0, 121, 107)
+            Else
+                .Value = ln
+                .Font.Bold = False
+                .Font.Size = 10.5
+                .Font.Color = RGB(38, 50, 56)
+            End If
+            .Font.name = "Arial"
+        End With
+    Next i
+    On Error GoTo 0
+End Sub
+
 Private Sub BuildDeveloperTestSheet()
     Dim ws As Worksheet
     On Error Resume Next
@@ -4698,8 +5664,7 @@ Public Sub GenerateTestPatient()
     On Error Resume Next
     wsIn.Range("B12").Value = txt
     On Error GoTo 0
-    wsIn.Activate
-    wsIn.Range("C5").Select
+    Call ShowSheetTopLeft(wsIn, "C5")
     MsgBox "Test patient loaded:" & vbCrLf & vbCrLf & _
         "   " & nm & "    DOB " & dob & vbCrLf & _
         "   " & got & " medications in the paste box (Exp/Lot/Source blank)." & vbCrLf & vbCrLf & _
@@ -4712,6 +5677,7 @@ Public Sub FillRandomExpLot()
     Randomize
     Dim ws As Worksheet
     Set ws = ThisWorkbook.Sheets(SH_MEDS)
+    ws.Activate                       ' take the tester to the Medications sheet
     Dim srcs As Variant
     srcs = Array("IN HOUSE", "DOH", "RxAPS", "Other")
     Dim lastRow As Long, r As Long, n As Long, mo As Integer, yr As Integer
@@ -4726,11 +5692,13 @@ Public Sub FillRandomExpLot()
             ws.Cells(r, C_LOT).NumberFormat = "@"
             ws.Cells(r, C_LOT).Value = "LOT" & Format(Int(Rnd * 900000) + 100000, "000000")
             ws.Cells(r, C_SRC).Value = srcs(Int(Rnd * 4))
+            Call LiveRefreshRow(r)    ' recolor filled cells to white; do NOT validate / turn blue
             n = n + 1
         End If
     Next r
-    Call ValidateMedications(False)
-    MsgBox n & " medication(s) filled with random Exp / Lot / Source for testing.", _
+    ws.Cells(MEDS_HDR_ROWS + 1, C_NAME).Select
+    MsgBox n & " medication(s) filled with random Exp / Lot / Source." & vbCrLf & _
+        "Rows stay white - click Review when you're ready to validate.", _
         vbInformation, "Developer Test"
 End Sub
 
