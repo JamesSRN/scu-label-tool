@@ -14,6 +14,10 @@ Print Labels banners redesigned, and the clipboard-popup source removed.
 **Edited encounters are versioned in the Log (2026-07-23)**
 - Re-saving an edited encounter now stamps its Log rows with a **version suffix**: the first log is plain (**1**, **2**, ...), the first edit becomes **1 (v2)**, the next **1 (v3)**, etc. The numeric identity is unchanged - matching, next-number, green-banding, and the Edit picker all read the **base number** (`Val`, and the snapshot store stays numeric), so nothing that keys on the encounter number breaks. New helpers `EncounterNextVersion` / `ParseEncVersion` / `EncLabel`; the label is carried to `LogPrint` via `gEncLabel`. Applies to both re-log paths (Save Edited Encounter and printing while editing).
 
+**Step numbers added to every sheet banner + README screenshots (2026-07-23)**
+- Each workflow sheet's **banner now starts with its step number**, matching the numbered tabs: **1.** Patient & Input (A2 subtitle), **2.** SCU Medications, **3.** PRINT LABELS, **4.** Dispense Log, **5.** Tebra Session Notes. All set in code by `SetupWorkbook` (Log/Input banners are otherwise static in the template - only their text is set, styling untouched).
+- **README** now has a **Screenshots** section in **workflow order** (Start Here overview, then 2 Medications, 2 Medications-Review, 3 Print Labels, 4 Log, 5 Tebra) using high-res PNGs in `support/assets/screenshots/`.
+
 **Tebra emblem persists + Setup & Help blurb no longer stacks (2026-07-23)**
 - You can now **add a logo/emblem to the Tebra Notes page** and it survives refresh/rebuild: `FillTebraTemplate` deletes shapes back-to-front but **keeps pictures** (msoPicture / msoLinkedPicture), same as the Patient & Input page. The Refresh button is recreated as before.
 - **Fixed the Setup & Help sheet stacking copies of the "How this tool works / How the parser works" blurb** on every build. `PlaceSetupHelpSheet` now finds the first "HOW THIS TOOL WORKS" marker and clears from there down before re-appending, so exactly one copy remains (self-healing - the next build wipes all previously stacked copies).

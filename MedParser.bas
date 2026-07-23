@@ -678,7 +678,7 @@ Public Sub FillTebraTemplate()
     ws.Range("A1:L2").Interior.Color = RGB(0, 131, 143)
     ws.Range("A1:F1").Merge
     With ws.Cells(1, 1)
-        .Value = "   Tebra Session Notes"
+        .Value = "   5.  Tebra Session Notes"
         .Font.Color = RGB(255, 255, 255)
         .Font.Bold = True
         .Font.Size = 16
@@ -782,6 +782,8 @@ Public Sub SetupWorkbook()
 
     Dim ws1 As Worksheet, ws2 As Worksheet, ws3 As Worksheet
     Set ws1 = ThisWorkbook.Sheets(SH_INPUT)
+    ' Numbered banner subtitle (A2) so the sheet reads as step 1, matching its "1. Patient & Input" tab.
+    ws1.Cells(2, 1).Value = "1.  Medication Dispensing  -  Patient & Input"
     Set ws2 = ThisWorkbook.Sheets(SH_MEDS)
     Set ws3 = ThisWorkbook.Sheets(SH_LABEL)
     ws3.Visible = xlSheetVisible   ' show while we rebuild it; re-hidden at the end
@@ -907,7 +909,7 @@ Public Sub SetupWorkbook()
     On Error GoTo 0
     ' Keep the title SHORT: it lives in the frozen #/Check Med/Medication columns, and a
     ' frozen cell cannot overflow its text past the freeze line, so a long title gets clipped.
-    medTitle = "SCU Medications"
+    medTitle = "2.  SCU Medications"
     ws2.Range(ws2.Cells(1, 1), ws2.Cells(1, C_LAST)).ClearContents
     ' Fill the banner row WITHOUT merging (a merged cell crossing the frozen columns glitches).
     ' The title lives in A1, left-aligned, and overflows over the green fill.
@@ -960,6 +962,9 @@ Public Sub SetupWorkbook()
     ' order is authoritative: Encounter sits right after Timestamp, then patient + med fields.
     Dim wsLog As Worksheet
     Set wsLog = ThisWorkbook.Sheets(SH_LOG)
+    ' Numbered banner (row 1) so the sheet reads as step 4, matching its "4. Log" tab.
+    ' Only the text is set; the existing purple banner fill / font stay as-is.
+    wsLog.Cells(1, 1).Value = "  4.  Saturday Clinic  -  Dispense Log"
     wsLog.Cells(2, LG_TIME).Value = "Timestamp"
     wsLog.Cells(2, LG_ENC).Value = "Encounter"
     wsLog.Cells(2, LG_PT).Value = "Patient"
@@ -1768,7 +1773,7 @@ Private Sub BuildAllLabelsPreview()
     ' button zone. Title vertically centered at the left; buttons centered on the band.
     ws.Range(ws.Cells(1, 1), ws.Cells(2, 13)).Interior.Color = RGB(216, 67, 21)
     With ws.Cells(1, 1)
-        .Value = "PRINT LABELS" & IIf(patName <> "", "   -   " & patName, "")
+        .Value = "3.  PRINT LABELS" & IIf(patName <> "", "   -   " & patName, "")
         .Font.Bold = True
         .Font.Size = 15
         .Font.name = "Arial"
