@@ -26,14 +26,14 @@ This is an Excel + VBA tool for the **Saturday Clinic for the Uninsured (SCU)** 
 
 It's built to be **robust for high-turnover volunteers**: it parses, checks, and flags every entry, so a first-time user is guided toward correct labels — and caught before a mistake reaches a patient.
 
-**Which file do I open?** Only two files are meant to be clicked. Leave everything else in place.
+**How do I open it?** Always start the tool with one launcher — it applies the latest code and opens the workbook for you.
 
-| I want to… | Open this |
+| | Do this |
 |---|---|
-| **Use the tool** — parse, print labels, keep the log | **`MedicationDispensing.xlsm`** |
-| **Apply a code update** — after `MedParser.bas` changes | **`APPLY UPDATES (double-click me).cmd`** |
+| **Open the tool** (every time) | Double-click **`OPEN LABEL TOOL (double-click me).cmd`** |
+| **Fallback** (only if a build won't run) | Open **`MedicationDispensing.xlsm`** directly |
 
-> The `.cmd` just reminds you to close the workbook first, then runs `Build-Release.vbs`. Everything else (`support/`, `tools/`, `dispense-log/`, the `.bas` source, the emblem, and the bootstrap workbook) is support material the build needs — don't move it.
+> The launcher runs `Build-Release.vbs`, which rebuilds the workbook from the latest `MedParser.bas` and opens it — so you're never on stale code. Make sure the workbook is **closed** first. Everything else (`support/`, `tools/`, the `.bas` source, the emblem, and the bootstrap workbook) is support material the build needs — don't move it.
 
 > **Install:** grab the latest `SCU-Label-Printing-vX.Y.zip` from the **[Releases page](https://github.com/JamesSRN/scu-label-tool/releases)**, unzip, and open `MedicationDispensing.xlsm`. Full steps in **[RELEASE.md](support/docs/RELEASE.md)**.
 
@@ -65,13 +65,13 @@ Highlights update **live as you type** — a missing **Quantity / Expiration / L
 
 ### 3 · Print Labels  (orange)
 
-Every checked med auto-previews as a real label. Click **Print Checked Labels** — **2 copies of each** — enter your initials, and confirm. The confirmation lists exactly what's about to print and flags any row skipped for missing Exp/Lot. **Reprint Last Batch** recovers from a jam without re-selecting.
+Every checked med auto-previews as a real label. Click **Print Checked Labels** — **2 copies of each** — enter your initials, and confirm. The confirmation lists exactly what's about to print and flags any row skipped for missing Exp/Lot.
 
 ![Label Previews gallery](support/assets/screenshots/print-gallery.png)
 
 ### 4 · Log  (purple)
 
-Every printed label is recorded automatically — timestamp, patient, DOB, medication details, **source**, initials, print count, and **Encounter #**. Each print is one **encounter**: numbered, shaded in cycling greens, and separated by a divider line so each patient reads as one block. A dated CSV copy is saved locally too. Nothing to do here — it's your record.
+Every printed label is recorded automatically — timestamp, patient, DOB, medication details, **source**, initials, print count, and **Encounter #**. Each print is one **encounter**: numbered, shaded in cycling greens, and separated by a divider line so each patient reads as one block. Nothing to do here — it's your record.
 
 ![Dispense Log](support/assets/screenshots/log.png)
 
@@ -92,16 +92,16 @@ A ready-to-paste note for **each patient**, grouped by source, with each note **
 - **Readable pop-ups** — Review, Print, and Remove all show each med's name + strength in bold with its status beneath.
 - **Required Source** dropdown (DOH / IN HOUSE / RxAPS / Other), logged on every row.
 - **Checkbox-driven** selection that drives printing, row color, and removal alike.
-- **2 copies per label**, batch or single, with detailed confirmations, Reprint Last Batch, and fit-to-page so the bottom row never clips.
-- **Complete dispense log** with numbered, green-banded **encounters** and a dated local CSV archive.
+- **2 copies per label**, batch or single, with detailed confirmations and fit-to-page so the bottom row never clips.
+- **Complete dispense log** with numbered, green-banded **encounters** and a divider between each.
 - **Tebra notes** sheet: paste-ready session notes grouped by source, one boxed note per patient.
 - **Brother QL-1100c auto-select** with a load-the-roll confirmation.
 
 ---
 
-## Applying code updates
+## Updates happen on open
 
-Close the workbook, then double-click **`APPLY UPDATES (double-click me).cmd`** (it launches `Build-Release.vbs`). Click **OK** on **Setup complete!** when prompted.
+There's no separate "apply updates" step. Every time you open the tool with **`OPEN LABEL TOOL`**, it rebuilds the workbook from the latest `MedParser.bas` and opens it — so the newest code is always applied. After a `git pull`, just open the tool the usual way.
 
 Requires, one-time in Excel's Trust Center:
 
@@ -114,7 +114,7 @@ Requires, one-time in Excel's Trust Center:
 - **Manual build (VBA editor):** remove the `MedParser` module, **Import** `MedParser.bas`, run `SetupWorkbook`, save.
 - **After changing the emblem crop:** run `tools/Build-ScuEmblem.ps1` first, then `Build-Release.vbs`.
 - The two worksheet event handlers are pasted once into the sheet modules — see `HANDOFF.md` §5.
-- Everything lives in **one folder** (outside OneDrive): `C:\Users\ringo\Documents\GitHub\GIT_VERSION_SCU Label Printing`. Code + docs are version-controlled; the `.xlsm`, `dispense-log\`, and `support\_backups\` are git-ignored so patient data stays local.
+- Everything lives in **one folder** (outside OneDrive): `C:\Users\ringo\Documents\GitHub\GIT_VERSION_SCU Label Printing`. Code + docs are version-controlled; the `.xlsm` and `support\_backups\` are git-ignored so patient data stays local.
 
 </details>
 
@@ -129,8 +129,8 @@ Requires, one-time in Excel's Trust Center:
 
 | File | What it is |
 |---|---|
-| `MedicationDispensing.xlsm` | The clinic workbook — **open this to use the tool** (local, git-ignored). |
-| `APPLY UPDATES (double-click me).cmd` | Friendly launcher that runs the build. |
+| `OPEN LABEL TOOL (double-click me).cmd` | **The everyday launcher** — rebuilds from `MedParser.bas` and opens the tool. |
+| `MedicationDispensing.xlsm` | The clinic workbook the launcher builds + opens (local, git-ignored). Fallback if a build won't run. |
 | `Build-Release.vbs` | Imports `MedParser.bas`, runs `SetupWorkbook`, saves the `.xlsm`. |
 | `MedParser.bas` | The VBA source of truth (parser, validation, label layout, printing, logging). |
 | `scu_emblem.png` | SC emblem for the label header (loaded at print time; must stay here). |
@@ -141,8 +141,6 @@ Requires, one-time in Excel's Trust Center:
 **`support/`** — `assets/` (emblem art + README screenshots), `test-data/` (no-PHI samples), `_backups/` (local snapshots, git-ignored).
 
 **`tools/`** — `check-encoding.ps1` (pre-build ASCII/CRLF check), `make-release-zip.ps1`, `Build-ScuEmblem.ps1`, `BUILD_RELEASE_NOTES.md`.
-
-**`dispense-log/`** — dated CSV archive the tool writes each clinic day (git-ignored, PHI).
 
 </details>
 
@@ -172,4 +170,4 @@ Requires, one-time in Excel's Trust Center:
 
 ## Privacy
 
-**This repo holds code and docs only.** The working `.xlsm` contains patient information and is kept **local** — excluded via `.gitignore`, never committed. The `dispense-log/` CSV archive and `support/_backups/` are git-ignored for the same reason. All screenshots in this README use **randomly generated test patients**.
+**This repo holds code and docs only.** The working `.xlsm` contains patient information and is kept **local** — excluded via `.gitignore`, never committed (as is `support/_backups/`). All screenshots in this README use **randomly generated test patients**.

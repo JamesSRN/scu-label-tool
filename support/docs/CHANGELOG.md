@@ -14,6 +14,11 @@ Print Labels banners redesigned, and the clipboard-popup source removed.
 **Edited encounters are versioned in the Log (2026-07-23)**
 - Re-saving an edited encounter now stamps its Log rows with a **version suffix**: the first log is plain (**1**, **2**, ...), the first edit becomes **1 (v2)**, the next **1 (v3)**, etc. The numeric identity is unchanged - matching, next-number, green-banding, and the Edit picker all read the **base number** (`Val`, and the snapshot store stays numeric), so nothing that keys on the encounter number breaks. New helpers `EncounterNextVersion` / `ParseEncVersion` / `EncLabel`; the label is carried to `LogPrint` via `gEncLabel`. Applies to both re-log paths (Save Edited Encounter and printing while editing).
 
+**One launcher: open = rebuild, single friendly message (2026-07-23)**
+- Replaced **`APPLY UPDATES (double-click me).cmd`** with **`OPEN LABEL TOOL (double-click me).cmd`** - the everyday way in. It runs `Build-Release.vbs`, which rebuilds from `MedParser.bas` and opens the workbook, so volunteers are never on stale code (no separate "apply updates" step). Opening `MedicationDispensing.xlsm` directly stays as a fallback if a build won't run.
+- **Consolidated the two build pop-ups into one.** Removed the mid-build "Setup complete!" MsgBox from `SetupWorkbook`; the launcher now shows a single friendly **"SCU Label Tool is ready"** message (with the keyboard shortcuts) at the very end, after the workbook is open.
+- **README:** switched to the one-launcher flow; **removed "Reprint Last Batch"** (its button/shortcut is gone) and **removed mentions of the local CSV save** (kept for data safety for now, just not documented).
+
 **Step numbers added to every sheet banner + README screenshots (2026-07-23)**
 - Each workflow sheet's **banner now starts with its step number**, matching the numbered tabs: **1.** Patient & Input (A2 subtitle), **2.** SCU Medications, **3.** PRINT LABELS, **4.** Dispense Log, **5.** Tebra Session Notes. All set in code by `SetupWorkbook` (Log/Input banners are otherwise static in the template - only their text is set, styling untouched).
 - **README** now has a **Screenshots** section in **workflow order** (Start Here overview, then 2 Medications, 2 Medications-Review, 3 Print Labels, 4 Log, 5 Tebra) using high-res PNGs in `support/assets/screenshots/`.

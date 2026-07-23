@@ -337,7 +337,7 @@ for `.bas` / `.vbs`.)
    `scu_emblem.png` (see §7 gotchas). The emblem is already correct; leave it.
 3. Double-click **`Build-Release.vbs`** (needs **Trust access to the VBA project
    object model** + folder as **Trusted Location**).
-4. Click OK on **Setup complete!** and **Release build complete**.
+4. Click OK on the single **SCU Label Tool is ready** message (workbook is left open). Volunteers launch this via **`OPEN LABEL TOOL (double-click me).cmd`**.
 
 `Build-Release.vbs` opens `MedicationDispensing.xlsm` in place (bootstraps from
 `Broken_PrettyPrint_MedicationDispensing.xlsm` only if missing), removes the old

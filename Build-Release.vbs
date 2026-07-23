@@ -433,11 +433,13 @@ xl.DisplayAlerts = True
 wb.Activate
 On Error GoTo 0
 
-MsgBox "Release build complete." & vbCrLf & vbCrLf & _
-    "- MedParser.bas imported" & vbCrLf & _
-    "- SetupWorkbook ran (project compiles)" & vbCrLf & _
-    "- MedicationDispensing.xlsm saved and LEFT OPEN for use" & vbCrLf & vbCrLf & _
-    "Close it before running Build-Release again.", vbInformation, "Build-Release - Done"
+MsgBox "SCU Label Tool is ready." & vbCrLf & vbCrLf & _
+    "The workbook is open on the Start Here tab - go ahead and use it." & vbCrLf & vbCrLf & _
+    "Handy shortcuts:" & vbCrLf & _
+    "   Ctrl+Shift+P  =  Parse Medications" & vbCrLf & _
+    "   Ctrl+Shift+R  =  Reset Session" & vbCrLf & _
+    "   Ctrl+Shift+L  =  Refresh Label Previews" & vbCrLf & vbCrLf & _
+    "When you are done for the day, just close it.", vbInformation, "SCU Label Tool"
 
 ' Hand the status bar back to Excel now that the build is done.
 On Error Resume Next

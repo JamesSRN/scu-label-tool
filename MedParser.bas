@@ -1045,13 +1045,8 @@ Public Sub SetupWorkbook()
     Application.EnableEvents = savedEE
     Application.ScreenUpdating = savedSU
     On Error GoTo 0
-
-    MsgBox "Setup complete!  (v" & APP_VERSION & ")" & vbCrLf & _
-           "Keyboard shortcuts registered:" & vbCrLf & _
-           "  Ctrl+Shift+P  =  Parse Medications" & vbCrLf & _
-           "  Ctrl+Shift+R  =  Reset Session" & vbCrLf & _
-           "  Ctrl+Shift+L  =  Refresh Label Previews", _
-           vbInformation, "Saturday Clinic - Setup Complete"
+    ' No pop-up here: the friendly "ready" message is shown once by the launcher
+    ' (Build-Release.vbs) at the very end, after the workbook is saved and opened.
 End Sub
 
 ' ============================================================

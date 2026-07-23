@@ -15,9 +15,9 @@
 3. Removes the existing `MedParser` module and imports `MedParser.bas` from the repo root.
 3b. Builds the `frmExpLot` and `frmMedEdit` UserForms (if missing) and installs the `ThisWorkbook` auto-reset handlers. See "Generated UserForms & handlers" below.
 4. Runs `'MedicationDispensing.xlsm'!SetupWorkbook` (compile check + rebuild buttons/label layout + `PreviewAllLabels`).
-5. **Saves AND closes** the workbook, then quits its Excel instance.
+5. **Saves the workbook and leaves it open** on the Start Here tab for immediate use.
 
-Click **OK** on the **Setup complete!** dialog when it appears, then on the final **Release build complete** message. On success the workbook is now closed — reopen `MedicationDispensing.xlsm` to use it.
+Click **OK** on the single **SCU Label Tool is ready** message at the end. The workbook is left open on the Start Here tab — go ahead and use it. (Volunteers normally launch this via **`OPEN LABEL TOOL (double-click me).cmd`**.)
 
 ## Robustness — never leaves a stray Excel process
 
