@@ -31,27 +31,31 @@ toward correct labels and caught before mistakes reach a patient.
 
 ## Screenshots
 
-_All screenshots use a randomly generated test patient - no real patient data._
+_All screenshots use randomly generated test patients - no real patient data. Shown in workflow order (the numbered, colored tabs)._
 
-**Medications tab** - live validation colors (yellow = missing, blue = reviewed, green = checked) with the review toolbar:
+**Start Here** - the built-in guide walks a first-time volunteer through the five numbered, color-coded tabs:
+
+![Start Here guide](support/assets/screenshots/start-here.png)
+
+**2. Medications** - live validation colors (yellow = missing, blue = reviewed, green = checked) with the review toolbar:
 
 ![Medications tab](support/assets/screenshots/medications-tab.png)
 
-**Medication Review** - each drug's name and strength large and bold, with any issues listed beneath:
+**2. Medications - Review** - each drug's name and strength large and bold, with any issues (missing Lot / Quantity / Expiration) listed beneath; the matching cells are highlighted yellow on the sheet:
 
 ![Medication Review dialog](support/assets/screenshots/review-dialog.png)
 
-**Label Previews gallery** - every label auto-previews; print the checked ones (2 copies each):
+**3. Print Labels** - every label auto-previews; print the checked ones (2 copies each):
 
 ![Label Previews gallery](support/assets/screenshots/print-gallery.png)
 
-**Tebra Notes** - one boxed, paste-ready note per patient, grouped by source:
-
-![Tebra Notes](support/assets/screenshots/tebra-notes.png)
-
-**Dispense Log** - every printed med recorded, grouped into per-patient encounters with divider lines:
+**4. Log** - every printed med recorded, grouped into per-patient encounters with divider lines:
 
 ![Dispense Log](support/assets/screenshots/log.png)
+
+**5. Tebra Notes** - one boxed, paste-ready note per patient, grouped by source:
+
+![Tebra Notes](support/assets/screenshots/tebra-notes.png)
 
 ## The workflow it's built around
 
