@@ -29,6 +29,30 @@ It is built to be **robust for high-turnover volunteers**: the tool parses,
 checks, and flags entries so that someone using it for the first time is guided
 toward correct labels and caught before mistakes reach a patient.
 
+## Screenshots
+
+_All screenshots use a randomly generated test patient - no real patient data._
+
+**Medications tab** - live validation colors (yellow = missing, blue = reviewed, green = checked) with the review toolbar:
+
+![Medications tab](support/assets/screenshots/medications-tab.png)
+
+**Medication Review** - each drug's name and strength large and bold, with any issues listed beneath:
+
+![Medication Review dialog](support/assets/screenshots/review-dialog.png)
+
+**Label Previews gallery** - every label auto-previews; print the checked ones (2 copies each):
+
+![Label Previews gallery](support/assets/screenshots/print-gallery.png)
+
+**Tebra Notes** - one boxed, paste-ready note per patient, grouped by source:
+
+![Tebra Notes](support/assets/screenshots/tebra-notes.png)
+
+**Dispense Log** - every printed med recorded, grouped into per-patient encounters with divider lines:
+
+![Dispense Log](support/assets/screenshots/log.png)
+
 ## The workflow it's built around
 
 1. **Paste** the prescription text for a patient into the *Patient & Input* tab

@@ -5620,8 +5620,10 @@ Public Sub GenerateTestPatient()
                    "Jennifer", "William", "Sofia", "Carlos", "Aisha", "Wei", "Fatima", "John", "Elena")
     lasts = Array("Smith", "Johnson", "Garcia", "Nguyen", "Patel", "Kim", "Brown", "Martinez", _
                   "Davis", "Lopez", "Wilson", "Ali", "Chen", "Okafor", "Rossi", "Hernandez")
+    ' Prefix the first name with "tst_" so test patients are obvious everywhere they appear
+    ' (Medications, labels, Log, Tebra) and never mistaken for a real patient.
     Dim nm As String
-    nm = lasts(Int(Rnd * (UBound(lasts) + 1))) & ", " & firsts(Int(Rnd * (UBound(firsts) + 1)))
+    nm = lasts(Int(Rnd * (UBound(lasts) + 1))) & ", tst_" & firsts(Int(Rnd * (UBound(firsts) + 1)))
     Dim yr As Integer, mo As Integer, dy As Integer
     yr = 1945 + Int(Rnd * 61)
     mo = 1 + Int(Rnd * 12)
