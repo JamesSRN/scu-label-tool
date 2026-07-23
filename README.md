@@ -1,191 +1,175 @@
-# SCU Label Printing tool
+<div align="center">
 
-An Excel + VBA tool for the **Saturday Clinic for the Uninsured (SCU)** free
-pharmacy that turns a block of pasted prescription text into clean, validated
-medication labels printed on a **Brother QL-1100c** (DK-1202, 62 x 100 mm,
-landscape) - and keeps a running dispense log.
+<img src="support/assets/scu-emblem-badge.png" alt="Saturday Clinic for the Uninsured emblem" width="130">
 
-> **Download & install:** grab the latest `SCU-Label-Printing-vX.Y.zip` from the
-> **[Releases page](https://github.com/JamesSRN/scu-label-tool/releases)**, unzip, and
-> open `MedicationDispensing.xlsm`. Full steps in **[support/docs/RELEASE.md](support/docs/RELEASE.md)**.
+# SCU Label Printing Tool
 
-## Which file do I click?
-
-Only two files in this folder are meant to be clicked:
-
-- **`MedicationDispensing.xlsm`** — **open this to use the tool** (parse, print labels, log).
-- **`APPLY UPDATES (double-click me).cmd`** — **double-click this to apply code updates**
-  after `MedParser.bas` changes. It reminds you to close the workbook first, then runs the
-  build. (It just launches `Build-Release.vbs`, which still works if you prefer to run it directly.)
-
-Everything else is support material — leave it in place:
-
-- **`support/`** — reference material grouped together: `docs/`, `test-data/`, `assets/`, `_backups/`.
-- **`tools/`** — build scripts the build runs (stays in the main folder).
-- **`dispense-log/`** — the daily CSV archive the tool writes (stays next to the workbook).
-- The `.bas` source, the emblem PNG, and the bootstrap workbook are also needed by the build.
-
-It is built to be **robust for high-turnover volunteers**: the tool parses,
-checks, and flags entries so that someone using it for the first time is guided
-toward correct labels and caught before mistakes reach a patient.
-
-## Screenshots
-
-_All screenshots use randomly generated test patients - no real patient data. Shown in workflow order (the numbered, colored tabs)._
-
-**Start Here** - the built-in guide walks a first-time volunteer through the five numbered, color-coded tabs:
-
-![Start Here guide](support/assets/screenshots/start-here.png)
-
-**2. Medications** - live validation colors (yellow = missing, blue = reviewed, green = checked) with the review toolbar:
-
-![Medications tab](support/assets/screenshots/medications-tab.png)
-
-**2. Medications - Review** - each drug's name and strength large and bold, with any issues (missing Lot / Quantity / Expiration) listed beneath; the matching cells are highlighted yellow on the sheet:
-
-![Medication Review dialog](support/assets/screenshots/review-dialog.png)
-
-**3. Print Labels** - every label auto-previews; print the checked ones (2 copies each):
-
-![Label Previews gallery](support/assets/screenshots/print-gallery.png)
-
-**4. Log** - every printed med recorded, grouped into per-patient encounters with divider lines:
-
-![Dispense Log](support/assets/screenshots/log.png)
-
-**5. Tebra Notes** - one boxed, paste-ready note per patient, grouped by source:
-
-![Tebra Notes](support/assets/screenshots/tebra-notes.png)
-
-## The workflow it's built around
-
-1. **Paste** the prescription text for a patient into the *Patient & Input* tab
-   and enter the patient name + DOB.
-2. **Parse** (one button / `Ctrl+Shift+P`): the text is split into one row per
-   medication on the *Medications* tab - name, strength, form, directions (SIG),
-   quantity, refills, expiration, and lot. **Refills default to 0** and a
-   **Source** dropdown (DOH / IN HOUSE / RxAPS / Other) starts blank. Parse
-   **clears the previous patient's list first** (keeping the name/DOB and Log) so a
-   new patient never mixes with old rows. After parsing the tool offers to collect
-   Expiration and Lot right away; **+ Add Medication** opens the same one-dialog
-   editor as **Edit this med**.
-3. **Review & fix**: every drug gets a **confidence** rating, and a validation
-   pass flags anything missing or suspicious. Highlights update **live as you type**:
-   a missing **Quantity / Expiration / Lot / Source** cell is **yellow** and clears to
-   **white** the moment you fill it (and back to yellow if you clear it). The **Review**
-   button opens a scrolling list showing each drug's **name + strength large & bold**
-   with its **error(s) stacked underneath**. On Review, complete rows validate to
-   **blue** and are then **auto-checked to green** for printing. Rows are fully editable;
-   volunteers can add or remove medications by hand.
-4. **Select what to print** with the *Check Med* boxes (double-click the box or the
-   medication name to toggle) - one med or many. **Checked = green; unchecking a
-   reviewed med returns it to blue.** The row color matches the preview gallery.
-5. **Preview** every label on the *Label Previews* tab (auto-refreshes), then
-   **Print Checked Labels** - **2 copies of each label**. A confirmation lists
-   exactly what's about to print and flags any rows skipped for missing
-   expiration/lot. **Reprint Last Batch** recovers from a jam without re-selecting.
-6. **Log**: every printed label is recorded (timestamp, patient, DOB, medication,
-   strength, SIG, quantity, refills, expiration, lot, **source**, Rx date, initials,
-   dosage form, print count, and **Encounter #**). Each print is one **Encounter**,
-   numbered and shaded in one of three cycling greens so each patient's print reads
-   as one block. A dated CSV copy is also saved locally.
-7. **Tebra notes**: the *TEBRA TEMPLATE* sheet builds paste-ready session notes -
-   one block per patient, grouped by source, with name/DOB on the right.
-8. **Next patient**: *Start NEW Patient* clears the patient and medication list
-   but keeps the Log, so the clinic can run patient after patient. *Reset
-   Session* wipes everything (including the Log) for a fresh day.
-
-## Key features
-
-- One-paste-to-labels parsing with per-drug confidence scoring; Parse starts a
-  fresh list each time so patients never mix.
-- Validation that catches missing or malformed fields before printing, with
-  **live** color-coded cells (yellow = missing, clears to white as you fill it) and a
-  clear **white -> blue (reviewed) -> green (checked)** row state.
-- Readable pop-ups: **Review**, **Print**, and **Remove** all show each med's name +
-  strength large and bold with its status stacked underneath.
-- One-dialog medication editor shared by **Add Medication** and **Edit this med**.
-- **Source** dropdown (DOH / IN HOUSE / RxAPS / Other), required and logged.
-- Checkbox-driven selection that drives printing, row color, and removal alike.
-- Auto-refreshing gallery of all label previews.
-- Single and batch printing with detailed confirmation popups - **2 copies per
-  label** - plus Reprint Last Batch, and fit-to-page so the bottom row never clips.
-- Auto-incrementing, edit-protected print count per medication.
-- Complete dispense log with per-print **Encounters** (numbered + green-banded)
-  and a dated local CSV archive.
-- **TEBRA TEMPLATE** sheet: paste-ready session notes grouped by source per patient.
-- Brother QL-1100c auto-select with a load-the-roll confirmation.
-
-## Contents
-
-**In the main folder:**
-
-- `MedicationDispensing.xlsm` - clinic workbook (local, git-ignored; open this to use the tool).
-- `APPLY UPDATES (double-click me).cmd` - friendly launcher that runs the build.
-- `Build-Release.vbs` - imports `MedParser.bas`, runs `SetupWorkbook`, saves the `.xlsm`.
-- `MedParser.bas` - the VBA source of truth (parser, validation, label layout, printing, logging).
-- `scu_emblem.png` - SC emblem for the label header (loaded at print time; must stay here).
-- `README.md` - this file.
-
-**In `support/docs/`:** `HANDOFF.md` (architecture / routine map), `LABEL_REDESIGN.md`, `CHANGELOG.md`
-(release history), `RELEASE.md`, `SETUP_INSTRUCTIONS.md`, `TROUBLESHOOTING.md`, `PRIVACY_AND_PHI.md`.
-
-**In `support/`:** `assets/logo-source/` (full + cropped clinic logo art), `test-data/` (no-PHI samples),
-`_backups/` (local snapshots, git-ignored).
-
-**In `tools/`:** `check-encoding.ps1` (pre-build ASCII/CRLF check), `make-release-zip.ps1`,
-`Build-ScuEmblem.ps1`, `BUILD_RELEASE_NOTES.md`.
-
-**`dispense-log/`:** dated CSV archive the tool writes each clinic day (git-ignored, PHI).
-
-## Folder on the clinic PC
-
-Everything lives in **one folder** (outside OneDrive):
-
-```
-C:\Users\ringo\Documents\GitHub\GIT_VERSION_SCU Label Printing
-```
-
-This folder holds the Git repo (pushed to GitHub), the VBA source, docs, and
-the live workbook (`MedicationDispensing.xlsm`). Code and docs are version-
-controlled; the `.xlsm`, `dispense-log\`, and `support\_backups\` are git-ignored so patient data stays
-local. Register this folder as an Excel Trusted Location so macros run.
-
-## Applying code changes
-
-Close the workbook, then double-click **`APPLY UPDATES (double-click me).cmd`**
-(it launches `Build-Release.vbs` for you). Click OK on **Setup complete!** when
-prompted. Requires Excel **Trust access to the VBA project object model** and this
-folder as a **Trusted Location**.
-
-Or in the VBA editor: remove the `MedParser` module, Import `MedParser.bas`, run
-`SetupWorkbook`, save.
-
-After updating the emblem crop, run `tools/Build-ScuEmblem.ps1` first, then
-`Build-Release.vbs`.
-
-The two worksheet event handlers are pasted once into the sheet modules - see
-`HANDOFF.md` section 5.
-
-## Known open items
-
-- **Trusted Location** — register the folder in Excel Trust Center so macros are not blocked.
-- **Print width** — `LABEL_WIDTH_PT = 242` uses more of the 100 mm die-cut; re-test on the clinic Brother that labels still fit one die-cut (228 pt was the prior no-bleed value).
-- **Bold clinic title on thermal** — may still look subtle; `ShrinkToFit` can limit apparent size.
-- **Physical regression test** — spot-check emblem and header after the 2026-06-30 logo/header fixes (screen + print path verified; Brother thermal spot-check recommended).
-
-## Recently fixed (2026-06-30)
-
-Logo/header/print tuning session — full detail in `HANDOFF.md` and `CHANGELOG.md`:
-
-- Emblem sliver, squished aspect, gray thermal output, gallery vs print mismatch
-- Blank label after each print (`PrintOut From:=1, To:=1`)
-- Clinic name clipped / too small / bold (`FmtLblClinicName`, A2:F2 merge)
-- Embedded logo fallback removed (weird partial logos after rebuild)
-- Bootstrap warning when `MedicationDispensing.xlsm` is missing during build
+</div>
 
 ---
 
-*Note on patient data:* this repo holds **code and docs only**. The working
-`.xlsm` contains patient information and is kept local (excluded via
-`.gitignore`); it is never committed.
+<div align="center">
+
+**Paste a patient's prescriptions → get clean, validated medication labels — printed on a Brother QL-1100c, with a running dispense log and paste-ready Tebra notes.**
+
+Saturday Clinic for the Uninsured · Medical College of Wisconsin
+
+`Excel + VBA` · `Brother QL-1100c — DK-1202` · `offline — no PHI committed` · `v2.1`
+
+</div>
+
+---
+
+## Start here
+
+This is an Excel + VBA tool for the **Saturday Clinic for the Uninsured (SCU)** free pharmacy. It turns a block of pasted prescription text into printed medication labels and keeps a dispense log.
+
+It's built to be **robust for high-turnover volunteers**: it parses, checks, and flags every entry, so a first-time user is guided toward correct labels — and caught before a mistake reaches a patient.
+
+**Which file do I open?** Only two files are meant to be clicked. Leave everything else in place.
+
+| I want to… | Open this |
+|---|---|
+| **Use the tool** — parse, print labels, keep the log | **`MedicationDispensing.xlsm`** |
+| **Apply a code update** — after `MedParser.bas` changes | **`APPLY UPDATES (double-click me).cmd`** |
+
+> The `.cmd` just reminds you to close the workbook first, then runs `Build-Release.vbs`. Everything else (`support/`, `tools/`, `dispense-log/`, the `.bas` source, the emblem, and the bootstrap workbook) is support material the build needs — don't move it.
+
+> **Install:** grab the latest `SCU-Label-Printing-vX.Y.zip` from the **[Releases page](https://github.com/JamesSRN/scu-label-tool/releases)**, unzip, and open `MedicationDispensing.xlsm`. Full steps in **[RELEASE.md](support/docs/RELEASE.md)**.
+
+---
+
+## How it works — five numbered tabs
+
+The whole workflow lives on **five color-coded, numbered tabs**. The workbook opens to a built-in guide that walks you through them:
+
+![Start Here guide](support/assets/screenshots/start-here.png)
+
+_All screenshots below use randomly generated test patients — no real patient data._
+
+### 1 · Patient & Input  (blue)
+
+Enter the patient's **name + DOB**, paste the prescription text into the big box, and click **PARSE MEDICATIONS** (or press `Ctrl+Shift+P`). Parse **clears the previous patient's list first** (keeping the name/DOB and the Log) so a new patient never mixes with old rows.
+
+### 2 · Medications  (green)
+
+Each drug becomes one row — name, strength, form, directions (SIG), quantity, refills, expiration, and lot. **Refills default to 0** and a **Source** dropdown (DOH / IN HOUSE / RxAPS / Other) is required.
+
+Highlights update **live as you type** — a missing **Quantity / Expiration / Lot / Source** cell is **yellow** and clears to **white** the instant you fill it. Then click **Review**: complete rows validate to **blue** and are auto-checked to **green** for printing. The Review pop-up lists each drug's **name + strength in bold** with any issues stacked beneath.
+
+![Medications tab](support/assets/screenshots/medications-tab.png)
+
+![Medication Review — errors listed under each drug, missing cells highlighted yellow](support/assets/screenshots/review-dialog.png)
+
+> **Row colors at a glance:** yellow cell = missing · **white** = filled, not yet reviewed · **blue** = reviewed OK · **green** = checked to print. Double-click a **Check Med** box (or the medication name) to check/uncheck. **+ Add Medication** and **Edit this med** share the same one-dialog editor.
+
+### 3 · Print Labels  (orange)
+
+Every checked med auto-previews as a real label. Click **Print Checked Labels** — **2 copies of each** — enter your initials, and confirm. The confirmation lists exactly what's about to print and flags any row skipped for missing Exp/Lot. **Reprint Last Batch** recovers from a jam without re-selecting.
+
+![Label Previews gallery](support/assets/screenshots/print-gallery.png)
+
+### 4 · Log  (purple)
+
+Every printed label is recorded automatically — timestamp, patient, DOB, medication details, **source**, initials, print count, and **Encounter #**. Each print is one **encounter**: numbered, shaded in cycling greens, and separated by a divider line so each patient reads as one block. A dated CSV copy is saved locally too. Nothing to do here — it's your record.
+
+![Dispense Log](support/assets/screenshots/log.png)
+
+### 5 · Tebra Notes  (teal)
+
+A ready-to-paste note for **each patient**, grouped by source, with each note **boxed** so you can select it, copy, and paste straight into that patient's Tebra chart.
+
+![Tebra Notes](support/assets/screenshots/tebra-notes.png)
+
+> **Between patients:** **Start NEW Patient** clears the patient + med list but keeps the Log (run patient after patient). **Reset Session** wipes everything — Log included — for a fresh day.
+
+---
+
+## Key features
+
+- **One paste → labels**, with a per-drug **confidence** score; Parse starts a fresh list each time so patients never mix.
+- **Validation before printing** — live color-coded cells (yellow = missing → white when filled) and a clear **white → blue (reviewed) → green (checked)** row state.
+- **Readable pop-ups** — Review, Print, and Remove all show each med's name + strength in bold with its status beneath.
+- **Required Source** dropdown (DOH / IN HOUSE / RxAPS / Other), logged on every row.
+- **Checkbox-driven** selection that drives printing, row color, and removal alike.
+- **2 copies per label**, batch or single, with detailed confirmations, Reprint Last Batch, and fit-to-page so the bottom row never clips.
+- **Complete dispense log** with numbered, green-banded **encounters** and a dated local CSV archive.
+- **Tebra notes** sheet: paste-ready session notes grouped by source, one boxed note per patient.
+- **Brother QL-1100c auto-select** with a load-the-roll confirmation.
+
+---
+
+## Applying code updates
+
+Close the workbook, then double-click **`APPLY UPDATES (double-click me).cmd`** (it launches `Build-Release.vbs`). Click **OK** on **Setup complete!** when prompted.
+
+Requires, one-time in Excel's Trust Center:
+
+- **Trust access to the VBA project object model**
+- this folder registered as a **Trusted Location** (so macros aren't blocked)
+
+<details>
+<summary>Manual build, emblem updates, and event handlers</summary>
+
+- **Manual build (VBA editor):** remove the `MedParser` module, **Import** `MedParser.bas`, run `SetupWorkbook`, save.
+- **After changing the emblem crop:** run `tools/Build-ScuEmblem.ps1` first, then `Build-Release.vbs`.
+- The two worksheet event handlers are pasted once into the sheet modules — see `HANDOFF.md` §5.
+- Everything lives in **one folder** (outside OneDrive): `C:\Users\ringo\Documents\GitHub\GIT_VERSION_SCU Label Printing`. Code + docs are version-controlled; the `.xlsm`, `dispense-log\`, and `support\_backups\` are git-ignored so patient data stays local.
+
+</details>
+
+---
+
+## What's in the folder
+
+<details>
+<summary>Full contents (click to expand)</summary>
+
+**Main folder**
+
+| File | What it is |
+|---|---|
+| `MedicationDispensing.xlsm` | The clinic workbook — **open this to use the tool** (local, git-ignored). |
+| `APPLY UPDATES (double-click me).cmd` | Friendly launcher that runs the build. |
+| `Build-Release.vbs` | Imports `MedParser.bas`, runs `SetupWorkbook`, saves the `.xlsm`. |
+| `MedParser.bas` | The VBA source of truth (parser, validation, label layout, printing, logging). |
+| `scu_emblem.png` | SC emblem for the label header (loaded at print time; must stay here). |
+| `README.md` | This file. |
+
+**`support/docs/`** — `HANDOFF.md` (architecture / routine map), `CHANGELOG.md` (release history), `RELEASE.md`, `SETUP_INSTRUCTIONS.md`, `TROUBLESHOOTING.md`, `LABEL_REDESIGN.md`, `PRIVACY_AND_PHI.md`.
+
+**`support/`** — `assets/` (emblem art + README screenshots), `test-data/` (no-PHI samples), `_backups/` (local snapshots, git-ignored).
+
+**`tools/`** — `check-encoding.ps1` (pre-build ASCII/CRLF check), `make-release-zip.ps1`, `Build-ScuEmblem.ps1`, `BUILD_RELEASE_NOTES.md`.
+
+**`dispense-log/`** — dated CSV archive the tool writes each clinic day (git-ignored, PHI).
+
+</details>
+
+---
+
+## Quick reference
+
+| I want to… | Go to |
+|---|---|
+| Install / update the tool | [RELEASE.md](support/docs/RELEASE.md) |
+| Understand the code (routine map) | [HANDOFF.md](support/docs/HANDOFF.md) |
+| See what changed | [CHANGELOG.md](support/docs/CHANGELOG.md) |
+| Fix a problem | [TROUBLESHOOTING.md](support/docs/TROUBLESHOOTING.md) |
+| Read the PHI / privacy rules | [PRIVACY_AND_PHI.md](support/docs/PRIVACY_AND_PHI.md) |
+
+<details>
+<summary>Known open items</summary>
+
+- **Trusted Location** — register the folder in Excel Trust Center so macros aren't blocked.
+- **Print width** — `LABEL_WIDTH_PT = 242` uses more of the 100 mm die-cut; re-test on the clinic Brother that labels still fit one die-cut (228 pt was the prior no-bleed value).
+- **Bold clinic title on thermal** — may still look subtle; `ShrinkToFit` can limit apparent size.
+- **Physical regression test** — spot-check the emblem and header on the Brother thermal (screen + print path verified).
+
+</details>
+
+---
+
+## Privacy
+
+**This repo holds code and docs only.** The working `.xlsm` contains patient information and is kept **local** — excluded via `.gitignore`, never committed. The `dispense-log/` CSV archive and `support/_backups/` are git-ignored for the same reason. All screenshots in this README use **randomly generated test patients**.
