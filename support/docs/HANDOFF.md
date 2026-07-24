@@ -1,6 +1,6 @@
 # SCU Label Printing Tool - Handoff
 
-Last updated: 2026-07-23 (**v2.1**: Check Med column moved left + frozen panes; Medications & Print Labels banners redesigned; readable `frmReview` list dialog reused for Review / Print confirm / Print complete / Remove; Add Medication uses the `frmMedEdit` form; **live yellow<->white highlighting** with a clear **white -> blue (reviewed) -> green (checked)** state and an `EnableEvents` guard invariant; Parse clears the previous list first (keeps name/DOB); removed the only clipboard `Copy`/`PasteSpecial`. Earlier **V2** (2026-07-09): Source column (required) right of Lot #; Refills right of Rx Date + default 0; 2 copies per label; auto-check on validate; per-print **Encounters** (numbered + green-banded) in the Log; **TEBRA TEMPLATE** sheet; Medications banner/grid spruce-up + hidden internal columns; **fit-to-page** so Exp/Lot never clip; resilient `ClearMedArea`; Add Medication prompts for Exp/Lot; red/yellow missing-field highlights)
+Last updated: 2026-07-24 (**v2.1 label + banner tweaks**: the label's qty line now prints the **Source** (IN HOUSE / DOH / RxAPS) before Refills; the label **patient name auto-shrinks** for long names (`LabelNameFontSize`, 12->8 pt); the Medications **encounter box is a single line** showing the encounter # + patient name - the two-line design was dropped because this Excel won't render a 2nd line in that shape. Earlier **v2.1**: Check Med column moved left + frozen panes; Medications & Print Labels banners redesigned; readable `frmReview` list dialog reused for Review / Print confirm / Print complete / Remove; Add Medication uses the `frmMedEdit` form; **live yellow<->white highlighting** with a clear **white -> blue (reviewed) -> green (checked)** state and an `EnableEvents` guard invariant; Parse clears the previous list first (keeps name/DOB); removed the only clipboard `Copy`/`PasteSpecial`. Earlier **V2** (2026-07-09): Source column (required) right of Lot #; Refills right of Rx Date + default 0; 2 copies per label; auto-check on validate; per-print **Encounters** (numbered + green-banded) in the Log; **TEBRA TEMPLATE** sheet; Medications banner/grid spruce-up + hidden internal columns; **fit-to-page** so Exp/Lot never clip; resilient `ClearMedArea`; Add Medication prompts for Exp/Lot; red/yellow missing-field highlights)
 
 An Excel + VBA tool for the **Saturday Clinic for the Uninsured (SCU)** free
 pharmacy. It turns pasted prescription text into a validated medication table and
@@ -239,7 +239,7 @@ Cell map (rows 16–18 hold off-label helper text that does not print):
 | Rx date | F5:H5 (right) |
 | DOB | F6:H6 (right) |
 | Medication + strength (hero) | A7:H7 |
-| Dosage form + qty **+ refills** | A8:H8 |
+| Dosage form + qty **+ source + refills** | A8:H8 |
 | "DIRECTIONS" mini-label | A9:H9 |
 | SIG / directions (**3 lines**) | A10:H12 (white on black) |
 | EXP (**bottom row**) | A15:D15 |
@@ -256,7 +256,8 @@ medication name is the focal point; EXP/LOT are pinned to the bottom row.
 
 | Element | Logic |
 |---|---|
-| Patient name | `PatientNameFontSize()` — steps 17→8 pt, always **≥ med line + 1 pt**; vertically centered on the Rx/DOB block |
+| Patient name | `LabelNameFontSize()` — steps **12→11→10→9→8 pt** by name length so long names fit the half-width name cell (both the single preview and the gallery cards). (`PatientNameFontSize()` remains for reference but the previews call `LabelNameFontSize`.) |
+| Qty line source | `UpdateLabelPreviewForMedRow` / `BuildAllLabelsPreview` insert the **Source** (`C_SRC`) between Qty and Refills, dot-separated |
 | Medication / SIG | `NameFontSize()` / `SigFontSize()` — steps down for long text |
 | Clinic name line 1 | `FmtLblClinicName()` (Century Gothic, **bold**, left, bottom) — `CLINIC_NAME_FONT_PRINT = 14` / gallery 12; `ShrinkToFit` |
 | Clinic name line 2 | `FmtLblNameSub()` (Century Gothic, left, top) — `CLINIC_NAMESUB_FONT_PRINT = 7` |
@@ -487,11 +488,12 @@ print (no blank follow-on label); logo/header layout on screen and print path
 | `AddMedicationRow` / `RemoveSelectedMedication` / `RenumberMeds` | List editing. Remove Selected removes all checked rows. |
 | `ApplyRowState` / `ApplyAllRowStates` / `IsRowSelected` / `ToggleRowSelect` | Row color by state; confidence triad; selection checkmark. |
 | `PrintCheckedLabels` | Batch-print every checked med; logs each. |
-| `BuildLabelPreviewLayout` / `ApplyLabelContentWidth` / `ApplyLabelPageSetup` / `UpdateLabelPreviewForMedRow` | Label layout, width scaling (`LABEL_WIDTH_PT = 242`), page setup, value writing (incl. **Refills** on the qty line; **EXP/LOT on bottom row 15**). |
+| `BuildLabelPreviewLayout` / `ApplyLabelContentWidth` / `ApplyLabelPageSetup` / `UpdateLabelPreviewForMedRow` | Label layout, width scaling (`LABEL_WIDTH_PT = 242`), page setup, value writing (qty line = **Dosage form . Qty . Source . Refills**; **EXP/LOT on bottom row 15**). |
 | `FmtLbl` / `FmtLblHeader` / `FmtLblClinicName` / `FmtLblNameSub` / `FmtLblContactRight` | Cell formatting. Header three-zone helpers: clinic name lines (Century Gothic), phone/address (Arial, right-aligned). |
 | `InsertLabelLogo` / `RefreshPrintLabelLogo` / `EnsurePrintLabelHeaderLayout` / `LogoFilePath` | Emblem insert (30 pt print / 28 pt gallery), **centered** (`centerHoriz`), refresh before print; three-zone header merges A2:C2 / A3:C3 / **D2:E3** (emblem) / F2:H2 / F3:H3. |
 | `PrepareLabelSheetForPrint` / `PrintLabelSurfaceSafe` | Suppress extra shapes; single-page `PrintOut From:=1, To:=1`. |
-| `LabelHeaderFont` / `SetMiniValue` / `MedFontSize` / `NameFontSize` / `PatientNameFontSize` / `SigFontSize` | Fonts and adaptive sizing. `SetMiniValue` shrinks the EXP/LOT value by length (merged cells ignore `ShrinkToFit`). Med name >38 chars wraps to two 11 pt lines (row 7 -> 28 pt, spacers 13/14 -> 1 pt). |
+| `LabelHeaderFont` / `SetMiniValue` / `MedFontSize` / `NameFontSize` / `LabelNameFontSize` / `PatientNameFontSize` / `SigFontSize` | Fonts and adaptive sizing. **`LabelNameFontSize`** steps the label patient name 12->8 pt by length (used by both previews). `SetMiniValue` shrinks the EXP/LOT value by length (merged cells ignore `ShrinkToFit`). Med name >38 chars wraps to two 11 pt lines (row 7 -> 28 pt, spacers 13/14 -> 1 pt). |
+| `RefreshEncounterBox` / `SetEditingEncounter` | Update the Medications banner's encounter box (**single line**: `Enc. #N - Last, F.` / `Editing Enc. #N - ...` / `New patient - Enc. #N`, name from `Input!C5`, first name shortened to an initial for long names). `SetEditingEncounter(n)` sets `gEditingEncounter` and refreshes. **One line only** - this Excel won't render a 2nd line in the shape. |
 | `BusyShow(pct, msg)` / `BusyHide` | "Please wait" progress popup (`frmBusy`) shown during the Print Checked Labels printer-lookup + page-setup delay; status-bar fallback if the form is missing. |
 | `MatchHeaderFormat` | Safe header format copy (PasteSpecial 1004 fix). |
 | `PrintLabel` / `PrintCheckedLabels` / `SelectBrotherPrinter` / `MarkPrinted` | Auto-select Brother, confirm, print, bump # of Prints. |

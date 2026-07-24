@@ -55,7 +55,7 @@ Enter the patient's **name + DOB**, paste the prescription text into the big box
 
 Each drug becomes one row — name, strength, form, directions (SIG), quantity, refills, expiration, and lot. **Refills default to 0** and a **Source** dropdown (DOH / IN HOUSE / RxAPS / Other) is required.
 
-Highlights update **live as you type** — a missing **Quantity / Expiration / Lot / Source** cell is **yellow** and clears to **white** the instant you fill it. Then click **Review**: complete rows validate to **blue** and are auto-checked to **green** for printing. The Review pop-up lists each drug's **name + strength in bold** with any issues stacked beneath.
+Highlights update **live as you type** — a missing **Quantity / Expiration / Lot / Source** cell is **yellow** and clears to **white** the instant you fill it. Then click **Review**: complete rows validate to **blue**, and you're asked whether to **check them all** for printing (they turn **green**) or leave them to check individually. The Review pop-up lists each drug's **name + strength in bold** with any issues stacked beneath.
 
 ![Medications tab](support/assets/screenshots/medications-tab.png)
 
@@ -65,7 +65,7 @@ Highlights update **live as you type** — a missing **Quantity / Expiration / L
 
 ### 3 · Print Labels  (orange)
 
-Every checked med auto-previews as a real label. Click **Print Checked Labels** — **2 copies of each** — enter your initials, and confirm. The confirmation lists exactly what's about to print and flags any row skipped for missing Exp/Lot.
+Every checked med auto-previews as a real label — drug + strength, directions, `form · qty · source · refills`, and Exp/Lot pinned to the bottom row (long patient names shrink to fit). Click **Print Checked Labels** — **2 copies of each** — enter your initials, and confirm. The confirmation lists exactly what's about to print and flags any row skipped for missing Exp/Lot.
 
 ![Label Previews gallery](support/assets/screenshots/print-gallery.png)
 
@@ -90,7 +90,7 @@ A ready-to-paste note for **each patient**, grouped by source, with each note **
 - **One paste → labels**, with a per-drug **confidence** score; Parse starts a fresh list each time so patients never mix.
 - **Validation before printing** — live color-coded cells (yellow = missing → white when filled) and a clear **white → blue (reviewed) → green (checked)** row state.
 - **Readable pop-ups** — Review, Print, and Remove all show each med's name + strength in bold with its status beneath.
-- **Required Source** dropdown (DOH / IN HOUSE / RxAPS / Other), logged on every row.
+- **Required Source** dropdown (DOH / IN HOUSE / RxAPS / Other), logged on every row and **printed on the label** (on the qty line, before Refills).
 - **Checkbox-driven** selection that drives printing, row color, and removal alike.
 - **2 copies per label**, batch or single, with detailed confirmations and fit-to-page so the bottom row never clips.
 - **Complete dispense log** with numbered, green-banded **encounters** and a divider between each.

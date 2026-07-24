@@ -8,11 +8,24 @@ Medication uses the `frmMedEdit` form, live yellow<->white highlighting with a c
 white -> blue -> green row state, Parse clears the previous list first, Medications &
 Print Labels banners redesigned, and the clipboard-popup source removed.
 
+**Label shows the Source; long patient names shrink to fit (2026-07-24)**
+- The label's **form/qty line now includes the Source** (IN HOUSE / DOH / RxAPS / Other) between Qty and Refills, dot-separated: `Tablet  .  Qty 30  .  IN HOUSE  .  Refills 2`. Applies to both the print label (`UpdateLabelPreviewForMedRow`) and the gallery cards (`BuildAllLabelsPreview`).
+- The **patient name on the label auto-shrinks** for long names via a new `LabelNameFontSize` helper (12 -> 11 -> 10 -> 9 -> 8 pt by length), on both the single preview and the gallery cards, so a long name no longer overflows/clips its half-width name cell. (An absurdly long name still can't fully fit a 62 mm label - that's test data, not a real patient.)
+
+**Encounter box is now a single line: number + patient name (2026-07-24, supersedes the two-line version below)**
+- The Medications banner's encounter box is now **one line**: `Enc. #1  -  Davis, Jennifer` for a new (unsaved) patient, `Editing Enc. #3  -  Rodriguez, M.` when editing a saved encounter, and `New patient  -  Enc. #1` before a name is entered. **The two-line / wrapping design was dropped** - this Excel refuses to render a second line in that shape (`Chr(10)` / `vbCr` / `vbCrLf` all collapse to one visible line and the shape height will not grow). Long names shorten the first name to an initial ("Last, F."), then hard-truncate. The patient name is now read from `Input!C5` in **both** the new-patient and editing states (previously only when editing). `RefreshEncounterBox` was rewritten accordingly.
+
 **Divider line between encounters in the Log (2026-07-23)**
 - The Log now draws a **dark divider rule above each new encounter group** (in addition to the cycling green shading), so encounters are easy to tell apart. `ApplyLogEncounterBorders` recomputes the dividers from scratch (grouped by base encounter number, so versioned rows stay together) and is called after every Log change - print, reprint, save-edited-encounter, and rebuild - so it stays correct when rows are added, replaced, or reordered.
 
 **Edited encounters are versioned in the Log (2026-07-23)**
 - Re-saving an edited encounter now stamps its Log rows with a **version suffix**: the first log is plain (**1**, **2**, ...), the first edit becomes **1 (v2)**, the next **1 (v3)**, etc. The numeric identity is unchanged - matching, next-number, green-banding, and the Edit picker all read the **base number** (`Val`, and the snapshot store stays numeric), so nothing that keys on the encounter number breaks. New helpers `EncounterNextVersion` / `ParseEncVersion` / `EncLabel`; the label is carried to `LogPrint` via `gEncLabel`. Applies to both re-log paths (Save Edited Encounter and printing while editing).
+
+**Encounter box shows the patient name (2026-07-23 - REVISED to a single line on 2026-07-24, see above)**
+- The Medications banner's encounter box now shows the **patient name on a second line** ("Editing #N" over "Last, First", pulled from the Input tab), so it's clear which patient you're editing. The box is a bit wider and taller and **wraps**; **very long names shorten the first name to an initial** ("Last, F."), then hard-truncate if still too long. Falls back to "Editing Encounter #N" if no name is set. A **new (unsaved) patient now shows the encounter number it will get** ("New patient (not saved)" / "Will be Encounter #N", via `NextEncounter()`) - the first patient of the day reads #1.
+
+**Review asks before auto-checking (2026-07-23)**
+- **Review** now validates rows to **blue**, then **asks "Check all passing meds?"** before turning them green. **Yes** checks them all (green); **No** leaves them blue for the volunteer to check individually. Previously it always auto-checked. The `frmReview` footer and the readable summary reflect whichever choice was made.
 
 **One launcher: open = rebuild, single friendly message (2026-07-23)**
 - Replaced **`APPLY UPDATES (double-click me).cmd`** with **`OPEN LABEL TOOL (double-click me).cmd`** - the everyday way in. It runs `Build-Release.vbs`, which rebuilds from `MedParser.bas` and opens the workbook, so volunteers are never on stale code (no separate "apply updates" step). Opening `MedicationDispensing.xlsm` directly stays as a fallback if a build won't run.

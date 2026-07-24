@@ -37,7 +37,7 @@ Reference for the current printed label layout in `MedParser.bas` (`BuildLabelPr
 |---------|------|--------|
 | Clinic name | Helvetica → Arial | `FmtLblClinicName` — **14 pt print / 12 pt gallery**, always **bold**, bottom-aligned |
 | Address | Helvetica → Arial | `FmtLblHeader` — **7 pt**, top-aligned, `ShrinkToFit`, no wrap |
-| Patient name | Helvetica → Arial | `PatientNameFontSize()` — at least med line + 1 pt, steps 17→8 |
+| Patient name | Helvetica → Arial | `LabelNameFontSize()` — steps **12→8 pt** by length so long names fit the half-width name cell (both preview + gallery). Qty line reads **form · qty · source · refills**. |
 | Medication, SIG, footer | Helvetica → Arial | `NameFontSize()` — steps 14→8 |
 | Rx / DOB / EXP / LOT | Helvetica → Arial | Fixed 8 pt |
 

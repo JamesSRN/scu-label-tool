@@ -782,8 +782,11 @@ Public Sub SetupWorkbook()
 
     Dim ws1 As Worksheet, ws2 As Worksheet, ws3 As Worksheet
     Set ws1 = ThisWorkbook.Sheets(SH_INPUT)
-    ' Numbered banner subtitle (A2) so the sheet reads as step 1, matching its "1. Patient & Input" tab.
-    ws1.Cells(2, 1).Value = "1.  Medication Dispensing  -  Patient & Input"
+    ' Numbered banner subtitle so the sheet reads as step 1, matching its "1. Patient & Input" tab.
+    ' Write to the merge anchor and protect it, so a merged-cell/format hiccup can't stop the build.
+    On Error Resume Next
+    ws1.Cells(2, 1).MergeArea.Cells(1, 1).Value = "1.  Medication Dispensing  -  Patient & Input"
+    On Error GoTo 0
     Set ws2 = ThisWorkbook.Sheets(SH_MEDS)
     Set ws3 = ThisWorkbook.Sheets(SH_LABEL)
     ws3.Visible = xlSheetVisible   ' show while we rebuild it; re-hidden at the end
@@ -963,8 +966,11 @@ Public Sub SetupWorkbook()
     Dim wsLog As Worksheet
     Set wsLog = ThisWorkbook.Sheets(SH_LOG)
     ' Numbered banner (row 1) so the sheet reads as step 4, matching its "4. Log" tab.
-    ' Only the text is set; the existing purple banner fill / font stay as-is.
-    wsLog.Cells(1, 1).Value = "  4.  Saturday Clinic  -  Dispense Log"
+    ' Only the text is set; the existing purple banner fill / font stay as-is. Write to the
+    ' merge anchor and protect it, so a merged-cell/format hiccup can't stop the build.
+    On Error Resume Next
+    wsLog.Cells(1, 1).MergeArea.Cells(1, 1).Value = "  4.  Saturday Clinic  -  Dispense Log"
+    On Error GoTo 0
     wsLog.Cells(2, LG_TIME).Value = "Timestamp"
     wsLog.Cells(2, LG_ENC).Value = "Encounter"
     wsLog.Cells(2, LG_PT).Value = "Patient"
@@ -1676,6 +1682,23 @@ Private Function PatientNameFontSize(ByVal patientName As String, ByVal medLine 
     PatientNameFontSize = sz
 End Function
 
+Private Function LabelNameFontSize(ByVal s As String) As Single
+    ' Patient name on the label cards: keep the design 12pt for normal names, then step down
+    ' for long ones so the name fits its (half-width) name cell without spilling or clipping.
+    Dim n As Long: n = Len(s)
+    If n <= 22 Then
+        LabelNameFontSize = 12
+    ElseIf n <= 28 Then
+        LabelNameFontSize = 11
+    ElseIf n <= 34 Then
+        LabelNameFontSize = 10
+    ElseIf n <= 42 Then
+        LabelNameFontSize = 9
+    Else
+        LabelNameFontSize = 8
+    End If
+End Function
+
 Private Function SigFontSize(ByVal s As String) As Single
     Dim n As Long: n = Len(s)
     If n <= 70 Then
@@ -1831,6 +1854,14 @@ Private Sub BuildAllLabelsPreview()
                 fq = "Qty " & qty
             End If
         End If
+        Dim srcG As String: srcG = Trim(wsM.Cells(r, C_SRC).Value)
+        If srcG <> "" Then
+            If fq <> "" Then
+                fq = fq & "   " & Chr(183) & "   " & srcG
+            Else
+                fq = srcG
+            End If
+        End If
         Dim refillsG As String: refillsG = Trim(wsM.Cells(r, C_REF).Value)
         If refillsG <> "" Then
             If fq <> "" Then
@@ -1861,7 +1892,8 @@ Private Sub BuildAllLabelsPreview()
         ws.Range(ws.Cells(base + 2, 1), ws.Cells(base + 2, 3)).Merge
         ws.Cells(base + 2, 1).Value = IIf(patName <> "", patName, "[Patient Name]")
         Call FmtLbl(ws.Cells(base + 2, 1), 12, True, "L", "C")
-        ws.Cells(base + 2, 1).Font.Size = 12       ' Name/DOB a bit smaller (matches print)
+        ' Name/DOB a bit smaller than the drug line; shrink further for long names so they fit.
+        ws.Cells(base + 2, 1).Font.Size = LabelNameFontSize(CStr(ws.Cells(base + 2, 1).Value))
         ws.Range(ws.Cells(base + 2, 4), ws.Cells(base + 2, 6)).Merge
         ws.Cells(base + 2, 4).Value = "DOB " & IIf(dob <> "", dob, "--")
         Call FmtLbl(ws.Cells(base + 2, 4), 12, True, "R", "C")
@@ -2212,21 +2244,33 @@ Private Sub LayoutMedButtonBar(ws As Worksheet)
 
     ' LEFT group: Add / Remove / Review (just right of the title).
     Dim x As Double
-    x = bannerLeft + 300
+    x = bannerLeft + 285
     Call PlaceBarBtn(ws, "btnAddMed", "+ Add",    x, y, bw, bh, RGB(21, 67, 96)):  x = x + bw + gp
     Call PlaceBarBtn(ws, "btnRemMed", "- Remove", x, y, bw, bh, RGB(127, 29, 29)): x = x + bw + gp
     Call PlaceBarBtn(ws, "btnRevMed", "Review",   x, y, bw, bh, RGB(38, 50, 56))
 
     ' Encounter status box at the far right of the banner (dynamic - see RefreshEncounterBox).
-    Dim boxW As Double, bx As Double
-    boxW = 168
+    ' REUSE + RESIZE an existing box instead of delete-and-recreate: deleting can fail
+    ' silently and leave a stale box. Resizing whatever box is there guarantees the current
+    ' size every build. Text is a SINGLE line (this Excel won't render a 2nd line in the
+    ' shape), so long patient names are shortened to a first initial. (Stay on Resume Next.)
+    Dim boxW As Double, bx As Double, ebh As Double, eboxY As Double
+    boxW = 208
+    ebh = 32
     bx = bannerRight - 8 - boxW
+    eboxY = ws.Rows(1).Top + (ws.Rows(1).Height - ebh) / 2
     On Error Resume Next
-    ws.Shapes("medEncBox").Delete
-    On Error GoTo 0
     Dim ebox As Shape
-    Set ebox = ws.Shapes.AddShape(msoShapeRoundedRectangle, bx, y, boxW, bh)
-    ebox.name = "medEncBox"
+    Set ebox = Nothing
+    Set ebox = ws.Shapes("medEncBox")
+    If ebox Is Nothing Then
+        Set ebox = ws.Shapes.AddShape(msoShapeRoundedRectangle, bx, eboxY, boxW, ebh)
+        ebox.name = "medEncBox"
+    End If
+    ebox.Left = bx
+    ebox.Top = eboxY
+    ebox.Width = boxW
+    ebox.Height = ebh
     ebox.Line.ForeColor.RGB = RGB(255, 255, 255)
     ebox.Line.Weight = 1
     ebox.TextFrame2.VerticalAnchor = msoAnchorMiddle
@@ -2273,13 +2317,38 @@ Private Sub RefreshEncounterBox()
     Dim ebox As Shape
     Set ebox = ThisWorkbook.Sheets(SH_MEDS).Shapes("medEncBox")
     If ebox Is Nothing Then Exit Sub
+    ' NOTE: this Excel refuses to render a 2nd line in this shape (Chr(10)/vbCr/vbCrLf all
+    ' collapse to one visible line and the shape height will not grow), so keep it to ONE line
+    ' and shrink long names to a first initial ("Last, F.") to fit. Encounter # always shown,
+    ' plus the patient name (from Input!C5) once one has been entered.
+    Dim msg As String, pfx As String, pn As String, disp As String, ci As Long
+    pn = Trim(ThisWorkbook.Sheets(SH_INPUT).Range("C5").Value)
     If gEditingEncounter > 0 Then
-        ebox.TextFrame2.TextRange.Text = "Editing Encounter #" & gEditingEncounter
+        pfx = "Editing Enc. #" & gEditingEncounter
         ebox.Fill.ForeColor.RGB = RGB(198, 40, 40)
     Else
-        ebox.TextFrame2.TextRange.Text = "New patient (not saved)"
+        pfx = "Enc. #" & NextEncounter()
         ebox.Fill.ForeColor.RGB = RGB(38, 50, 56)
     End If
+    If pn = "" Then
+        ' No patient entered yet.
+        If gEditingEncounter > 0 Then msg = pfx Else msg = "New patient  -  " & pfx
+    Else
+        disp = pn
+        ' Keep everything on one line: if too wide, shorten the FIRST name to an initial,
+        ' then hard-truncate as a last resort.
+        If Len(pfx & "  -  " & disp) > 40 Then
+            ci = InStr(pn, ",")
+            If ci > 0 Then disp = Trim(Left(pn, ci - 1)) & ", " & _
+                Left(Trim(Mid(pn, ci + 1)), 1) & "."
+        End If
+        If Len(pfx & "  -  " & disp) > 40 Then disp = Left(disp, 40 - Len(pfx) - 7) & ".."
+        msg = pfx & "  -  " & disp
+    End If
+    ebox.TextFrame2.TextRange.Text = msg
+    ebox.TextFrame2.TextRange.Font.Size = 9
+    ebox.TextFrame2.TextRange.Font.Bold = msoTrue
+    ebox.TextFrame2.TextRange.Font.Fill.ForeColor.RGB = RGB(255, 255, 255)
     On Error GoTo 0
 End Sub
 
@@ -4267,6 +4336,24 @@ Public Sub ReviewMedications()
         Exit Sub
     End If
 
+    ' Rows are now validated (blue = OK). Before auto-checking them green for printing,
+    ' ask whether the volunteer wants them all checked.
+    Dim okCount As Long, rc As Long
+    okCount = 0
+    For rc = MEDS_HDR_ROWS + 1 To lastRow
+        If Trim(ws.Cells(rc, C_NAME).Value) <> "" And Trim(ws.Cells(rc, C_WARN).Value) = "OK" Then _
+            okCount = okCount + 1
+    Next rc
+    Dim autoCheck As Boolean
+    autoCheck = False
+    If okCount > 0 Then
+        autoCheck = (MsgBox(okCount & " medication(s) passed review (blue)." & vbCrLf & vbCrLf & _
+            "Check them ALL for printing now?" & vbCrLf & vbCrLf & _
+            "Yes  =  check all (they turn green)" & vbCrLf & _
+            "No   =  leave them; check the ones you want", _
+            vbYesNo + vbQuestion, "Check all passing meds?") = vbYes)
+    End If
+
     Dim n As Integer, flagged As Integer
     n = 0 : flagged = 0
 
@@ -4298,7 +4385,7 @@ Public Sub ReviewMedications()
             If Trim(ws.Cells(r, C_WARN).Value) = "OK" Then
                 isOK = True
                 errTxt = "Ready to print."
-                ws.Cells(r, C_SEL).Value = ChrW(10003)   ' auto-check passing meds
+                If autoCheck Then ws.Cells(r, C_SEL).Value = ChrW(10003)   ' auto-check passing meds (only if the volunteer said Yes)
                 Call ApplyRowState(ws, r)
             Else
                 isOK = False
@@ -4319,11 +4406,17 @@ Public Sub ReviewMedications()
 
     Dim foot As String
     If flagged = 0 Then
-        foot = "All " & n & " look complete - checked and ready to print. " & _
-               "Uncheck any you don't want."
+        If autoCheck Then
+            foot = "All " & n & " look complete - checked (green) and ready to print. Uncheck any you don't want."
+        Else
+            foot = "All " & n & " look complete (blue). Check the ones you want to print - they turn green."
+        End If
     Else
-        foot = flagged & " of " & n & " still need attention (highlighted cells). " & _
-               "Passing meds are auto-checked for printing."
+        If autoCheck Then
+            foot = flagged & " of " & n & " still need attention (highlighted cells). Passing meds are checked for printing."
+        Else
+            foot = flagged & " of " & n & " still need attention (highlighted cells). Complete rows are blue - check the ones to print."
+        End If
     End If
 
     If usedForm Then
@@ -4574,6 +4667,7 @@ Public Sub UpdateLabelPreviewForMedRow(ByVal medRow As Long, Optional ByVal refr
     medLine = medName
     If strength <> "" Then medLine = medLine & " " & strength
     Dim refills As String: refills = Trim(wsM.Cells(medRow, C_REF).Value)
+    Dim srcv As String: srcv = Trim(wsM.Cells(medRow, C_SRC).Value)
     Dim fq As String
     fq = formTxt
     If qty <> "" Then
@@ -4581,6 +4675,13 @@ Public Sub UpdateLabelPreviewForMedRow(ByVal medRow As Long, Optional ByVal refr
             fq = fq & "   " & Chr(183) & "   Qty " & qty
         Else
             fq = "Qty " & qty
+        End If
+    End If
+    If srcv <> "" Then
+        If fq <> "" Then
+            fq = fq & "   " & Chr(183) & "   " & srcv
+        Else
+            fq = srcv
         End If
     End If
     If refills <> "" Then
@@ -4593,7 +4694,7 @@ Public Sub UpdateLabelPreviewForMedRow(ByVal medRow As Long, Optional ByVal refr
 
     Dim pn As String: pn = IIf(patName <> "", patName, "[Patient Name]")
     wsL.Cells(5, 1).Value = pn
-    wsL.Cells(5, 1).Font.Size = 12       ' Name/DOB a bit smaller than the medication line
+    wsL.Cells(5, 1).Font.Size = LabelNameFontSize(pn)   ' shrink long names so they fit
     wsL.Cells(5, 5).Value = "DOB  " & IIf(dob <> "", dob, "--")
     wsL.Cells(5, 5).Font.Size = 12
 
