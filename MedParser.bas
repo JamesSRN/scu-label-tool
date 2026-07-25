@@ -1646,14 +1646,16 @@ Private Sub SetMiniValue(c As Range, miniText As String, valueText As String, vS
 End Sub
 
 Private Function MedFontSize(ByVal s As String) As Single
-    ' Keep the hero medication line on one line by stepping the size down
+    ' Keep the hero medication line on one line by stepping the size down. Sizes are kept a
+    ' little conservative so a single line clears the 20 pt name row with margin even on a
+    ' printer whose font metrics render slightly taller (belt-and-suspenders vs the overlap).
     Dim n As Long: n = Len(s)
     If n <= 24 Then
-        MedFontSize = 14
+        MedFontSize = 13
     ElseIf n <= 30 Then
-        MedFontSize = 12.5
+        MedFontSize = 12
     ElseIf n <= 38 Then
-        MedFontSize = 11
+        MedFontSize = 10.5
     Else
         MedFontSize = 10
     End If
@@ -1902,17 +1904,19 @@ Private Sub BuildAllLabelsPreview()
         ws.Range(ws.Cells(base + 3, 1), ws.Cells(base + 3, 6)).Merge
         ws.Cells(base + 3, 1).Value = medLine
         Call FmtLbl(ws.Cells(base + 3, 1), 13, True, "L", "C")
-        ws.Cells(base + 3, 1).WrapText = True
         Dim medWrap As Boolean: medWrap = (Len(medLine) > MED_WRAP_MAXLEN)
         If medWrap Then
+            ws.Cells(base + 3, 1).WrapText = True     ' long name: 2-line wrap allowed
             ws.Cells(base + 3, 1).Font.Size = MED_WRAP_FONT
         Else
+            ws.Cells(base + 3, 1).WrapText = False    ' one line: never overflow onto qty
             ws.Cells(base + 3, 1).Font.Size = MedFontSize(medLine)
         End If
 
         ws.Range(ws.Cells(base + 4, 1), ws.Cells(base + 4, 4)).Merge
         ws.Cells(base + 4, 1).Value = fq
         Call FmtLbl(ws.Cells(base + 4, 1), 8, False, "L", "C")
+        ws.Cells(base + 4, 1).WrapText = False    ' qty line stays one line (never overflow)
         ws.Range(ws.Cells(base + 4, 5), ws.Cells(base + 4, 6)).Merge
         ws.Cells(base + 4, 5).Value = "Rx " & IIf(dateRx <> "", dateRx, "--")
         Call FmtLbl(ws.Cells(base + 4, 5), 8, False, "R", "C")
@@ -4700,16 +4704,21 @@ Public Sub UpdateLabelPreviewForMedRow(ByVal medRow As Long, Optional ByVal refr
 
     wsL.Cells(7, 1).Value = medLine
     wsL.Cells(7, 1).Font.Bold = True
-    wsL.Cells(7, 1).WrapText = True
     If Len(medLine) > MED_WRAP_MAXLEN Then
         ' Long name: wrap to two lines at a readable size (uses the white space in
         ' the med band) instead of shrinking to a tiny single line. Row 7 grows and
         ' the spacer rows 13/14 shrink so the A1:H15 print area height is preserved.
+        wsL.Cells(7, 1).WrapText = True
         wsL.Cells(7, 1).Font.Size = MED_WRAP_FONT
         wsL.Rows(7).RowHeight = 28
         wsL.Rows(13).RowHeight = 1
         wsL.Rows(14).RowHeight = 1
     Else
+        ' One line: WrapText OFF so the name can NEVER spill onto the Qty row. With
+        ' WrapText on + a fixed row height, a printer whose font metrics measure the
+        ' line as taller than the row overflows it downward (this made every label
+        ' overprint the Qty row on a different PC). Off = clip to the row instead.
+        wsL.Cells(7, 1).WrapText = False
         wsL.Cells(7, 1).Font.Size = MedFontSize(medLine)
         wsL.Rows(7).RowHeight = 20
         wsL.Rows(13).RowHeight = 3
@@ -4717,6 +4726,7 @@ Public Sub UpdateLabelPreviewForMedRow(ByVal medRow As Long, Optional ByVal refr
     End If
 
     wsL.Cells(8, 1).Value = fq
+    wsL.Cells(8, 1).WrapText = False   ' qty/source/refills stays one line (never overflow)
     wsL.Cells(8, 6).Value = "Rx  " & IIf(dateRx <> "", dateRx, "--")
 
     Dim sigText As String
