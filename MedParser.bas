@@ -145,6 +145,7 @@ Private gLastBatchVol As String
 Private gEditingEncounter As Long   ' >0 while a past encounter is loaded for editing; 0 otherwise
 Private gEncLabel As String         ' Encounter-column display label ("1" or "1 (v2)"); "" = use the number
 Private gBuilding As Boolean        ' True only while SetupWorkbook runs (fast-build mode)
+Private gInTebraFill As Boolean     ' re-entrancy guard: True while FillTebraTemplate runs
 
 ' V2: append each print to a dated local CSV archive (PHI - stays on this machine,
 ' git-ignored) so the day's dispensing record survives the on-close Log wipe.
@@ -417,11 +418,11 @@ Private Sub BuildQuickStartSheet()
     Call GuideStep(ws, 5, 1, RGB(21, 101, 192), "Patient & Input   (blue tab)", _
         "Open the '1. Patient & Input' tab. Type the patient's NAME and DOB, paste the medication list into the big box, then click PARSE MEDICATIONS.")
     Call GuideStep(ws, 10, 2, RGB(46, 125, 50), "Medications   (green tab)", _
-        "On the '2. Medications' tab, fill any RED cell (Expiration / Lot) and pick a SOURCE for any YELLOW cell. Click 'Review & Validate'. Passing meds are checked automatically - double-click a 'Check Med' cell to add or remove one (a green row will print).")
+        "On the '2. Medications' tab, fill any RED cell (Expiration / Lot) and pick a SOURCE for any YELLOW cell. Click 'Review & Validate', then check the meds to print: double-click a 'Check Med' cell to (un)check one, or double-click the 'Check Med' HEADER to (un)check them all (green rows print).")
     Call GuideStep(ws, 15, 3, RGB(216, 67, 21), "Print Labels   (orange tab)", _
         "Click 'Preview ALL Labels' to open the '3. Print Labels' tab. Check that the labels look right, then click 'Print Checked Labels' and enter your initials. TWO labels print for each checked med.")
     Call GuideStep(ws, 20, 4, RGB(106, 27, 154), "Log   (purple tab)", _
-        "Everything you print is recorded on the '4. Log' tab automatically, grouped by patient visit ('Encounter') in cycling green. Nothing to do here - it is your record.")
+        "Everything you print is recorded on the '4. Log' tab automatically, grouped by patient visit ('Encounter'), each visit a different color. Nothing to do here - it is your record.")
     Call GuideStep(ws, 25, 5, RGB(0, 131, 143), "Tebra Notes   (teal tab)", _
         "The '5. Tebra Notes' tab builds a ready-to-paste note for each patient, grouped by source. Copy it into Tebra.")
 
@@ -650,6 +651,8 @@ End Sub
 ' reconciliation/counseling note, with "Medications Dispensed in Clinic" filled from the
 ' current patient's medications. Wired to a button and rebuilt each Setup.
 Public Sub FillTebraTemplate()
+    If gInTebraFill Then Exit Sub        ' re-entrancy guard (the Tebra tab's own Activate calls this)
+    gInTebraFill = True
     On Error Resume Next
     Dim ws As Worksheet, wsLg As Worksheet
     Set ws = EnsureTebraSheet()
@@ -751,6 +754,7 @@ Public Sub FillTebraTemplate()
     ws.Cells(1, 1).Select
     If Not gBuilding Then Application.ScreenUpdating = True
     On Error GoTo 0
+    gInTebraFill = False
 End Sub
 
 Public Sub SetupWorkbook()
@@ -959,6 +963,7 @@ Public Sub SetupWorkbook()
     ' # of Prints / Print? column numbers, which the reorder shifted). Runs at build time
     ' only (Build-Release has VBA-project trust); volunteers get the baked-in handler.
     Call InstallMedSheetEvents(ws2)
+    Call InstallTebraAutoRefresh          ' rebuild Tebra from the Log on tab-open (picks up hand-added Log rows)
     Call ApplyAllRowStates(ws2)
 
     ' Dispense Log header row written entirely by code (via LG_* constants) so the column
@@ -1739,6 +1744,36 @@ Private Function EnsureAllLabelsSheet() As Worksheet
     ' (was: Call InstallAutoRefresh(ws) - now a preinstalled Worksheet_Activate handler)
     Set EnsureAllLabelsSheet = ws
 End Function
+
+' Inject a Worksheet_Activate handler on the Tebra sheet so the note rebuilds FROM THE LOG
+' every time the user opens the tab. This is what makes a row hand-added to the Log (with no
+' print) appear in Tebra - just click onto the "5. Tebra Notes" tab. Guarded with
+' EnableEvents so FillTebraTemplate's own Activate can't re-fire it. Runs at build time
+' (Build-Release has VBA-project trust); volunteers get the baked-in handler.
+Private Sub InstallTebraAutoRefresh()
+    On Error Resume Next
+    Dim ws As Worksheet
+    Set ws = ThisWorkbook.Sheets(SH_TEBRA)
+    If ws Is Nothing Then Exit Sub
+    Dim cm As Object
+    Set cm = ThisWorkbook.VBProject.VBComponents(ws.CodeName).CodeModule
+    If cm Is Nothing Then Exit Sub
+    Dim startLine As Long, numLines As Long
+    startLine = cm.ProcStartLine("Worksheet_Activate", 0)
+    If startLine > 0 Then
+        numLines = cm.ProcCountLines("Worksheet_Activate", 0)
+        cm.DeleteLines startLine, numLines
+    End If
+    cm.AddFromString _
+        "Private Sub Worksheet_Activate()" & vbCrLf & _
+        "    On Error Resume Next" & vbCrLf & _
+        "    Application.EnableEvents = False" & vbCrLf & _
+        "    FillTebraTemplate" & vbCrLf & _
+        "    Application.EnableEvents = True" & vbCrLf & _
+        "    On Error GoTo 0" & vbCrLf & _
+        "End Sub"
+    On Error GoTo 0
+End Sub
 
 Private Sub InstallAutoRefresh(ws As Worksheet)
     ' Inject a Worksheet_Activate handler so the gallery rebuilds whenever the
@@ -2650,7 +2685,15 @@ Public Sub ClearLogSilent()
     If wsLog Is Nothing Then Exit Sub
     Dim lastLog As Long
     lastLog = wsLog.Cells(wsLog.Rows.Count, 1).End(xlUp).Row
-    If lastLog > LOG_HDR_ROWS Then wsLog.Range(wsLog.Cells(LOG_HDR_ROWS + 1, 1), wsLog.Cells(lastLog, LG_LAST)).ClearContents
+    If lastLog > LOG_HDR_ROWS Then
+        With wsLog.Range(wsLog.Cells(LOG_HDR_ROWS + 1, 1), wsLog.Cells(lastLog, LG_LAST))
+            .ClearContents
+            .Interior.ColorIndex = xlNone            ' drop encounter shading so a blank Log
+            .Borders(xlEdgeTop).LineStyle = xlNone   ' opens with NO residual highlighting
+            .Borders(xlEdgeBottom).LineStyle = xlNone
+            .Borders(xlInsideHorizontal).LineStyle = xlNone
+        End With
+    End If
     Call ClearEncounterStore   ' encounters share the Log's lifecycle (kept on New Patient, wiped on full reset/close)
     On Error GoTo 0
 End Sub
@@ -3712,6 +3755,39 @@ Public Sub LiveRefreshRow(ByVal r As Long)
     Call ApplyRowState(ws, r)
 End Sub
 
+' Check ALL meds if any are currently unchecked; otherwise uncheck ALL. Wired to a
+' double-click on the "Check Med" column header so a volunteer can (un)check the whole
+' list in one action instead of Review checking everything automatically.
+Public Sub CheckAllToggle()
+    Dim ws As Worksheet
+    Set ws = ThisWorkbook.Sheets(SH_MEDS)
+    Dim lastRow As Long, r As Long, anyUnchecked As Boolean
+    lastRow = ws.Cells(ws.Rows.Count, C_NAME).End(xlUp).Row
+    anyUnchecked = False
+    For r = MEDS_HDR_ROWS + 1 To lastRow
+        If Trim(ws.Cells(r, C_NAME).Value) <> "" Then
+            If Trim(ws.Cells(r, C_SEL).Value) = "" Then
+                anyUnchecked = True
+                Exit For
+            End If
+        End If
+    Next r
+    Dim savedEE As Boolean
+    savedEE = Application.EnableEvents
+    Application.EnableEvents = False
+    For r = MEDS_HDR_ROWS + 1 To lastRow
+        If Trim(ws.Cells(r, C_NAME).Value) <> "" Then
+            If anyUnchecked Then
+                ws.Cells(r, C_SEL).Value = ChrW(10003)   ' check all
+            Else
+                ws.Cells(r, C_SEL).Value = ""            ' uncheck all
+            End If
+            Call ApplyRowState(ws, r)
+        End If
+    Next r
+    Application.EnableEvents = savedEE
+End Sub
+
 Private Sub InstallMedSheetEvents(ws As Worksheet)
     ' Inject Worksheet_BeforeDoubleClick so double-clicking the Print? cell
     ' toggles selection. Needs trust access to the VBA project object model.
@@ -3731,6 +3807,12 @@ Private Sub InstallMedSheetEvents(ws As Worksheet)
         "    ' Prints (#) column is auto-managed - block editing it" & vbCrLf & _
         "    If Target.Column = " & C_CNT & " Then" & vbCrLf & _
         "        Cancel = True" & vbCrLf & _
+        "        Exit Sub" & vbCrLf & _
+        "    End If" & vbCrLf & _
+        "    ' Double-click the 'Check Med' HEADER to check / uncheck ALL meds at once" & vbCrLf & _
+        "    If Target.Column = " & C_SEL & " And Target.Row = " & MEDS_HDR_ROWS & " Then" & vbCrLf & _
+        "        Cancel = True" & vbCrLf & _
+        "        CheckAllToggle" & vbCrLf & _
         "        Exit Sub" & vbCrLf & _
         "    End If" & vbCrLf & _
         "    ' Double-click the Check Med box OR the Medication name to toggle the check" & vbCrLf & _
@@ -4340,23 +4422,9 @@ Public Sub ReviewMedications()
         Exit Sub
     End If
 
-    ' Rows are now validated (blue = OK). Before auto-checking them green for printing,
-    ' ask whether the volunteer wants them all checked.
-    Dim okCount As Long, rc As Long
-    okCount = 0
-    For rc = MEDS_HDR_ROWS + 1 To lastRow
-        If Trim(ws.Cells(rc, C_NAME).Value) <> "" And Trim(ws.Cells(rc, C_WARN).Value) = "OK" Then _
-            okCount = okCount + 1
-    Next rc
-    Dim autoCheck As Boolean
-    autoCheck = False
-    If okCount > 0 Then
-        autoCheck = (MsgBox(okCount & " medication(s) passed review (blue)." & vbCrLf & vbCrLf & _
-            "Check them ALL for printing now?" & vbCrLf & vbCrLf & _
-            "Yes  =  check all (they turn green)" & vbCrLf & _
-            "No   =  leave them; check the ones you want", _
-            vbYesNo + vbQuestion, "Check all passing meds?") = vbYes)
-    End If
+    ' Review no longer auto-checks meds. The volunteer checks the ones they want to print:
+    ' double-click a "Check Med" cell to (un)check one, or double-click the "Check Med"
+    ' HEADER to (un)check the whole list at once (CheckAllToggle).
 
     Dim n As Integer, flagged As Integer
     n = 0 : flagged = 0
@@ -4389,7 +4457,6 @@ Public Sub ReviewMedications()
             If Trim(ws.Cells(r, C_WARN).Value) = "OK" Then
                 isOK = True
                 errTxt = "Ready to print."
-                If autoCheck Then ws.Cells(r, C_SEL).Value = ChrW(10003)   ' auto-check passing meds (only if the volunteer said Yes)
                 Call ApplyRowState(ws, r)
             Else
                 isOK = False
@@ -4410,17 +4477,11 @@ Public Sub ReviewMedications()
 
     Dim foot As String
     If flagged = 0 Then
-        If autoCheck Then
-            foot = "All " & n & " look complete - checked (green) and ready to print. Uncheck any you don't want."
-        Else
-            foot = "All " & n & " look complete (blue). Check the ones you want to print - they turn green."
-        End If
+        foot = "All " & n & " look complete (blue). Check the ones you want to print - they turn green" & _
+               " (or double-click the 'Check Med' header to check them all)."
     Else
-        If autoCheck Then
-            foot = flagged & " of " & n & " still need attention (highlighted cells). Passing meds are checked for printing."
-        Else
-            foot = flagged & " of " & n & " still need attention (highlighted cells). Complete rows are blue - check the ones to print."
-        End If
+        foot = flagged & " of " & n & " still need attention (highlighted cells). Complete rows are blue - " & _
+               "check the ones to print (or the 'Check Med' header to check all)."
     End If
 
     If usedForm Then
@@ -5129,13 +5190,13 @@ Private Sub LogPrint(ByVal medRow As Long, ByVal vol As String, ByVal encounter 
     End If
     wsLg.Cells(nextLog, LG_INIT).Value = vol                             ' Initials
 
-    ' Shade the whole row by encounter, cycling 3 greens, so each patient's print reads
-    ' as one clearly-bounded block in the Log.
+    ' Shade the whole row by encounter, cycling light green -> light blue -> white, so each
+    ' patient's print reads as one clearly-bounded block in the Log.
     Dim encColor As Long
     Select Case (encounter - 1) Mod 3
-        Case 0:    encColor = RGB(232, 245, 233)   ' lightest green
-        Case 1:    encColor = RGB(200, 230, 201)   ' light green
-        Case Else: encColor = RGB(165, 214, 167)   ' medium green
+        Case 0:    encColor = RGB(226, 239, 218)   ' light green
+        Case 1:    encColor = RGB(221, 235, 247)   ' light blue
+        Case Else: encColor = RGB(255, 255, 255)   ' white
     End Select
 
     Dim c As Integer
@@ -5491,7 +5552,7 @@ Public Sub SaveEditedEncounter()
     gEncLabel = EncLabel(encNum, EncounterNextVersion(encNum))
     Call DeleteRowsByEncounter(wsLg, LG_ENC, encNum, LOG_HDR_ROWS + 1)   ' drop old Log rows
     Call SaveEncounterSnapshot(encNum)                                    ' refresh snapshot
-    For r = MEDS_HDR_ROWS + 1 To lastMed                                  ' re-log under same #
+    For r = MEDS_HDR_ROWS + 1 To lastMed                                  ' re-log ALL meds under same # (checked or not)
         If Trim(wsM.Cells(r, C_NAME).Value) <> "" Then
             Call LogPrint(r, Trim(vol & " (edited)"), encNum)
         End If
@@ -5505,11 +5566,23 @@ Public Sub SaveEditedEncounter()
     On Error GoTo 0
 
     Call SetEditingEncounter(0)
-    If MsgBox("Encounter " & encNum & " updated in the Log and Tebra note." & vbCrLf & vbCrLf & _
-        "Reprint the CHECKED labels now (2 copies each)?", _
-        vbYesNo + vbQuestion, "Reprint?") = vbYes Then
+    ' ALL meds were logged above; only the CHECKED ones get a reprinted label. Show the
+    ' checked count so "reprint" can never surprise-print the whole list.
+    Dim chkCount As Long: chkCount = 0
+    For r = MEDS_HDR_ROWS + 1 To lastMed
+        If Trim(wsM.Cells(r, C_NAME).Value) <> "" And IsRowSelected(wsM, r) Then chkCount = chkCount + 1
+    Next r
+    Dim doReprint As Boolean: doReprint = False
+    If chkCount > 0 Then
+        doReprint = (MsgBox("Encounter " & encNum & " updated in the Log and Tebra note." & vbCrLf & vbCrLf & _
+            "Reprint the " & chkCount & " CHECKED label(s) now (" & LABEL_COPIES & " copies each)?" & vbCrLf & _
+            "Unchecked meds are logged but not reprinted.", _
+            vbYesNo + vbQuestion, "Reprint?") = vbYes)
+    End If
+    If doReprint Then
         Call PrintEncounterLabelsNoLog
     Else
+        MsgBox "Encounter " & encNum & " updated in the Log and Tebra note.", vbInformation, "Saved"
         Call ShowLogSheet
     End If
 End Sub
