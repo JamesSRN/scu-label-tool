@@ -16,4 +16,6 @@ echo.
 pause >nul
 echo.
 echo    Opening... follow the Excel pop-ups that appear.
-start "" "Build-Release.vbs"
+rem Invoke the script host explicitly so this never depends on the .vbs file association
+rem (an editor grabbing .vbs is what makes the launcher "flash and do nothing").
+wscript "%~dp0Build-Release.vbs"

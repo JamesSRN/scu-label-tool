@@ -1721,7 +1721,15 @@ End Function
 '  PREVIEW ALL LABELS  (generated gallery + per-label actions)
 ' ============================================================
 Public Sub PreviewAllLabels()
+    Call AppReady                    ' un-stick events/screen from any interrupted prior action
+    On Error GoTo Fail
     Call BuildAllLabelsPreview
+    Exit Sub
+Fail:
+    Call AppReady
+    MsgBox "Something went wrong while building the label previews." & vbCrLf & _
+        "Nothing was harmed - click a main button and try again." & vbCrLf & vbCrLf & _
+        "Details: " & Err.Description, vbExclamation, "Preview error"
 End Sub
 
 Private Function EnsureAllLabelsSheet() As Worksheet
@@ -2091,14 +2099,24 @@ Public Sub RowPrint()
 End Sub
 
 Public Sub RowCheck()
+    Call AppReady                    ' un-stick events/screen from any interrupted prior action
+    On Error GoTo Fail
     Dim r As Long
     r = CallerRow()
     If r <= MEDS_HDR_ROWS Then Exit Sub
     Call ToggleRowSelect(r)
     Call BuildAllLabelsPreview
+    Exit Sub
+Fail:
+    Call AppReady
+    MsgBox "Something went wrong while checking that label." & vbCrLf & _
+        "Nothing was harmed - click a main button and try again." & vbCrLf & vbCrLf & _
+        "Details: " & Err.Description, vbExclamation, "Check label error"
 End Sub
 
 Public Sub RowRemove()
+    Call AppReady                    ' un-stick events/screen from any interrupted prior action
+    On Error GoTo Fail
     Dim r As Long
     r = CallerRow()
     If r <= MEDS_HDR_ROWS Then Exit Sub
@@ -2134,18 +2152,30 @@ Public Sub RowRemove()
     End If
 
     ' Delete the table columns (1..C_LAST, the full row) and shift up; side buttons stay.
+    ' Save/restore EnableEvents so a failed delete can't leave events stuck off (the Fail
+    ' handler also re-enables them via AppReady).
+    Dim savedEE As Boolean
+    savedEE = Application.EnableEvents
     Application.EnableEvents = False
     wsM.Range(wsM.Cells(r, 1), wsM.Cells(r, C_LAST)).Delete Shift:=xlUp
-    Application.EnableEvents = True
+    Application.EnableEvents = savedEE
 
     Call RenumberMeds
     Call ValidateMedications(False)
     Call ApplyAllRowStates(wsM)
     Call ApplySourceValidation(wsM)
     Call BuildAllLabelsPreview
+    Exit Sub
+Fail:
+    Call AppReady
+    MsgBox "Something went wrong while removing that medication." & vbCrLf & _
+        "Nothing was harmed - click a main button and try again." & vbCrLf & vbCrLf & _
+        "Details: " & Err.Description, vbExclamation, "Remove error"
 End Sub
 
 Public Sub RowEdit()
+    Call AppReady                    ' un-stick events/screen from any interrupted prior action
+    On Error GoTo Fail
     Dim r As Long
     r = CallerRow()
     If r <= MEDS_HDR_ROWS Then Exit Sub
@@ -2172,6 +2202,12 @@ Public Sub RowEdit()
 
     Call ValidateMedications(False)
     Call BuildAllLabelsPreview
+    Exit Sub
+Fail:
+    Call AppReady
+    MsgBox "Something went wrong while editing that medication." & vbCrLf & _
+        "Nothing was harmed - click a main button and try again." & vbCrLf & vbCrLf & _
+        "Details: " & Err.Description, vbExclamation, "Edit medication error"
 End Sub
 
 Private Function EditMedWithForm(wsM As Worksheet, r As Long) As Boolean
@@ -2402,6 +2438,8 @@ End Sub
 ' ============================================================
 
 Public Sub ParseMedications()
+    Call AppReady                    ' un-stick events/screen from any interrupted prior action
+    On Error GoTo Fail
     Dim wsIn  As Worksheet
     Dim wsMed As Worksheet
     Set wsIn  = ThisWorkbook.Sheets(SH_INPUT)
@@ -2541,18 +2579,34 @@ Public Sub ParseMedications()
         ' Validate + show the full review of every medication
         Call ReviewMedications
     End If
+    Exit Sub
+Fail:
+    Call AppReady
+    MsgBox "Something went wrong while parsing the medications." & vbCrLf & _
+        "Nothing was harmed - check the pasted text and try again." & vbCrLf & vbCrLf & _
+        "Details: " & Err.Description, vbExclamation, "Parse error"
 End Sub
 
 Public Sub ClearPasteArea()
+    Call AppReady                    ' un-stick events/screen from any interrupted prior action
+    On Error GoTo Fail
     Dim ws As Worksheet
     Set ws = ThisWorkbook.Sheets(SH_INPUT)
     ws.Range("B12").Value = ""
     ws.Range("C12").Value = ""
     ws.Activate
     ws.Range("B12").Select
+    Exit Sub
+Fail:
+    Call AppReady
+    MsgBox "Something went wrong while clearing the paste box." & vbCrLf & _
+        "Nothing was harmed - click a main button and try again." & vbCrLf & vbCrLf & _
+        "Details: " & Err.Description, vbExclamation, "Clear paste error"
 End Sub
 
 Public Sub ResetSession()
+    Call AppReady                    ' un-stick events/screen from any interrupted prior action
+    On Error GoTo Fail
     If MsgBox("FULL RESET: clear ALL patient data, the medication list, AND the" & vbCrLf & _
               "entire dispense Log, and start completely fresh?" & vbCrLf & vbCrLf & _
               "(This cannot be undone. To keep the Log, use 'Start NEW Patient' instead.)", _
@@ -2598,12 +2652,20 @@ Public Sub ResetSession()
     Call ShowSheetTopLeft(wsIn, "C5")
     MsgBox "Full reset complete - patient, medications, and Log cleared." & vbCrLf & _
            "Ready for a fresh session.", vbInformation, "Reset Complete"
+    Exit Sub
+Fail:
+    Call AppReady
+    MsgBox "Something went wrong while resetting the session." & vbCrLf & _
+        "Nothing was harmed - click a main button and try again." & vbCrLf & vbCrLf & _
+        "Details: " & Err.Description, vbExclamation, "Reset error"
 End Sub
 
 ' ============================================================
 '  START NEW PATIENT  (clears current patient + meds, KEEPS the Log)
 ' ============================================================
 Public Sub StartNewPatient()
+    Call AppReady                    ' un-stick events/screen from any interrupted prior action
+    On Error GoTo Fail
     If MsgBox("Start a NEW patient?" & vbCrLf & vbCrLf & _
               "This clears the current patient name, DOB, pasted text, and the" & vbCrLf & _
               "medication list so you can enter the next patient." & vbCrLf & vbCrLf & _
@@ -2630,6 +2692,12 @@ Public Sub StartNewPatient()
     Call ShowSheetTopLeft(wsIn, "C5")
     MsgBox "Ready for the next patient." & vbCrLf & "The dispense Log was kept.", _
            vbInformation, "New Patient"
+    Exit Sub
+Fail:
+    Call AppReady
+    MsgBox "Something went wrong while starting a new patient." & vbCrLf & _
+        "Nothing was harmed - click a main button and try again." & vbCrLf & vbCrLf & _
+        "Details: " & Err.Description, vbExclamation, "New patient error"
 End Sub
 
 Public Sub ClearSessionSilent()
@@ -3722,6 +3790,7 @@ Public Sub ToggleRowSelect(ByVal r As Long)
     ' unchecking should only toggle green <-> its reviewed state (blue if still OK).
     Dim savedEE As Boolean
     savedEE = Application.EnableEvents
+    On Error GoTo restore                ' guarantee events are turned back on even on error
     Application.EnableEvents = False
     If Trim(ws.Cells(r, C_SEL).Value) = "" Then
         ws.Cells(r, C_SEL).Value = ChrW(10003)
@@ -3729,7 +3798,9 @@ Public Sub ToggleRowSelect(ByVal r As Long)
         ws.Cells(r, C_SEL).Value = ""
     End If
     Call ApplyRowState(ws, r)
+restore:
     Application.EnableEvents = savedEE
+    On Error GoTo 0
 End Sub
 
 Private Sub ApplyAllRowStates(ws As Worksheet)
@@ -3755,6 +3826,18 @@ Public Sub LiveRefreshRow(ByVal r As Long)
     Call ApplyRowState(ws, r)
 End Sub
 
+' Self-heal, called at the top of the main buttons: undo any app state a previous
+' interrupted routine may have left stuck. A stuck Application.EnableEvents = False
+' silently breaks the double-click check/uncheck; a stuck ScreenUpdating leaves the
+' screen frozen. Cheap, safe, idempotent - so one button click un-sticks the app.
+Private Sub AppReady()
+    On Error Resume Next
+    Application.EnableEvents = True
+    Application.ScreenUpdating = True
+    Application.StatusBar = False
+    On Error GoTo 0
+End Sub
+
 ' Check ALL meds if any are currently unchecked; otherwise uncheck ALL. Wired to a
 ' double-click on the "Check Med" column header so a volunteer can (un)check the whole
 ' list in one action instead of Review checking everything automatically.
@@ -3774,6 +3857,7 @@ Public Sub CheckAllToggle()
     Next r
     Dim savedEE As Boolean
     savedEE = Application.EnableEvents
+    On Error GoTo restore                ' guarantee events are turned back on even on error
     Application.EnableEvents = False
     For r = MEDS_HDR_ROWS + 1 To lastRow
         If Trim(ws.Cells(r, C_NAME).Value) <> "" Then
@@ -3785,7 +3869,9 @@ Public Sub CheckAllToggle()
             Call ApplyRowState(ws, r)
         End If
     Next r
+restore:
     Application.EnableEvents = savedEE
+    On Error GoTo 0
 End Sub
 
 Private Sub InstallMedSheetEvents(ws As Worksheet)
@@ -3856,6 +3942,7 @@ Private Sub InstallMedSheetEvents(ws As Worksheet)
 End Sub
 
 Public Sub PrintCheckedLabels()
+    Call AppReady                    ' un-stick events/screen from any interrupted prior action
     Dim ws As Worksheet, wsL As Worksheet
     Set ws = ThisWorkbook.Sheets(SH_MEDS)
     Set wsL = ThisWorkbook.Sheets(SH_LABEL)
@@ -4403,7 +4490,15 @@ End Sub
 
 ' Button wrapper for validation alone
 Public Sub RunValidation()
+    Call AppReady                    ' un-stick events/screen from any interrupted prior action
+    On Error GoTo Fail
     Call ValidateMedications(True)
+    Exit Sub
+Fail:
+    Call AppReady
+    MsgBox "Something went wrong while reviewing the medications." & vbCrLf & _
+        "Nothing was harmed - click a main button and try again." & vbCrLf & vbCrLf & _
+        "Details: " & Err.Description, vbExclamation, "Review error"
 End Sub
 
 ' Review the whole medication list with a summary + how to add/remove.
@@ -4514,6 +4609,8 @@ End Function
 
 ' Manually add a medication row.
 Public Sub AddMedicationRow()
+    Call AppReady
+    On Error GoTo Fail
     Dim ws As Worksheet
     Set ws = ThisWorkbook.Sheets(SH_MEDS)
     Dim wsI As Worksheet
@@ -4581,6 +4678,12 @@ Public Sub AddMedicationRow()
     MsgBox rec.MedName & " added." & vbCrLf & _
            "Fill in any missing details - they are highlighted.", _
            vbInformation, "Medication Added"
+    Exit Sub
+Fail:
+    Call AppReady
+    MsgBox "Something went wrong adding the medication row." & vbCrLf & _
+        "Nothing was harmed - try again." & vbCrLf & vbCrLf & _
+        "Details: " & Err.Description, vbExclamation, "Add row error"
 End Sub
 
 ' Collect a new medication via the frmMedEdit form (opened blank, titled "Add
@@ -5399,6 +5502,8 @@ End Sub
 
 ' Reopen a past encounter: show a list, pick a number, restore the patient + full med list.
 Public Sub EditEncounter()
+    Call AppReady                    ' un-stick events/screen from any interrupted prior action
+    On Error GoTo Fail
     Dim wsE As Worksheet
     Set wsE = EncStore()
     Dim last As Long
@@ -5463,6 +5568,12 @@ Public Sub EditEncounter()
         "encounter's saved meds. Finish/print the current patient first if needed.", _
         vbYesNo + vbQuestion, "Edit Encounter") = vbNo Then Exit Sub
     Call LoadEncounter(encNum)
+    Exit Sub
+Fail:
+    Call AppReady
+    MsgBox "Something went wrong opening that encounter." & vbCrLf & _
+        "Nothing was harmed - try again." & vbCrLf & vbCrLf & _
+        "Details: " & Err.Description, vbExclamation, "Edit Encounter error"
 End Sub
 
 ' Restore a snapshot into the Input + Medications tabs and enter editing mode.
@@ -5591,6 +5702,8 @@ End Sub
 ' prints and nothing is logged yet - it just snapshots the work so "Edit Past Encounter"
 ' can reopen it. Printing it later reuses the same encounter number.
 Public Sub SaveEncounterDraft()
+    Call AppReady                    ' un-stick events/screen from any interrupted prior action
+    On Error GoTo Fail
     Dim wsM As Worksheet, wsI As Worksheet
     Set wsM = ThisWorkbook.Sheets(SH_MEDS)
     Set wsI = ThisWorkbook.Sheets(SH_INPUT)
@@ -5622,6 +5735,12 @@ Public Sub SaveEncounterDraft()
         medCount & " medication(s) for " & Trim(wsI.Range("C5").Value) & "." & vbCrLf & vbCrLf & _
         "Reopen it any time with ""Edit Past Encounter"", then print or keep editing.", _
         vbInformation, "Saved for Later"
+    Exit Sub
+Fail:
+    Call AppReady
+    MsgBox "Something went wrong while saving the draft." & vbCrLf & _
+        "Nothing was harmed - click a main button and try again." & vbCrLf & vbCrLf & _
+        "Details: " & Err.Description, vbExclamation, "Save draft error"
 End Sub
 
 ' Print every named med that has Exp + Lot (2 copies each) WITHOUT logging - used by the
@@ -6313,4 +6432,4 @@ End Function
 
 ' ============================================================
 '  AUTO-RUN on workbook open
-' ===========================================
+' ===========================================

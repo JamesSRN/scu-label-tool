@@ -1,5 +1,7 @@
 # Patient data / PHI - never commit
-*.xlsm
+# NOTE: *.xlsm is intentionally NOT ignored - MedicationDispensing.xlsm auto-wipes
+# all patient data + the Log on close, so the tracked copy carries no PHI. Commit a
+# freshly-rebuilt (closed) workbook. Other spreadsheet exports stay ignored.
 *.xlsx
 *.xls
 *.csv
@@ -20,6 +22,4 @@ tools/*.generated.txt
 # Release ZIPs are attached to GitHub Releases, not committed (may bundle the workbook)
 dist/
 
-# Clean template MAY be tracked despite the *.xlsm rule above (no PHI). Uncomment the
-# exception if you move a PHI-free template into templates\ (see tools/reorg-v2.ps1):
-# !templates/Template_MedicationDispensing.xlsm
+# (The workbook itself is now tracked - see the *.xlsm note at the top of this file.)

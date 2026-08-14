@@ -55,13 +55,13 @@ Enter the patient's **name + DOB**, paste the prescription text into the big box
 
 Each drug becomes one row — name, strength, form, directions (SIG), quantity, refills, expiration, and lot. **Refills default to 0** and a **Source** dropdown (DOH / IN HOUSE / RxAPS / Other) is required.
 
-Highlights update **live as you type** — a missing **Quantity / Expiration / Lot / Source** cell is **yellow** and clears to **white** the instant you fill it. Then click **Review**: complete rows validate to **blue**, and you're asked whether to **check them all** for printing (they turn **green**) or leave them to check individually. The Review pop-up lists each drug's **name + strength in bold** with any issues stacked beneath.
+Highlights update **live as you type** — a missing **Quantity / Expiration / Lot / Source** cell is **yellow** and clears to **white** the instant you fill it. Then click **Review**: complete rows validate to **blue**. Review no longer auto-checks anything — you choose what prints: **double-click a Check Med cell** to check one (it turns **green**), or **double-click the "Check Med" column header** to check / uncheck the whole list at once. The Review pop-up lists each drug's **name + strength in bold** with any issues stacked beneath.
 
 ![Medications tab](support/assets/screenshots/medications-tab.png)
 
 ![Medication Review — errors listed under each drug, missing cells highlighted yellow](support/assets/screenshots/review-dialog.png)
 
-> **Row colors at a glance:** yellow cell = missing · **white** = filled, not yet reviewed · **blue** = reviewed OK · **green** = checked to print. Double-click a **Check Med** box (or the medication name) to check/uncheck. **+ Add Medication** and **Edit this med** share the same one-dialog editor.
+> **Row colors at a glance:** yellow cell = missing · **white** = filled, not yet reviewed · **blue** = reviewed OK · **green** = checked to print. Double-click a **Check Med** box (or the medication name) to check/uncheck one, or **double-click the Check Med header** to check/uncheck all. **+ Add Medication** and **Edit this med** share the same one-dialog editor.
 
 ### 3 · Print Labels  (orange)
 
@@ -71,13 +71,13 @@ Every checked med auto-previews as a real label — drug + strength, directions,
 
 ### 4 · Log  (purple)
 
-Every printed label is recorded automatically — timestamp, patient, DOB, medication details, **source**, initials, print count, and **Encounter #**. Each print is one **encounter**: numbered, shaded in cycling greens, and separated by a divider line so each patient reads as one block. Nothing to do here — it's your record.
+Every printed label is recorded automatically — timestamp, patient, DOB, medication details, **source**, initials, print count, and **Encounter #**. Each print is one **encounter**: numbered, shaded by encounter in **cycling light green / light blue / white**, and separated by a divider line so each patient reads as one block. Nothing to do here — it's your record. (The Log clears on close, so it always opens blank with no leftover highlighting.)
 
 ![Dispense Log](support/assets/screenshots/log.png)
 
 ### 5 · Tebra Notes  (teal)
 
-A ready-to-paste note for **each patient**, grouped by source, with each note **boxed** so you can select it, copy, and paste straight into that patient's Tebra chart.
+A ready-to-paste note for **each patient**, grouped by source, with each note **boxed** so you can select it, copy, and paste straight into that patient's Tebra chart. The notes are built **from the Log** and **rebuild every time you open the Tebra Notes tab** — so anything in the Log (even a row you typed in by hand) shows up here automatically.
 
 ![Tebra Notes](support/assets/screenshots/tebra-notes.png)
 
