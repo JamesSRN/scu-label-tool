@@ -1005,6 +1005,12 @@ Public Sub SetupWorkbook()
     wsLog.Cells(2, LG_ENC).HorizontalAlignment = xlCenter
     Call ApplyLogEncounterBorders            ' dividers between encounters (if the Log has rows)
 
+    ' "Copy All" export button, to the RIGHT of the Log (col LG_LAST + 2). Saves the whole
+    ' Log to a new dated .xlsx in a folder the volunteer chooses (ExportLogCopy). Re-created
+    ' each build so it always tracks the current columns.
+    Call AddButtonToSheet(wsLog, "log_copyall", "Copy All", "ExportLogCopy", _
+                          2, LG_LAST + 2, 110, 28, RGB(106, 27, 154))
+
     ' Default Date of Rx to today
     If Trim(ws1.Range("C7").Value) = "" Then
         ws1.Range("C7").Value = Format(Now(), "MM/DD/YYYY")
@@ -2602,6 +2608,73 @@ Fail:
     MsgBox "Something went wrong while clearing the paste box." & vbCrLf & _
         "Nothing was harmed - click a main button and try again." & vbCrLf & vbCrLf & _
         "Details: " & Err.Description, vbExclamation, "Clear paste error"
+End Sub
+
+' Save a copy of the ENTIRE dispense Log to a new, dated .xlsx in a folder the volunteer
+' chooses. Wired to the "Copy All" button placed to the right of the Log by SetupWorkbook.
+' The whole Log sheet (values + encounter shading) is copied into a fresh workbook, the
+' buttons are stripped from the copy, and it is saved as a standalone spreadsheet.
+Public Sub ExportLogCopy()
+    Call AppReady                    ' un-stick events/screen from any interrupted prior action
+    On Error GoTo Fail
+    Dim wsLog As Worksheet
+    Set wsLog = ThisWorkbook.Sheets(SH_LOG)
+    Dim lastLog As Long
+    lastLog = wsLog.Cells(wsLog.Rows.Count, LG_TIME).End(xlUp).Row
+    If lastLog <= LOG_HDR_ROWS Then
+        MsgBox "The Log is empty - there is nothing to copy yet.", vbInformation, "Copy All - Export Log"
+        Exit Sub
+    End If
+
+    ' Let the volunteer pick the destination folder.
+    Dim folderPath As String
+    folderPath = ""
+    On Error Resume Next
+    With Application.FileDialog(msoFileDialogFolderPicker)
+        .Title = "Choose a folder to save the Log copy into"
+        .AllowMultiSelect = False
+        If .Show = -1 Then folderPath = .SelectedItems(1)
+    End With
+    On Error GoTo Fail
+    If folderPath = "" Then Exit Sub          ' cancelled - nothing saved
+    If Right(folderPath, 1) <> "\" Then folderPath = folderPath & "\"
+
+    ' Dated filename, e.g. SCU_Dispense_Log_2026-08-14_1630.xlsx
+    Dim fullPath As String
+    fullPath = folderPath & "SCU_Dispense_Log_" & Format(Now(), "YYYY-MM-DD_HHMM") & ".xlsx"
+
+    ' Copy the whole Log sheet into a NEW workbook, strip the buttons from the copy, save.
+    Application.ScreenUpdating = False
+    wsLog.Copy                                ' -> new single-sheet workbook, now active
+    Dim wbNew As Workbook, wsCopy As Worksheet
+    Set wbNew = ActiveWorkbook
+    Set wsCopy = wbNew.Sheets(1)
+    On Error Resume Next
+    wsCopy.Name = "Dispense Log"
+    Dim shp As Shape
+    For Each shp In wsCopy.Shapes
+        shp.Delete
+    Next shp
+    On Error GoTo Fail
+
+    Application.DisplayAlerts = False
+    wbNew.SaveAs Filename:=fullPath, FileFormat:=51   ' 51 = .xlsx (macro-free)
+    wbNew.Close SaveChanges:=False
+    Application.DisplayAlerts = True
+    Application.ScreenUpdating = True
+
+    ThisWorkbook.Activate
+    MsgBox "Saved a copy of the entire Log (" & (lastLog - LOG_HDR_ROWS) & " row(s)) to:" & vbCrLf & vbCrLf & _
+        fullPath & vbCrLf & vbCrLf & _
+        "Note: this file contains patient information - keep it in a secure folder.", _
+        vbInformation, "Copy All - Log Saved"
+    Exit Sub
+Fail:
+    Application.DisplayAlerts = True
+    Call AppReady
+    MsgBox "Something went wrong while saving the Log copy." & vbCrLf & _
+        "Nothing was harmed - try again, or pick a different folder." & vbCrLf & vbCrLf & _
+        "Details: " & Err.Description, vbExclamation, "Copy All error"
 End Sub
 
 Public Sub ResetSession()
