@@ -1005,10 +1005,10 @@ Public Sub SetupWorkbook()
     wsLog.Cells(2, LG_ENC).HorizontalAlignment = xlCenter
     Call ApplyLogEncounterBorders            ' dividers between encounters (if the Log has rows)
 
-    ' "Copy All" export button, to the RIGHT of the Log (col LG_LAST + 2). Saves the whole
+    ' "Save Log" export button, to the RIGHT of the Log (col LG_LAST + 2). Saves the whole
     ' Log to a new dated .xlsx in a folder the volunteer chooses (ExportLogCopy). Re-created
     ' each build so it always tracks the current columns.
-    Call AddButtonToSheet(wsLog, "log_copyall", "Copy All", "ExportLogCopy", _
+    Call AddButtonToSheet(wsLog, "log_copyall", "Save Log", "ExportLogCopy", _
                           2, LG_LAST + 2, 110, 28, RGB(106, 27, 154))
 
     ' Default Date of Rx to today
@@ -1832,7 +1832,7 @@ Private Sub BuildAllLabelsPreview()
 
     ws.Columns("A:F").ColumnWidth = 10
     ws.Columns("G").ColumnWidth = 2
-    ws.Columns("H:J").ColumnWidth = 16
+    ws.Columns("H:K").ColumnWidth = 16   ' widened button zone (H:K) so the 2x2 grid can be bigger
 
     Dim patName As String, dob As String
     patName = Trim(wsI.Range("C5").Value)
@@ -2039,9 +2039,33 @@ Private Sub BuildAllLabelsPreview()
         Else
             chkCap = "Check this label": chkClr = RGB(84, 110, 122)
         End If
-        Call AddRowButton(ws, "al_check_" & r, chkCap, "RowCheck", base, chkClr)
-        Call AddRowButton(ws, "al_edit_" & r, "Edit this med", "RowEdit", base + 3, RGB(21, 101, 192))
-        Call AddRowButton(ws, "al_remove_" & r, "Remove this med", "RowRemove", base + 6, RGB(191, 54, 12))
+        ' Per-card action buttons laid out as a 2x2 grid to the RIGHT of the label card
+        ' (in the H:J button zone), vertically centered against the card so no button
+        ' hangs below the label:
+        '     [ Check / Uncheck this label ] [ Edit this med     ]
+        '     [ Print extra (no log)       ] [ Remove this med   ]
+        Dim btnLeft As Double, btnRight As Double, btnGap As Double, btnW As Double, btnColR As Double
+        Dim btnH As Double, rowGap As Double
+        Dim cardTopPt As Double, cardBotPt As Double, blockTop As Double, rowTop1 As Double, rowTop2 As Double
+        btnH = 28                ' taller buttons
+        btnGap = 16              ' horizontal gap between the two columns
+        rowGap = 16              ' vertical gap between the two rows
+        btnLeft = ws.Columns("H").Left + 2
+        btnRight = ws.Columns("K").Left + ws.Columns("K").Width - 2   ' zone now runs H:K (wider buttons)
+        btnW = (btnRight - btnLeft - btnGap) / 2
+        btnColR = btnLeft + btnW + btnGap
+        cardTopPt = ws.Rows(base).Top
+        cardBotPt = ws.Rows(base + 8).Top + ws.Rows(base + 8).Height
+        blockTop = cardTopPt + ((cardBotPt - cardTopPt) - (2 * btnH + rowGap)) / 2
+        rowTop1 = blockTop
+        rowTop2 = blockTop + btnH + rowGap
+
+        Call AddRowButton(ws, "al_check_" & r, chkCap, "RowCheck", btnLeft, rowTop1, btnW, btnH, chkClr)
+        Call AddRowButton(ws, "al_edit_" & r, "Edit this med", "RowEdit", btnColR, rowTop1, btnW, btnH, RGB(21, 101, 192))
+        ' Spare-label button: prints this one label on demand WITHOUT logging a dispense or
+        ' bumping the print count (for extra copies a patient needs). See RowPrintExtra.
+        Call AddRowButton(ws, "al_print_" & r, "Print extra (no log)", "RowPrintExtra", btnLeft, rowTop2, btnW, btnH, RGB(0, 121, 107))
+        Call AddRowButton(ws, "al_remove_" & r, "Remove this med", "RowRemove", btnColR, rowTop2, btnW, btnH, RGB(191, 54, 12))
 NextR:
     Next r
 
@@ -2061,19 +2085,22 @@ NextR:
     If Not gBuilding Then Application.ScreenUpdating = True
 End Sub
 
-Private Sub AddRowButton(ws As Worksheet, nm As String, caption As String, macro As String, atRow As Long, bg As Long)
-    Dim leftPos As Double, topPos As Double
-    leftPos = ws.Columns("H").Left + 2
-    topPos = ws.Rows(atRow).Top + 1
+' Place one rounded-rectangle action button at an explicit position/size. The gallery
+' lays these out as a 2x2 grid to the right of each label card (see BuildAllLabelsPreview),
+' so left/top/width are passed in rather than derived from a single stacked column.
+Private Sub AddRowButton(ws As Worksheet, nm As String, caption As String, macro As String, _
+                          leftPos As Double, topPos As Double, widthPt As Double, heightPt As Double, bg As Long)
     Dim shp As Shape
-    Set shp = ws.Shapes.AddShape(msoShapeRoundedRectangle, leftPos, topPos, 150, 20)
+    Set shp = ws.Shapes.AddShape(msoShapeRoundedRectangle, leftPos, topPos, widthPt, heightPt)
     shp.Name = nm
     shp.OnAction = macro
     shp.Fill.ForeColor.RGB = bg
     shp.Line.Visible = msoFalse
     With shp.TextFrame2
+        .WordWrap = msoFalse                 ' keep each caption on one line (never wrap/clip to 2)
+        .AutoSize = msoAutoSizeNone
         .TextRange.Text = caption
-        .TextRange.Font.Size = 9
+        .TextRange.Font.Size = 10
         .TextRange.Font.Bold = msoTrue
         .TextRange.Font.Fill.ForeColor.RGB = RGB(255, 255, 255)
         .VerticalAnchor = msoAnchorMiddle
@@ -2102,6 +2129,65 @@ Public Sub RowPrint()
     On Error Resume Next
     ThisWorkbook.Sheets(SH_ALL).Activate
     On Error GoTo 0
+End Sub
+
+' Gallery "Print extra (no log)" button: print ONE spare copy of a single med's label on
+' demand. Unlike PrintLabel / PrintCheckedLabels this does NOT call LogPrint or MarkPrinted,
+' so the spare is never recorded in the dispense Log and never bumps the med's print count -
+' it just sends extra labels to the printer for a patient who needs another copy.
+' (Copies fixed at 1 for a true "single" print; change EXTRA_COPIES below to LABEL_COPIES to
+'  match the standard 2-copy label instead.)
+Public Sub RowPrintExtra()
+    Call AppReady                    ' un-stick events/screen from any interrupted prior action
+    On Error GoTo Fail
+    Const EXTRA_COPIES As Long = 1
+    Dim r As Long
+    r = CallerRow()
+    If r <= MEDS_HDR_ROWS Then Exit Sub
+    Dim wsM As Worksheet, wsL As Worksheet
+    Set wsM = ThisWorkbook.Sheets(SH_MEDS)
+    Set wsL = ThisWorkbook.Sheets(SH_LABEL)
+    If Trim(wsM.Cells(r, C_NAME).Value) = "" Then Exit Sub
+
+    ' Render the label surface for THIS med (refresh chrome so the logo/widths are correct).
+    Call UpdateLabelPreviewForMedRow(r, True)
+    Call ApplyLabelPageSetup(wsL)
+
+    ' Auto-select the Brother QL-1100c, with a manual-picker fallback (same as PrintLabel).
+    Dim brotherName As String
+    brotherName = SelectBrotherPrinter()
+    If brotherName = "" Then
+        If MsgBox("The Brother QL-1100c label printer was not found." & vbCrLf & vbCrLf & _
+            "Click OK to choose a printer manually, or Cancel to stop.", _
+            vbOKCancel + vbExclamation, "Brother Printer Not Found") = vbCancel Then Exit Sub
+        On Error Resume Next
+        Application.Dialogs(xlDialogPrint).Show
+        On Error GoTo 0
+    End If
+
+    ' Confirm, and make it explicit that this spare is NOT logged/counted as a dispense.
+    If MsgBox("Print an EXTRA label (not logged as a dispense):" & vbCrLf & vbCrLf & _
+        MedConfirmBlock(wsM, r) & vbCrLf & vbCrLf & _
+        "This prints a spare label only - it is NOT added to the dispense Log" & vbCrLf & _
+        "and does NOT change the med's print count." & vbCrLf & vbCrLf & _
+        "YES = print now       NO = cancel", _
+        vbYesNo + vbQuestion, "Print Extra Label") = vbNo Then Exit Sub
+
+    If Not PrintLabelSurfaceSafe(EXTRA_COPIES) Then
+        MsgBox "Printing failed. Check the printer connection and that a label roll" & vbCrLf & _
+               "is loaded, then try again.", vbExclamation, "Print Error"
+        Exit Sub
+    End If
+
+    On Error Resume Next
+    ThisWorkbook.Sheets(SH_ALL).Activate
+    On Error GoTo 0
+    Exit Sub
+Fail:
+    Call AppReady
+    MsgBox "Something went wrong while printing the extra label." & vbCrLf & _
+        "Nothing was harmed - click a main button and try again." & vbCrLf & vbCrLf & _
+        "Details: " & Err.Description, vbExclamation, "Print extra error"
 End Sub
 
 Public Sub RowCheck()
@@ -2158,13 +2244,9 @@ Public Sub RowRemove()
     End If
 
     ' Delete the table columns (1..C_LAST, the full row) and shift up; side buttons stay.
-    ' Save/restore EnableEvents so a failed delete can't leave events stuck off (the Fail
-    ' handler also re-enables them via AppReady).
-    Dim savedEE As Boolean
-    savedEE = Application.EnableEvents
     Application.EnableEvents = False
     wsM.Range(wsM.Cells(r, 1), wsM.Cells(r, C_LAST)).Delete Shift:=xlUp
-    Application.EnableEvents = savedEE
+    Application.EnableEvents = True
 
     Call RenumberMeds
     Call ValidateMedications(False)
@@ -2443,6 +2525,16 @@ End Sub
 '  PUBLIC ENTRY POINTS
 ' ============================================================
 
+' Self-heal: re-enable events / screen / status bar so one click un-sticks the app after
+' any interrupted prior action. Called at the top of every main button + each Fail handler.
+Private Sub AppReady()
+    On Error Resume Next
+    Application.EnableEvents = True
+    Application.ScreenUpdating = True
+    Application.StatusBar = False
+    On Error GoTo 0
+End Sub
+
 Public Sub ParseMedications()
     Call AppReady                    ' un-stick events/screen from any interrupted prior action
     On Error GoTo Fail
@@ -2589,7 +2681,7 @@ Public Sub ParseMedications()
 Fail:
     Call AppReady
     MsgBox "Something went wrong while parsing the medications." & vbCrLf & _
-        "Nothing was harmed - check the pasted text and try again." & vbCrLf & vbCrLf & _
+        "Nothing was harmed - click a main button and try again." & vbCrLf & vbCrLf & _
         "Details: " & Err.Description, vbExclamation, "Parse error"
 End Sub
 
@@ -2611,7 +2703,7 @@ Fail:
 End Sub
 
 ' Save a copy of the ENTIRE dispense Log to a new, dated .xlsx in a folder the volunteer
-' chooses. Wired to the "Copy All" button placed to the right of the Log by SetupWorkbook.
+' chooses. Wired to the "Save Log" button placed to the right of the Log by SetupWorkbook.
 ' The whole Log sheet (values + encounter shading) is copied into a fresh workbook, the
 ' buttons are stripped from the copy, and it is saved as a standalone spreadsheet.
 Public Sub ExportLogCopy()
@@ -2622,26 +2714,22 @@ Public Sub ExportLogCopy()
     Dim lastLog As Long
     lastLog = wsLog.Cells(wsLog.Rows.Count, LG_TIME).End(xlUp).Row
     If lastLog <= LOG_HDR_ROWS Then
-        MsgBox "The Log is empty - there is nothing to copy yet.", vbInformation, "Copy All - Export Log"
+        MsgBox "The Log is empty - there is nothing to save yet.", vbInformation, "Save Log"
         Exit Sub
     End If
 
-    ' Let the volunteer pick the destination folder.
-    Dim folderPath As String
-    folderPath = ""
-    On Error Resume Next
-    With Application.FileDialog(msoFileDialogFolderPicker)
-        .Title = "Choose a folder to save the Log copy into"
-        .AllowMultiSelect = False
-        If .Show = -1 Then folderPath = .SelectedItems(1)
-    End With
-    On Error GoTo Fail
-    If folderPath = "" Then Exit Sub          ' cancelled - nothing saved
-    If Right(folderPath, 1) <> "\" Then folderPath = folderPath & "\"
-
-    ' Dated filename, e.g. SCU_Dispense_Log_2026-08-14_1630.xlsx
+    ' Save As dialog, with the file name pre-filled as "Dispensary Log <date>". The volunteer
+    ' can change the name or folder, or accept it as-is. GetSaveAsFilename only returns the
+    ' chosen path (it does not save); Cancel returns Boolean False.
+    Dim defaultName As String, chosen As Variant
+    defaultName = "Dispensary Log " & Format(Now(), "YYYY-MM-DD") & ".xlsx"
+    chosen = Application.GetSaveAsFilename( _
+        InitialFileName:=defaultName, _
+        FileFilter:="Excel Workbook (*.xlsx), *.xlsx", _
+        Title:="Save Log")
+    If VarType(chosen) = vbBoolean Then Exit Sub   ' cancelled - nothing saved
     Dim fullPath As String
-    fullPath = folderPath & "SCU_Dispense_Log_" & Format(Now(), "YYYY-MM-DD_HHMM") & ".xlsx"
+    fullPath = CStr(chosen)
 
     ' Copy the whole Log sheet into a NEW workbook, strip the buttons from the copy, save.
     Application.ScreenUpdating = False
@@ -2667,14 +2755,14 @@ Public Sub ExportLogCopy()
     MsgBox "Saved a copy of the entire Log (" & (lastLog - LOG_HDR_ROWS) & " row(s)) to:" & vbCrLf & vbCrLf & _
         fullPath & vbCrLf & vbCrLf & _
         "Note: this file contains patient information - keep it in a secure folder.", _
-        vbInformation, "Copy All - Log Saved"
+        vbInformation, "Save Log - Saved"
     Exit Sub
 Fail:
     Application.DisplayAlerts = True
     Call AppReady
     MsgBox "Something went wrong while saving the Log copy." & vbCrLf & _
         "Nothing was harmed - try again, or pick a different folder." & vbCrLf & vbCrLf & _
-        "Details: " & Err.Description, vbExclamation, "Copy All error"
+        "Details: " & Err.Description, vbExclamation, "Save Log error"
 End Sub
 
 Public Sub ResetSession()
@@ -3863,7 +3951,6 @@ Public Sub ToggleRowSelect(ByVal r As Long)
     ' unchecking should only toggle green <-> its reviewed state (blue if still OK).
     Dim savedEE As Boolean
     savedEE = Application.EnableEvents
-    On Error GoTo restore                ' guarantee events are turned back on even on error
     Application.EnableEvents = False
     If Trim(ws.Cells(r, C_SEL).Value) = "" Then
         ws.Cells(r, C_SEL).Value = ChrW(10003)
@@ -3871,9 +3958,7 @@ Public Sub ToggleRowSelect(ByVal r As Long)
         ws.Cells(r, C_SEL).Value = ""
     End If
     Call ApplyRowState(ws, r)
-restore:
     Application.EnableEvents = savedEE
-    On Error GoTo 0
 End Sub
 
 Private Sub ApplyAllRowStates(ws As Worksheet)
@@ -3899,18 +3984,6 @@ Public Sub LiveRefreshRow(ByVal r As Long)
     Call ApplyRowState(ws, r)
 End Sub
 
-' Self-heal, called at the top of the main buttons: undo any app state a previous
-' interrupted routine may have left stuck. A stuck Application.EnableEvents = False
-' silently breaks the double-click check/uncheck; a stuck ScreenUpdating leaves the
-' screen frozen. Cheap, safe, idempotent - so one button click un-sticks the app.
-Private Sub AppReady()
-    On Error Resume Next
-    Application.EnableEvents = True
-    Application.ScreenUpdating = True
-    Application.StatusBar = False
-    On Error GoTo 0
-End Sub
-
 ' Check ALL meds if any are currently unchecked; otherwise uncheck ALL. Wired to a
 ' double-click on the "Check Med" column header so a volunteer can (un)check the whole
 ' list in one action instead of Review checking everything automatically.
@@ -3930,7 +4003,6 @@ Public Sub CheckAllToggle()
     Next r
     Dim savedEE As Boolean
     savedEE = Application.EnableEvents
-    On Error GoTo restore                ' guarantee events are turned back on even on error
     Application.EnableEvents = False
     For r = MEDS_HDR_ROWS + 1 To lastRow
         If Trim(ws.Cells(r, C_NAME).Value) <> "" Then
@@ -3942,9 +4014,7 @@ Public Sub CheckAllToggle()
             Call ApplyRowState(ws, r)
         End If
     Next r
-restore:
     Application.EnableEvents = savedEE
-    On Error GoTo 0
 End Sub
 
 Private Sub InstallMedSheetEvents(ws As Worksheet)
@@ -3968,8 +4038,9 @@ Private Sub InstallMedSheetEvents(ws As Worksheet)
         "        Cancel = True" & vbCrLf & _
         "        Exit Sub" & vbCrLf & _
         "    End If" & vbCrLf & _
-        "    ' Double-click the 'Check Med' HEADER to check / uncheck ALL meds at once" & vbCrLf & _
-        "    If Target.Column = " & C_SEL & " And Target.Row = " & MEDS_HDR_ROWS & " Then" & vbCrLf & _
+        "    ' Double-click the 'Check Med' HEADER (title cell B2, or anywhere in the header" & vbCrLf & _
+        "    ' block above the data) to check / uncheck ALL meds at once" & vbCrLf & _
+        "    If Target.Column = " & C_SEL & " And Target.Row >= 2 And Target.Row <= " & MEDS_HDR_ROWS & " Then" & vbCrLf & _
         "        Cancel = True" & vbCrLf & _
         "        CheckAllToggle" & vbCrLf & _
         "        Exit Sub" & vbCrLf & _
@@ -4016,6 +4087,7 @@ End Sub
 
 Public Sub PrintCheckedLabels()
     Call AppReady                    ' un-stick events/screen from any interrupted prior action
+    On Error GoTo Fail
     Dim ws As Worksheet, wsL As Worksheet
     Set ws = ThisWorkbook.Sheets(SH_MEDS)
     Set wsL = ThisWorkbook.Sheets(SH_LABEL)
@@ -4041,6 +4113,11 @@ Public Sub PrintCheckedLabels()
     useForm = (Err.Number = 0)
     Err.Clear
     On Error GoTo 0
+
+    If useForm And gEditingEncounter > 0 Then
+        frmReview.AddMed "Editing encounter " & gEditingEncounter & " - all meds stay logged", _
+            "Only the CHECKED meds get a printed label.", True
+    End If
 
     Dim listMsg As String, idx As Integer, dohCnt As Integer
     Dim cttl As String, ctxt As String, cOK As Boolean
@@ -4080,6 +4157,7 @@ Public Sub PrintCheckedLabels()
         If frmReview.Result <> "OK" Then Exit Sub
     Else
         If MsgBox("Ready to process these " & cnt & " checked medication(s) (labels print " & LABEL_COPIES & " copies each) on the Brother QL-1100c:" & vbCrLf & vbCrLf & _
+                  IIf(gEditingEncounter > 0, "Editing encounter " & gEditingEncounter & ": ALL meds stay in the Log; only the checked ones print." & vbCrLf & vbCrLf, "") & _
                   listMsg & vbCrLf & _
                   "Make sure the DK-1202 (62 x 100 mm) roll is loaded." & vbCrLf & vbCrLf & _
                   "YES = continue       NO = cancel", _
@@ -4138,36 +4216,57 @@ Public Sub PrintCheckedLabels()
     skipped = 0
     skippedNames = ""
     printedRows = ""
+    ' When EDITING a saved encounter, its whole record is being re-saved: log EVERY med on the
+    ' list (checked or not) so unchecked meds stay in the encounter instead of being dropped.
+    ' In a normal (new) print, only checked meds are logged, exactly as before.
+    Dim editing As Boolean
+    editing = (gEditingEncounter > 0)
+    Dim sel As Boolean, hasExpLot As Boolean, printThis As Boolean, printedOK As Boolean, logThis As Boolean
     Application.ScreenUpdating = False
     For r = MEDS_HDR_ROWS + 1 To lastRow
-        If Trim(ws.Cells(r, C_NAME).Value) <> "" And IsRowSelected(ws, r) Then
+        If Trim(ws.Cells(r, C_NAME).Value) <> "" Then
+            sel = IsRowSelected(ws, r)
             isDOH = (UCase(Trim(ws.Cells(r, C_SRC).Value)) = "DOH")
-            If isDOH Then
-                If printDOH Then
-                    Call UpdateLabelPreviewForMedRow(r, False)
-                    If PrintLabelSurfaceSafe(LABEL_COPIES) Then
-                        Call MarkPrinted(r)
-                        done = done + 1
-                        printedRows = printedRows & r & ","
-                    End If
-                End If
-                Call LogPrint(r, batchVol, encNum)   ' DOH: recorded whether or not a label prints
-                Call ApplyRowState(ws, r)
-                logged = logged + 1
-            ElseIf Trim(ws.Cells(r, C_EXP).Value) = "" Or Trim(ws.Cells(r, C_LOT).Value) = "" Then
-                skipped = skipped + 1
-                skippedNames = skippedNames & "   - " & _
-                    Trim(Trim(ws.Cells(r, C_NAME).Value) & " " & Trim(ws.Cells(r, C_STR).Value)) & vbCrLf
-            Else
+            hasExpLot = (Trim(ws.Cells(r, C_EXP).Value) <> "" And Trim(ws.Cells(r, C_LOT).Value) <> "")
+
+            ' PRINT a label only for CHECKED meds (DOH honors the printDOH choice; others need Exp/Lot).
+            printThis = False
+            If sel Then
+                If isDOH Then printThis = printDOH Else printThis = hasExpLot
+            End If
+            printedOK = False
+            If printThis Then
                 Call UpdateLabelPreviewForMedRow(r, False)
                 If PrintLabelSurfaceSafe(LABEL_COPIES) Then
                     Call MarkPrinted(r)
-                    Call LogPrint(r, batchVol, encNum)
-                    Call ApplyRowState(ws, r)
+                    printedOK = True
                     done = done + 1
-                    logged = logged + 1
                     printedRows = printedRows & r & ","
                 End If
+            End If
+
+            ' LOG: editing -> every med; normal -> checked DOH (always) or checked med whose
+            ' label actually printed (unchanged behavior for a fresh dispense).
+            logThis = False
+            If editing Then
+                logThis = True
+            ElseIf sel And isDOH Then
+                logThis = True
+            ElseIf sel And (Not isDOH) And hasExpLot And printedOK Then
+                logThis = True
+            End If
+            If logThis Then
+                Call LogPrint(r, batchVol, encNum)
+                Call ApplyRowState(ws, r)
+                logged = logged + 1
+            End If
+
+            ' A CHECKED, non-DOH med missing Exp/Lot prints no label (it is still logged above
+            ' when editing, so the record keeps it).
+            If sel And (Not isDOH) And (Not hasExpLot) Then
+                skipped = skipped + 1
+                skippedNames = skippedNames & "   - " & _
+                    Trim(Trim(ws.Cells(r, C_NAME).Value) & " " & Trim(ws.Cells(r, C_STR).Value)) & vbCrLf
             End If
         End If
     Next r
@@ -4256,6 +4355,12 @@ Public Sub PrintCheckedLabels()
         End If
         MsgBox msg, icon, "Print Complete"
     End If
+    Exit Sub
+Fail:
+    Call AppReady
+    MsgBox "Something went wrong while printing the labels." & vbCrLf & _
+        "Nothing was harmed - click a main button and try again." & vbCrLf & vbCrLf & _
+        "Details: " & Err.Description, vbExclamation, "Print error"
 End Sub
 
 ' Reprint the last successfully-printed batch (for paper jams / misfeeds). Reuses the
@@ -4682,7 +4787,7 @@ End Function
 
 ' Manually add a medication row.
 Public Sub AddMedicationRow()
-    Call AppReady
+    Call AppReady                    ' un-stick events/screen from any interrupted prior action
     On Error GoTo Fail
     Dim ws As Worksheet
     Set ws = ThisWorkbook.Sheets(SH_MEDS)
@@ -4754,9 +4859,9 @@ Public Sub AddMedicationRow()
     Exit Sub
 Fail:
     Call AppReady
-    MsgBox "Something went wrong adding the medication row." & vbCrLf & _
-        "Nothing was harmed - try again." & vbCrLf & vbCrLf & _
-        "Details: " & Err.Description, vbExclamation, "Add row error"
+    MsgBox "Something went wrong while adding the medication." & vbCrLf & _
+        "Nothing was harmed - click a main button and try again." & vbCrLf & vbCrLf & _
+        "Details: " & Err.Description, vbExclamation, "Add medication error"
 End Sub
 
 ' Collect a new medication via the frmMedEdit form (opened blank, titled "Add
@@ -5573,11 +5678,92 @@ Private Sub ClearEncounterStore()
     On Error GoTo 0
 End Sub
 
-' A friendly "how encounter editing works" heads-up, shown when the volunteer clicks
-' Edit Encounter. Reuses the same readable frmReview list as the Medications-tab Review
-' (large bold step titles + smaller explanation lines underneath), with a plain MsgBox
-' fallback if the form is unavailable. Returns True to continue to the encounter picker,
-' False if the volunteer clicks Cancel.
+' Sanity-check that the Dispense Log's columns are still in the expected order before we
+' read fields out of it by position (Edit Encounter reconstructs meds from fixed columns).
+' Checks the header row (row LOG_HDR_ROWS) against keyword markers for the columns we rely
+' on. Returns False and a human-readable first-mismatch message if the order looks wrong
+' (e.g. a Log pasted in from a differently-structured workbook). SetupWorkbook rewrites
+' these headers on every build, so a freshly launched workbook always passes.
+Private Function LogColumnsValid(ByRef mismatchMsg As String) As Boolean
+    Dim wsLg As Worksheet
+    Set wsLg = ThisWorkbook.Sheets(SH_LOG)
+    Dim cols As Variant, keys As Variant, labels As Variant
+    cols = Array(LG_TIME, LG_ENC, LG_PT, LG_DOB, LG_NAME, LG_EXP, LG_LOT, LG_SRC, LG_CNT)
+    keys = Array("time", "encounter", "patient", "dob", "medication", "expir", "lot", "source", "print")
+    labels = Array("Timestamp", "Encounter", "Patient", "DOB", "Medication", "Expiration", "Lot #", "Source", "Print #")
+    Dim i As Long, hdr As String
+    mismatchMsg = ""
+    LogColumnsValid = True
+    For i = 0 To UBound(cols)
+        hdr = LCase(Trim(CStr(wsLg.Cells(LOG_HDR_ROWS, cols(i)).Value)))
+        If InStr(hdr, CStr(keys(i))) = 0 Then
+            LogColumnsValid = False
+            If mismatchMsg = "" Then
+                mismatchMsg = "Column " & cols(i) & " should be """ & labels(i) & """ but reads """ & _
+                    Trim(CStr(wsLg.Cells(LOG_HDR_ROWS, cols(i)).Value)) & """."
+            End If
+        End If
+    Next i
+End Function
+
+' Give copied-in Log rows that have no Encounter number a fresh one so they can be edited.
+' Consecutive data rows (a row with a patient or medication) that share the same Patient +
+' DOB are grouped into a single encounter, numbered after the highest existing encounter.
+' Rows are shaded/formatted to match logged encounters. Returns how many rows were assigned.
+Private Function AssignBlankEncounters() As Long
+    On Error Resume Next
+    Dim wsLg As Worksheet
+    Dim last As Long, r As Long, nextNum As Long, assigned As Long, curNum As Long
+    Dim prevKey As String, prevBlank As Boolean, key As String, hasData As Boolean
+    Dim encColor As Long, c As Integer, savedEE As Boolean
+    Set wsLg = ThisWorkbook.Sheets(SH_LOG)
+    last = wsLg.Cells(wsLg.Rows.Count, 1).End(xlUp).Row
+    nextNum = NextEncounter()
+    assigned = 0: curNum = 0: prevKey = Chr(0): prevBlank = False
+    savedEE = Application.EnableEvents
+    Application.EnableEvents = False
+    For r = LOG_HDR_ROWS + 1 To last
+        hasData = (Trim(wsLg.Cells(r, LG_PT).Value) <> "" Or Trim(wsLg.Cells(r, LG_NAME).Value) <> "")
+        If hasData And Trim(wsLg.Cells(r, LG_ENC).Value) = "" Then
+            key = UCase(Trim(wsLg.Cells(r, LG_PT).Value) & "|" & Trim(wsLg.Cells(r, LG_DOB).Value))
+            If (Not prevBlank) Or (key <> prevKey) Then
+                curNum = nextNum
+                nextNum = nextNum + 1
+            End If
+            wsLg.Cells(r, LG_ENC).Value = curNum
+            Select Case (curNum - 1) Mod 3
+                Case 0: encColor = RGB(226, 239, 218)   ' light green
+                Case 1: encColor = RGB(221, 235, 247)   ' light blue
+                Case Else: encColor = RGB(255, 255, 255) ' white
+            End Select
+            For c = 1 To LG_LAST
+                With wsLg.Cells(r, c)
+                    .Font.Name = "Arial"
+                    .Font.Size = 9
+                    .Interior.Color = encColor
+                End With
+            Next c
+            wsLg.Cells(r, LG_ENC).HorizontalAlignment = xlCenter
+            wsLg.Cells(r, LG_ENC).Font.Bold = True
+            assigned = assigned + 1
+            prevBlank = True
+            prevKey = key
+        Else
+            prevBlank = False
+            prevKey = Chr(0)
+        End If
+    Next r
+    Application.EnableEvents = savedEE
+    If assigned > 0 Then Call ApplyLogEncounterBorders
+    AssignBlankEncounters = assigned
+    On Error GoTo 0
+End Function
+
+' Reopen a past encounter: show a list, pick a number, restore the patient + full med list.
+' A friendly "how encounter editing works" heads-up, shown when the volunteer clicks Edit
+' Encounter. Reuses the same readable frmReview list as the Medications-tab Review (large bold
+' step titles + smaller explanation lines underneath), with a plain MsgBox fallback. Returns
+' True to continue to the encounter picker, False if the volunteer clicks Cancel.
 Private Function ShowEncounterHeadsUp() As Boolean
     ShowEncounterHeadsUp = True
 
@@ -5591,21 +5777,30 @@ Private Function ShowEncounterHeadsUp() As Boolean
 
     If usedForm Then
         On Error Resume Next
-        frmReview.AddMed "1.  What Edit Encounter does", _
-            "Reopens a past dispense and puts its saved medications back on the " & _
-            "Medications tab so you can fix or reprint them.", True
-        frmReview.AddMed "2.  Every med comes back CHECKED", _
-            "Uncheck any you will NOT reprint - double-click a 'Check Med' cell, or " & _
-            "the 'Check Med' column header to toggle the whole list at once.", True
-        frmReview.AddMed "3.  Save your changes", _
-            "Click 'Save Edited Encounter' when done. It updates the Log and the Tebra " & _
-            "note for this encounter in place - it never creates a duplicate.", True
-        frmReview.AddMed "4.  Reprinting is safe", _
-            "After saving it offers to reprint ONLY the checked meds, and shows the " & _
-            "count first - so it can never surprise-print the whole list.", True
-        frmReview.AddMed "5.  Heads up", _
-            "This REPLACES the medications currently on screen. Finish or print the " & _
-            "current patient first if you still need them.", True
+        ' NOTE: frmReview sizes each description by its number of explicit line breaks
+        ' (Height = (1 + count of Chr(10)) * 15 + 4), NOT by how the text wraps. So each
+        ' line below is pre-broken with vbLf and kept short enough (~44 chars) that it
+        ' never wraps further - otherwise wrapped lines get clipped.
+        frmReview.AddMed "1.  It REPLACES the old Log entry", _
+            "Saving overwrites this encounter's previous" & vbLf & _
+            "rows in the Log - it does not add a copy." & vbLf & _
+            "What's on the list now becomes the record.", True
+        frmReview.AddMed "2.  ALL meds are saved to the Log", _
+            "Every med on the list is written to the Log" & vbLf & _
+            "- checked or not. The checkboxes do NOT" & vbLf & _
+            "decide what gets logged.", True
+        frmReview.AddMed "3.  Add / Remove change the record", _
+            "To take a med OUT of the Log, click Remove." & vbLf & _
+            "To put one IN, click + Add Medication." & vbLf & _
+            "Editing a row updates that saved med.", True
+        frmReview.AddMed "4.  Checkboxes = reprinting only", _
+            "Check a med only if you want its label to" & vbLf & _
+            "print again now. Unchecked meds are still" & vbLf & _
+            "saved to the Log - they just don't reprint.", True
+        frmReview.AddMed "5.  Save Edited Encounter to finish", _
+            "Click 'Save Edited Encounter' to write your" & vbLf & _
+            "changes to the Log and Tebra note, then" & vbLf & _
+            "reprint only the checked labels.", True
         frmReview.SetHeader "Editing an Encounter - How it works"
         frmReview.SetFooter "Click Continue to pick an encounter, or Cancel to go back."
         frmReview.ConfigButtons True, "Continue", "Cancel"
@@ -5615,37 +5810,83 @@ Private Function ShowEncounterHeadsUp() As Boolean
         On Error GoTo 0
     Else
         Dim m As String
-        m = "EDITING AN ENCOUNTER - how it works:" & vbCrLf & vbCrLf & _
-            "1. Reopens a past dispense and puts its saved meds back on the Medications tab." & vbCrLf & vbCrLf & _
-            "2. Every med comes back CHECKED - uncheck any you will NOT reprint (double-click a 'Check Med' cell, or the header to toggle all)." & vbCrLf & vbCrLf & _
-            "3. Click 'Save Edited Encounter' when done - it updates the Log and Tebra note in place (no duplicate)." & vbCrLf & vbCrLf & _
-            "4. It then offers to reprint ONLY the checked meds, showing the count first." & vbCrLf & vbCrLf & _
-            "5. This REPLACES the meds currently on screen - finish the current patient first if needed." & vbCrLf & vbCrLf & _
+        m = "EDITING AN ENCOUNTER - how to use it:" & vbCrLf & vbCrLf & _
+            "1. Saving REPLACES this encounter's old Log rows - it does not add a second copy." & vbCrLf & vbCrLf & _
+            "2. EVERY med on the list is saved to the Log, checked or not. The checkboxes do not decide what is logged." & vbCrLf & vbCrLf & _
+            "3. To change what's in the record, use Remove and + Add Medication (not the checkboxes)." & vbCrLf & vbCrLf & _
+            "4. Check a med only to REPRINT its label. Unchecked meds are still saved - they just don't reprint." & vbCrLf & vbCrLf & _
+            "5. Click 'Save Edited Encounter' to write changes to the Log and Tebra note, then reprint the checked labels." & vbCrLf & vbCrLf & _
             "Continue?"
         ShowEncounterHeadsUp = (MsgBox(m, vbOKCancel + vbInformation, "Editing an Encounter - How it works") = vbOK)
     End If
 End Function
 
-' Reopen a past encounter: show a list, pick a number, restore the patient + full med list.
 Public Sub EditEncounter()
     Call AppReady                    ' un-stick events/screen from any interrupted prior action
     On Error GoTo Fail
-    Dim wsE As Worksheet
+    ' The editable encounter list is pulled DYNAMICALLY from the visible dispense Log
+    ' (the source of truth), so it always matches what a volunteer sees on the 4. Log tab.
+    ' Draft encounters (Save for Later) are never printed, so they live only in the hidden
+    ' snapshot store - those are appended afterward so drafts remain editable too.
+    Dim wsLg As Worksheet, wsE As Worksheet
+    Set wsLg = ThisWorkbook.Sheets(SH_LOG)
     Set wsE = EncStore()
-    Dim last As Long
-    last = wsE.Cells(wsE.Rows.Count, ES_ENC).End(xlUp).Row
-    If last < 2 Then
-        MsgBox "There are no saved encounters to edit yet." & vbCrLf & _
-               "An encounter is saved each time you Print Checked Labels.", vbInformation, "Edit Encounter"
+    Dim lastLog As Long, lastE As Long
+    lastLog = wsLg.Cells(wsLg.Rows.Count, 1).End(xlUp).Row
+    lastE = wsE.Cells(wsE.Rows.Count, ES_ENC).End(xlUp).Row
+
+    ' Guard: the list + restore below read the Log by FIXED column position. If a pasted-in
+    ' Log scrambled the column order, warn and bail instead of restoring the wrong fields.
+    Dim colMsg As String
+    If Not LogColumnsValid(colMsg) Then
+        MsgBox "The Dispense Log's columns don't match the expected order, so encounters" & vbCrLf & _
+            "cannot be edited safely (fields could map to the wrong data)." & vbCrLf & vbCrLf & _
+            colMsg & vbCrLf & vbCrLf & _
+            "Expected order (left to right): Timestamp, Encounter, Patient, DOB, Medication," & vbCrLf & _
+            "Strength, Directions, Qty, Refills, Expiration, Lot #, Source, Rx Date, Initials," & vbCrLf & _
+            "Dosage Form, Print #." & vbCrLf & vbCrLf & _
+            "If you pasted a Log from another workbook, re-order its columns to match, or" & vbCrLf & _
+            "relaunch the tool (OPEN LABEL TOOL) to rebuild the correct Log header, then retry.", _
+            vbExclamation, "Edit Encounter - Log columns mismatch"
         Exit Sub
     End If
-    ' Quick rundown of how encounter editing works (volunteer heads-up); Cancel backs out.
-    If Not ShowEncounterHeadsUp() Then Exit Sub
-    ' Distinct encounter numbers, in order of first appearance.
+
+    ' Tolerate copied-in rows with no Encounter number: offer to auto-assign one per patient
+    ' (consecutive rows sharing Patient + DOB become one encounter) so they can be edited.
+    Dim blankCount As Long, rr0 As Long, resp0 As VbMsgBoxResult
+    blankCount = 0
+    For rr0 = LOG_HDR_ROWS + 1 To lastLog
+        If (Trim(wsLg.Cells(rr0, LG_PT).Value) <> "" Or Trim(wsLg.Cells(rr0, LG_NAME).Value) <> "") _
+           And Trim(wsLg.Cells(rr0, LG_ENC).Value) = "" Then blankCount = blankCount + 1
+    Next rr0
+    If blankCount > 0 Then
+        resp0 = MsgBox(blankCount & " Log row(s) have no Encounter number (e.g. rows copied/pasted in)." & vbCrLf & vbCrLf & _
+            "Assign encounter numbers to them automatically so they can be edited?" & vbCrLf & _
+            "Rows are grouped into encounters by patient - consecutive rows with the same" & vbCrLf & _
+            "Patient + DOB become one encounter, numbered after the highest existing one.", _
+            vbYesNoCancel + vbQuestion, "Assign Encounter Numbers?")
+        If resp0 = vbCancel Then Exit Sub
+        If resp0 = vbYes Then
+            Call AssignBlankEncounters
+            lastLog = wsLg.Cells(wsLg.Rows.Count, 1).End(xlUp).Row   ' refresh (row count unchanged, but safe)
+        End If
+    End If
+
+    ' Distinct encounter numbers, in order of first appearance: Log rows first (Val collapses
+    ' a versioned label like "1 (v2)" back to base encounter 1), then draft-only numbers.
     Dim seen As String, order As String, r As Long, e As Long
     seen = "|"
     order = ""
-    For r = 2 To last
+    For r = LOG_HDR_ROWS + 1 To lastLog
+        If Trim(wsLg.Cells(r, LG_ENC).Value) <> "" Then
+            e = Val(wsLg.Cells(r, LG_ENC).Value)
+            If e > 0 And InStr(seen, "|" & e & "|") = 0 Then
+                seen = seen & e & "|"
+                order = order & e & ","
+            End If
+        End If
+    Next r
+    For r = 2 To lastE
         If IsNumeric(wsE.Cells(r, ES_ENC).Value) Then
             e = CLng(wsE.Cells(r, ES_ENC).Value)
             If InStr(seen, "|" & e & "|") = 0 Then
@@ -5654,27 +5895,53 @@ Public Sub EditEncounter()
             End If
         End If
     Next r
-    Dim listTxt As String, parts() As String, i As Long, mc As Long, pnm As String, pdb As String
+
+    If order = "" Then
+        MsgBox "There are no encounters to edit yet." & vbCrLf & _
+               "An encounter is saved each time you Print Checked Labels" & vbCrLf & _
+               "(or when you Save for Later).", vbInformation, "Edit Encounter"
+        Exit Sub
+    End If
+
+    ' Quick rundown of how encounter editing works (volunteer heads-up); Cancel backs out.
+    If Not ShowEncounterHeadsUp() Then Exit Sub
+
+    ' Build the display list. Prefer the Log for the patient/DOB/med count; fall back to the
+    ' snapshot store for draft-only encounters (which are not in the Log yet).
+    Dim listTxt As String, parts() As String, i As Long, mc As Long
+    Dim pnm As String, pdb As String, isDraft As Boolean
     listTxt = ""
     parts = Split(order, ",")
     For i = 0 To UBound(parts)
         If parts(i) <> "" Then
             e = CLng(parts(i))
-            mc = 0
-            pnm = ""
-            pdb = ""
-            For r = 2 To last
-                If IsNumeric(wsE.Cells(r, ES_ENC).Value) Then
-                    If CLng(wsE.Cells(r, ES_ENC).Value) = e Then
+            mc = 0: pnm = "": pdb = "": isDraft = True
+            For r = LOG_HDR_ROWS + 1 To lastLog
+                If Trim(wsLg.Cells(r, LG_ENC).Value) <> "" Then
+                    If Val(wsLg.Cells(r, LG_ENC).Value) = e Then
                         mc = mc + 1
-                        pnm = Trim(wsE.Cells(r, ES_PT).Value)
-                        pdb = Trim(wsE.Cells(r, ES_DOB).Value)
+                        pnm = Trim(wsLg.Cells(r, LG_PT).Value)
+                        pdb = Trim(wsLg.Cells(r, LG_DOB).Value)
+                        isDraft = False
                     End If
                 End If
             Next r
+            If isDraft Then
+                For r = 2 To lastE
+                    If IsNumeric(wsE.Cells(r, ES_ENC).Value) Then
+                        If CLng(wsE.Cells(r, ES_ENC).Value) = e Then
+                            mc = mc + 1
+                            pnm = Trim(wsE.Cells(r, ES_PT).Value)
+                            pdb = Trim(wsE.Cells(r, ES_DOB).Value)
+                        End If
+                    End If
+                Next r
+            End If
             listTxt = listTxt & "   " & e & ")   " & pnm
             If pdb <> "" Then listTxt = listTxt & "   (DOB " & pdb & ")"
-            listTxt = listTxt & "    - " & mc & " med(s)" & vbCrLf
+            listTxt = listTxt & "    - " & mc & " med(s)"
+            If isDraft Then listTxt = listTxt & "   [draft - not yet printed]"
+            listTxt = listTxt & vbCrLf
         End If
     Next i
     Dim ans As String
@@ -5700,18 +5967,100 @@ Public Sub EditEncounter()
 Fail:
     Call AppReady
     MsgBox "Something went wrong opening that encounter." & vbCrLf & _
-        "Nothing was harmed - try again." & vbCrLf & vbCrLf & _
+        "Nothing was harmed - click a main button and try again." & vbCrLf & vbCrLf & _
         "Details: " & Err.Description, vbExclamation, "Edit Encounter error"
 End Sub
 
 ' Restore a snapshot into the Input + Medications tabs and enter editing mode.
 Private Sub LoadEncounter(ByVal encNum As Long)
-    Dim wsE As Worksheet, wsM As Worksheet, wsI As Worksheet
-    Set wsE = EncStore()
+    Dim wsM As Worksheet, wsI As Worksheet
     Set wsM = ThisWorkbook.Sheets(SH_MEDS)
     Set wsI = ThisWorkbook.Sheets(SH_INPUT)
     Application.ScreenUpdating = False
     Call ClearMedArea(wsM)
+    ' The Log is the source of truth: if this encounter appears in the Log, rebuild it FROM the
+    ' Log so any edits made directly on the 4. Log tab are honored. Only fall back to the hidden
+    ' snapshot for draft encounters (Save for Later) that were never printed to the Log.
+    If EncounterInLog(encNum) Then
+        Call LoadEncounterFromLog(encNum, wsM, wsI)
+    Else
+        Call LoadEncounterFromSnapshot(encNum, wsM, wsI)
+    End If
+    Call RenumberMeds
+    Call ValidateMedications(False)
+    Call SetEditingEncounter(encNum)
+    If Not gBuilding Then Application.ScreenUpdating = True
+    wsM.Activate
+    MsgBox "Editing encounter " & encNum & "." & vbCrLf & vbCrLf & _
+        "Add, remove, or fix medications as needed. Every med is checked -" & vbCrLf & _
+        "uncheck any you will NOT reprint. Then click ""Save Edited Encounter""" & vbCrLf & _
+        "to update the Log and Tebra note (it will offer to reprint the checked ones).", _
+        vbInformation, "Editing Encounter " & encNum
+End Sub
+
+' Reconstruct an encounter's patient + medication rows directly from the Log (matched by
+' base encounter number, so a versioned "1 (v2)" row is still recognized as encounter 1).
+' Used as a fallback by LoadEncounter when the hidden snapshot for this encounter is missing.
+Private Sub LoadEncounterFromLog(ByVal encNum As Long, wsM As Worksheet, wsI As Worksheet)
+    Dim wsLg As Worksheet
+    Set wsLg = ThisWorkbook.Sheets(SH_LOG)
+    Dim last As Long, r As Long, rr As Long, gotHdr As Boolean
+    last = wsLg.Cells(wsLg.Rows.Count, 1).End(xlUp).Row
+    gotHdr = False
+    For r = LOG_HDR_ROWS + 1 To last
+        If Trim(wsLg.Cells(r, LG_ENC).Value) <> "" Then
+            If Val(wsLg.Cells(r, LG_ENC).Value) = encNum Then
+                If Not gotHdr Then
+                    wsI.Range("C5").Value = wsLg.Cells(r, LG_PT).Value
+                    wsI.Range("C6").Value = wsLg.Cells(r, LG_DOB).Value
+                    wsI.Range("C7").Value = wsLg.Cells(r, LG_DATE).Value
+                    gotHdr = True
+                End If
+                Dim rec As MedRecord
+                rec.MedName = CStr(wsLg.Cells(r, LG_NAME).Value)
+                rec.Strength = CStr(wsLg.Cells(r, LG_STR).Value)
+                rec.DosageForm = CStr(wsLg.Cells(r, LG_FORM).Value)
+                rec.SIG = CStr(wsLg.Cells(r, LG_SIG).Value)
+                rec.Quantity = CStr(wsLg.Cells(r, LG_QTY).Value)
+                rec.Refills = CStr(wsLg.Cells(r, LG_REF).Value)
+                rec.Expiration = CStr(wsLg.Cells(r, LG_EXP).Value)
+                rec.LotNumber = CStr(wsLg.Cells(r, LG_LOT).Value)
+                rec.Confidence = "Restored"
+                rec.Warnings = ""
+                rec.RawText = "[restored from Log encounter " & encNum & "]"
+                rr = FirstEmptyRow(wsM)
+                Call WriteMedRow(wsM, rr, rec, CStr(wsLg.Cells(r, LG_PT).Value), _
+                                 CStr(wsLg.Cells(r, LG_DOB).Value), CStr(wsLg.Cells(r, LG_DATE).Value), 0)
+                wsM.Cells(rr, C_SRC).Value = wsLg.Cells(r, LG_SRC).Value   ' restore Source (WriteMedRow blanks it)
+                wsM.Cells(rr, C_SEL).Value = ChrW(10003)                   ' pre-check (uncheck any you won't reprint)
+                Call ApplyRowState(wsM, rr)
+            End If
+        End If
+    Next r
+End Sub
+
+' True if the dispense Log contains any row for this base encounter number (Val collapses a
+' versioned label like "1 (v2)" back to base encounter 1).
+Private Function EncounterInLog(ByVal encNum As Long) As Boolean
+    Dim wsLg As Worksheet
+    Set wsLg = ThisWorkbook.Sheets(SH_LOG)
+    Dim last As Long, r As Long
+    last = wsLg.Cells(wsLg.Rows.Count, 1).End(xlUp).Row
+    For r = LOG_HDR_ROWS + 1 To last
+        If Trim(wsLg.Cells(r, LG_ENC).Value) <> "" Then
+            If Val(wsLg.Cells(r, LG_ENC).Value) = encNum Then
+                EncounterInLog = True
+                Exit Function
+            End If
+        End If
+    Next r
+End Function
+
+' Restore a DRAFT encounter's patient + meds from the hidden snapshot store. Used only for
+' Save-for-Later drafts that were never printed, so they are not in the Log.
+Private Sub LoadEncounterFromSnapshot(ByVal encNum As Long, wsM As Worksheet, wsI As Worksheet)
+    Dim wsE As Worksheet
+    Set wsE = EncStore()
     Dim last As Long, r As Long, rr As Long, gotHdr As Boolean
     last = wsE.Cells(wsE.Rows.Count, ES_ENC).End(xlUp).Row
     gotHdr = False
@@ -5735,7 +6084,7 @@ Private Sub LoadEncounter(ByVal encNum As Long)
                 rec.LotNumber = CStr(wsE.Cells(r, ES_LOT).Value)
                 rec.Confidence = "Restored"
                 rec.Warnings = ""
-                rec.RawText = "[restored from encounter " & encNum & "]"
+                rec.RawText = "[restored from draft encounter " & encNum & "]"
                 rr = FirstEmptyRow(wsM)
                 Call WriteMedRow(wsM, rr, rec, CStr(wsE.Cells(r, ES_PT).Value), _
                                  CStr(wsE.Cells(r, ES_DOB).Value), CStr(wsE.Cells(r, ES_DATE).Value), 0)
@@ -5745,16 +6094,6 @@ Private Sub LoadEncounter(ByVal encNum As Long)
             End If
         End If
     Next r
-    Call RenumberMeds
-    Call ValidateMedications(False)
-    Call SetEditingEncounter(encNum)
-    If Not gBuilding Then Application.ScreenUpdating = True
-    wsM.Activate
-    MsgBox "Editing encounter " & encNum & "." & vbCrLf & vbCrLf & _
-        "Add, remove, or fix medications as needed. Every med is checked -" & vbCrLf & _
-        "uncheck any you will NOT reprint. Then click ""Save Edited Encounter""" & vbCrLf & _
-        "to update the Log and Tebra note (it will offer to reprint the checked ones).", _
-        vbInformation, "Editing Encounter " & encNum
 End Sub
 
 ' Save the edited encounter: replace its Log + snapshot rows, refresh Tebra, offer reprint.
@@ -6038,9 +6377,109 @@ Private Sub BuildDeveloperTestSheet()
     Call AddButtonToSheet(ws, "dev_genpt",  "1. Generate Test Patient",       "GenerateTestPatient", 6, 1, 220, 28, RGB(21, 101, 192))
     Call AddButtonToSheet(ws, "dev_explot", "2. Fill Random Exp / Lot / Source", "FillRandomExpLot",  9, 1, 220, 24, RGB(0, 121, 107))
     Call AddButtonToSheet(ws, "dev_tests",  "Run Parser Self-Tests",          "RunParserTests",     12, 1, 220, 24, RGB(84, 110, 122))
-    Call AddButtonToSheet(ws, "dev_reset",  "Reset Session (clear everything)", "ResetSession",      15, 1, 220, 24, RGB(191, 54, 12))
+    Call AddButtonToSheet(ws, "dev_seed",   "Seed 3 Test Encounters (Log)",   "SeedTestEncounters", 15, 1, 220, 24, RGB(106, 27, 154))
+    Call AddButtonToSheet(ws, "dev_reset",  "Reset Session (clear everything)", "ResetSession",      18, 1, 220, 24, RGB(191, 54, 12))
     ws.Columns("A").ColumnWidth = 32
     ws.Visible = xlSheetVisible
+End Sub
+
+' TESTING: append 3 test patients (a few meds each) to the Log as three new encounters, so
+' the encounter logic (Edit Past Encounter, reprint, Tebra) can be exercised without printing.
+' Writes Log rows directly (mirroring LogPrint's columns + encounter shading). Clear them with
+' Reset Session or by closing the tool.
+Public Sub SeedTestEncounters()
+    Call AppReady                    ' un-stick events/screen from any interrupted prior action
+    On Error GoTo Fail
+    If MsgBox("Add 3 TEST patients (a few meds each) to the Log as new encounters?" & vbCrLf & vbCrLf & _
+        "For testing the encounter logic - it only adds Log rows, it does not print." & vbCrLf & _
+        "Clear them any time with Reset Session (or by closing the tool).", _
+        vbYesNo + vbQuestion, "Seed Test Encounters") = vbNo Then Exit Sub
+
+    Dim wsLg As Worksheet
+    Set wsLg = ThisWorkbook.Sheets(SH_LOG)
+    Dim baseEnc As Long
+    baseEnc = NextEncounter()
+
+    Application.ScreenUpdating = False
+    ' Encounter 1 - Alice (2 meds)
+    Call WriteSeedLogRow(wsLg, baseEnc, "Test, Alice", "03/12/1980", "Amoxicillin", "500 mg", _
+        "Take 1 capsule by mouth three times daily", "30", "0", "05/2027", "LOT-A1", "IN HOUSE", "Capsule")
+    Call WriteSeedLogRow(wsLg, baseEnc, "Test, Alice", "03/12/1980", "Lisinopril", "10 mg", _
+        "Take 1 tablet by mouth once daily", "30", "1", "08/2027", "LOT-A2", "DOH", "Tablet")
+    ' Encounter 2 - Bob (3 meds)
+    Call WriteSeedLogRow(wsLg, baseEnc + 1, "Demo, Bob", "07/22/1975", "Metformin", "500 mg", _
+        "Take 1 tablet by mouth twice daily with food", "60", "2", "01/2028", "LOT-B1", "IN HOUSE", "Tablet")
+    Call WriteSeedLogRow(wsLg, baseEnc + 1, "Demo, Bob", "07/22/1975", "Atorvastatin", "20 mg", _
+        "Take 1 tablet by mouth at bedtime", "30", "1", "03/2028", "LOT-B2", "RxAPS", "Tablet")
+    Call WriteSeedLogRow(wsLg, baseEnc + 1, "Demo, Bob", "07/22/1975", "Ibuprofen", "200 mg", _
+        "Take 1 tablet by mouth every 6 hours as needed", "24", "0", "12/2027", "LOT-B3", "IN HOUSE", "Tablet")
+    ' Encounter 3 - Carol (2 meds)
+    Call WriteSeedLogRow(wsLg, baseEnc + 2, "Sample, Carol", "11/05/1992", "Omeprazole", "20 mg", _
+        "Take 1 capsule by mouth before breakfast", "30", "0", "06/2027", "LOT-C1", "DOH", "Capsule")
+    Call WriteSeedLogRow(wsLg, baseEnc + 2, "Sample, Carol", "11/05/1992", "Sertraline", "50 mg", _
+        "Take 1 tablet by mouth once daily", "30", "2", "09/2027", "LOT-C2", "IN HOUSE", "Tablet")
+
+    Call ApplyLogEncounterBorders
+    On Error Resume Next
+    Call FillTebraTemplate
+    On Error GoTo Fail
+    If Not gBuilding Then Application.ScreenUpdating = True
+
+    Call ShowLogSheet
+    MsgBox "Added 3 test encounters (" & baseEnc & ", " & (baseEnc + 1) & ", " & (baseEnc + 2) & ") to the Log." & vbCrLf & vbCrLf & _
+        "Now try Edit Past Encounter on one of them.", vbInformation, "Seed Test Encounters"
+    Exit Sub
+Fail:
+    Application.ScreenUpdating = True
+    Call AppReady
+    MsgBox "Something went wrong seeding the test encounters." & vbCrLf & _
+        "Nothing was harmed - try again." & vbCrLf & vbCrLf & _
+        "Details: " & Err.Description, vbExclamation, "Seed error"
+End Sub
+
+' Write one test row to the Log (mirrors LogPrint's columns + green/blue/white encounter
+' shading). Rx date defaults to today, initials "TST", print # 1.
+Private Sub WriteSeedLogRow(wsLg As Worksheet, ByVal encNum As Long, _
+        ByVal pt As String, ByVal dob As String, ByVal med As String, ByVal strg As String, _
+        ByVal sig As String, ByVal qty As String, ByVal ref As String, ByVal exp As String, _
+        ByVal lot As String, ByVal src As String, ByVal form As String)
+    Dim nextLog As Long
+    nextLog = wsLg.Cells(wsLg.Rows.Count, 1).End(xlUp).Row + 1
+    If nextLog <= LOG_HDR_ROWS Then nextLog = LOG_HDR_ROWS + 1
+    wsLg.Cells(nextLog, LG_TIME).Value = Format(Now(), "MM/DD/YYYY HH:MM:SS")
+    wsLg.Cells(nextLog, LG_ENC).Value = encNum
+    wsLg.Cells(nextLog, LG_PT).Value = pt
+    wsLg.Cells(nextLog, LG_DOB).Value = dob
+    wsLg.Cells(nextLog, LG_NAME).Value = med
+    wsLg.Cells(nextLog, LG_STR).Value = strg
+    wsLg.Cells(nextLog, LG_SIG).Value = sig
+    wsLg.Cells(nextLog, LG_QTY).Value = qty
+    wsLg.Cells(nextLog, LG_REF).Value = ref
+    wsLg.Cells(nextLog, LG_EXP).NumberFormat = "@"
+    wsLg.Cells(nextLog, LG_EXP).Value = exp
+    wsLg.Cells(nextLog, LG_LOT).NumberFormat = "@"
+    wsLg.Cells(nextLog, LG_LOT).Value = lot
+    wsLg.Cells(nextLog, LG_SRC).Value = src
+    wsLg.Cells(nextLog, LG_DATE).Value = Format(Now(), "MM/DD/YYYY")
+    wsLg.Cells(nextLog, LG_INIT).Value = "TST"
+    wsLg.Cells(nextLog, LG_FORM).Value = form
+    wsLg.Cells(nextLog, LG_CNT).Value = 1
+    Dim encColor As Long
+    Select Case (encNum - 1) Mod 3
+        Case 0:    encColor = RGB(226, 239, 218)   ' light green
+        Case 1:    encColor = RGB(221, 235, 247)   ' light blue
+        Case Else: encColor = RGB(255, 255, 255)   ' white
+    End Select
+    Dim c As Integer
+    For c = 1 To LG_LAST
+        With wsLg.Cells(nextLog, c)
+            .Font.Name = "Arial"
+            .Font.Size = 9
+            .Interior.Color = encColor
+        End With
+    Next c
+    wsLg.Cells(nextLog, LG_ENC).HorizontalAlignment = xlCenter
+    wsLg.Cells(nextLog, LG_ENC).Font.Bold = True
 End Sub
 
 ' Fill the Input tab with a random patient + medication list (no Exp/Lot), ready to Parse.
