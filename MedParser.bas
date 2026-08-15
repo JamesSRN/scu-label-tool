@@ -5500,6 +5500,59 @@ Private Sub ClearEncounterStore()
     On Error GoTo 0
 End Sub
 
+' A friendly "how encounter editing works" heads-up, shown when the volunteer clicks
+' Edit Encounter. Reuses the same readable frmReview list as the Medications-tab Review
+' (large bold step titles + smaller explanation lines underneath), with a plain MsgBox
+' fallback if the form is unavailable. Returns True to continue to the encounter picker,
+' False if the volunteer clicks Cancel.
+Private Function ShowEncounterHeadsUp() As Boolean
+    ShowEncounterHeadsUp = True
+
+    Dim usedForm As Boolean
+    usedForm = False
+    On Error Resume Next
+    frmReview.ResetList
+    usedForm = (Err.Number = 0)
+    Err.Clear
+    On Error GoTo 0
+
+    If usedForm Then
+        On Error Resume Next
+        frmReview.AddMed "1.  What Edit Encounter does", _
+            "Reopens a past dispense and puts its saved medications back on the " & _
+            "Medications tab so you can fix or reprint them.", True
+        frmReview.AddMed "2.  Every med comes back CHECKED", _
+            "Uncheck any you will NOT reprint - double-click a 'Check Med' cell, or " & _
+            "the 'Check Med' column header to toggle the whole list at once.", True
+        frmReview.AddMed "3.  Save your changes", _
+            "Click 'Save Edited Encounter' when done. It updates the Log and the Tebra " & _
+            "note for this encounter in place - it never creates a duplicate.", True
+        frmReview.AddMed "4.  Reprinting is safe", _
+            "After saving it offers to reprint ONLY the checked meds, and shows the " & _
+            "count first - so it can never surprise-print the whole list.", True
+        frmReview.AddMed "5.  Heads up", _
+            "This REPLACES the medications currently on screen. Finish or print the " & _
+            "current patient first if you still need them.", True
+        frmReview.SetHeader "Editing an Encounter - How it works"
+        frmReview.SetFooter "Click Continue to pick an encounter, or Cancel to go back."
+        frmReview.ConfigButtons True, "Continue", "Cancel"
+        frmReview.FinishList
+        frmReview.Show
+        ShowEncounterHeadsUp = (frmReview.Result = "OK")
+        On Error GoTo 0
+    Else
+        Dim m As String
+        m = "EDITING AN ENCOUNTER - how it works:" & vbCrLf & vbCrLf & _
+            "1. Reopens a past dispense and puts its saved meds back on the Medications tab." & vbCrLf & vbCrLf & _
+            "2. Every med comes back CHECKED - uncheck any you will NOT reprint (double-click a 'Check Med' cell, or the header to toggle all)." & vbCrLf & vbCrLf & _
+            "3. Click 'Save Edited Encounter' when done - it updates the Log and Tebra note in place (no duplicate)." & vbCrLf & vbCrLf & _
+            "4. It then offers to reprint ONLY the checked meds, showing the count first." & vbCrLf & vbCrLf & _
+            "5. This REPLACES the meds currently on screen - finish the current patient first if needed." & vbCrLf & vbCrLf & _
+            "Continue?"
+        ShowEncounterHeadsUp = (MsgBox(m, vbOKCancel + vbInformation, "Editing an Encounter - How it works") = vbOK)
+    End If
+End Function
+
 ' Reopen a past encounter: show a list, pick a number, restore the patient + full med list.
 Public Sub EditEncounter()
     Call AppReady                    ' un-stick events/screen from any interrupted prior action
@@ -5513,6 +5566,8 @@ Public Sub EditEncounter()
                "An encounter is saved each time you Print Checked Labels.", vbInformation, "Edit Encounter"
         Exit Sub
     End If
+    ' Quick rundown of how encounter editing works (volunteer heads-up); Cancel backs out.
+    If Not ShowEncounterHeadsUp() Then Exit Sub
     ' Distinct encounter numbers, in order of first appearance.
     Dim seen As String, order As String, r As Long, e As Long
     seen = "|"
