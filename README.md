@@ -31,9 +31,9 @@ It's built to be **robust for high-turnover volunteers**: it parses, checks, and
 | | Do this |
 |---|---|
 | **Open the tool** (every time) | Double-click **`OPEN LABEL TOOL (double-click me).cmd`** |
-| **Fallback** (only if a build won't run) | Open **`MedicationDispensing.xlsm`** directly |
+| **Fallback** (if the launcher won't run) | Double-click **`Build-Release.vbs`** — it does the same rebuild-and-open |
 
-> The launcher runs `Build-Release.vbs`, which rebuilds the workbook from the latest `MedParser.bas` and opens it — so you're never on stale code. Make sure the workbook is **closed** first. Everything else (`support/`, `tools/`, the `.bas` source, the emblem, and the bootstrap workbook) is support material the build needs — don't move it.
+> The launcher runs `Build-Release.vbs`, which rebuilds the workbook from the latest `MedParser.bas` and opens it — so you're never on stale code. If the launcher itself won't run, **double-click `Build-Release.vbs`** to do the exact same rebuild-and-open. (Opening `MedicationDispensing.xlsm` directly is a last resort only — it skips the rebuild, so it may be on older code.) Make sure the workbook is **closed** first. Everything else (`support/`, `tools/`, the `.bas` source, the emblem, and the bootstrap workbook) is support material the build needs — don't move it.
 
 > **Install:** grab the latest `SCU-Label-Printing-vX.Y.zip` from the **[Releases page](https://github.com/JamesSRN/scu-label-tool/releases)**, unzip, and open `MedicationDispensing.xlsm`. Full steps in **[RELEASE.md](support/docs/RELEASE.md)**.
 
@@ -138,8 +138,8 @@ Requires, one-time in Excel's Trust Center:
 | File | What it is |
 |---|---|
 | `OPEN LABEL TOOL (double-click me).cmd` | **The everyday launcher** — rebuilds from `MedParser.bas` and opens the tool. |
-| `MedicationDispensing.xlsm` | The clinic workbook the launcher builds + opens (local, git-ignored). Fallback if a build won't run. |
-| `Build-Release.vbs` | Imports `MedParser.bas`, runs `SetupWorkbook`, saves the `.xlsm`. |
+| `MedicationDispensing.xlsm` | The clinic workbook the launcher builds + opens (local, git-ignored). Opening it directly is a last resort — it skips the rebuild, so it may be stale. |
+| `Build-Release.vbs` | Imports `MedParser.bas`, runs `SetupWorkbook`, saves + opens the `.xlsm`. **Double-click it directly if the launcher won't run** — it's the fallback way in. |
 | `MedParser.bas` | The VBA source of truth (parser, validation, label layout, printing, logging). |
 | `scu_emblem.png` | SC emblem for the label header (loaded at print time; must stay here). |
 | `README.md` | This file. |
