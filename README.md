@@ -63,9 +63,15 @@ Highlights update **live as you type** — a missing **Quantity / Expiration / L
 
 > **Row colors at a glance:** yellow cell = missing · **white** = filled, not yet reviewed · **blue** = reviewed OK · **green** = checked to print. Double-click a **Check Med** box (or the medication name) to check/uncheck one, or **double-click the Check Med header** to check/uncheck all. **+ Add Medication** and **Edit this med** share the same one-dialog editor.
 
+> **Saving & editing a visit.** The toolbar's right side manages **encounters** — one patient visit. **Save Enc.** stores the current patient, **Save Draft** parks an unfinished one (drafts are never printed), and **Edit Enc.** reopens a past encounter to fix and re-print it (re-saved edits show up in the Log as `1 (v2)`, `1 (v3)`, …). The edit list is pulled **straight from the Log**, so it always matches what you see there — and it even handles a Log you pasted in from elsewhere: it offers to **auto-number** any blank encounters and **warns you instead of guessing** if the Log's columns are out of order.
+
 ### 3 · Print Labels  (orange)
 
 Every checked med auto-previews as a real label — drug + strength, directions, `form · qty · source · refills`, and Exp/Lot pinned to the bottom row (long patient names shrink to fit). Click **Print Checked Labels** — **2 copies of each** — enter your initials, and confirm. The confirmation lists exactly what's about to print and flags any row skipped for missing Exp/Lot.
+
+Each label card also has its own buttons to the right — **Check / Uncheck this label**, **Edit this med**, **Remove this med**, and **Print extra (no log)** — so you can fix or drop a single label right from the gallery.
+
+> **Need a spare?** **Print extra (no log)** prints one more copy of just that label on demand — for extra physical labels a patient needs. It's **not** added to the dispense Log and does **not** change the print count.
 
 ![Label Previews gallery](support/assets/screenshots/print-gallery-v2.png)
 
@@ -93,7 +99,9 @@ A ready-to-paste note for **each patient**, grouped by source, with each note **
 - **Required Source** dropdown (DOH / IN HOUSE / RxAPS / Other), logged on every row and **printed on the label** (on the qty line, before Refills).
 - **Checkbox-driven** selection that drives printing, row color, and removal alike.
 - **2 copies per label**, batch or single, with detailed confirmations and fit-to-page so the bottom row never clips.
+- **Print extra (no log)** per-card button for spare labels a patient needs — printed without touching the dispense Log or the print count.
 - **Complete dispense log** with numbered, green-banded **encounters** and a divider between each.
+- **Edit past encounters** — reopen any logged visit (the list is pulled live from the Log), fix it, and re-save as a new version; tolerant of pasted-in logs (auto-numbers blank encounters, warns on column mismatches).
 - **Tebra notes** sheet: paste-ready session notes grouped by source, one boxed note per patient.
 - **Brother QL-1100c auto-select** with a load-the-roll confirmation.
 
