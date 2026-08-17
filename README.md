@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="support/assets/scu-emblem-badge.png" alt="Saturday Clinic for the Uninsured emblem" width="130">
+<img src="support/assets/scu-emblem-badge-v2.png" alt="Saturday Clinic for the Uninsured emblem" width="130">
 
 # SCU Label Printing Tool
 
@@ -43,7 +43,7 @@ It's built to be **robust for high-turnover volunteers**: it parses, checks, and
 
 The whole workflow lives on **five color-coded, numbered tabs**. The workbook opens to a built-in guide that walks you through them:
 
-![Start Here guide](support/assets/screenshots/start-here.png)
+![Start Here guide](support/assets/screenshots/start-here-v2.png)
 
 _All screenshots below use randomly generated test patients — no real patient data._
 
@@ -57,9 +57,9 @@ Each drug becomes one row — name, strength, form, directions (SIG), quantity, 
 
 Highlights update **live as you type** — a missing **Quantity / Expiration / Lot / Source** cell is **yellow** and clears to **white** the instant you fill it. Then click **Review**: complete rows validate to **blue**. Review no longer auto-checks anything — you choose what prints: **double-click a Check Med cell** to check one (it turns **green**), or **double-click the "Check Med" column header** to check / uncheck the whole list at once. The Review pop-up lists each drug's **name + strength in bold** with any issues stacked beneath.
 
-![Medications tab](support/assets/screenshots/medications-tab.png)
+![Medications tab](support/assets/screenshots/medications-tab-v2.png)
 
-![Medication Review — errors listed under each drug, missing cells highlighted yellow](support/assets/screenshots/review-dialog.png)
+![Medication Review — errors listed under each drug, missing cells highlighted yellow](support/assets/screenshots/review-dialog-v2.png)
 
 > **Row colors at a glance:** yellow cell = missing · **white** = filled, not yet reviewed · **blue** = reviewed OK · **green** = checked to print. Double-click a **Check Med** box (or the medication name) to check/uncheck one, or **double-click the Check Med header** to check/uncheck all. **+ Add Medication** and **Edit this med** share the same one-dialog editor.
 
@@ -67,19 +67,19 @@ Highlights update **live as you type** — a missing **Quantity / Expiration / L
 
 Every checked med auto-previews as a real label — drug + strength, directions, `form · qty · source · refills`, and Exp/Lot pinned to the bottom row (long patient names shrink to fit). Click **Print Checked Labels** — **2 copies of each** — enter your initials, and confirm. The confirmation lists exactly what's about to print and flags any row skipped for missing Exp/Lot.
 
-![Label Previews gallery](support/assets/screenshots/print-gallery.png)
+![Label Previews gallery](support/assets/screenshots/print-gallery-v2.png)
 
 ### 4 · Log  (purple)
 
 Every printed label is recorded automatically — timestamp, patient, DOB, medication details, **source**, initials, print count, and **Encounter #**. Each print is one **encounter**: numbered, shaded by encounter in **cycling light green / light blue / white**, and separated by a divider line so each patient reads as one block. Nothing to do here — it's your record. (The Log clears on close, so it always opens blank with no leftover highlighting.)
 
-![Dispense Log](support/assets/screenshots/log.png)
+![Dispense Log](support/assets/screenshots/log-v2.png)
 
 ### 5 · Tebra Notes  (teal)
 
 A ready-to-paste note for **each patient**, grouped by source, with each note **boxed** so you can select it, copy, and paste straight into that patient's Tebra chart. The notes are built **from the Log** and **rebuild every time you open the Tebra Notes tab** — so anything in the Log (even a row you typed in by hand) shows up here automatically.
 
-![Tebra Notes](support/assets/screenshots/tebra-notes.png)
+![Tebra Notes](support/assets/screenshots/tebra-notes-v2.png)
 
 > **Between patients:** **Start NEW Patient** clears the patient + med list but keeps the Log (run patient after patient). **Reset Session** wipes everything — Log included — for a fresh day.
 
