@@ -524,6 +524,61 @@ BAA. The repo is code + docs + no-PHI samples only.
 
 ---
 
+## 10. Code review - 2026-08-23 (static review of `MedParser.bas` on `origin/master`)
+
+A full read-through of the module (every routine) plus a scan for the usual VBA
+pitfalls (error handling, `EnableEvents` / `ScreenUpdating` balance, re-entrancy,
+off-by-one, `Val` / type coercion). **No crashes, data-corruption, or logic errors**
+were found in the core parse -> validate -> print -> log -> edit-encounter flow. The
+items below are minor / edge-case (all Low severity).
+
+1. **`FillTebraTemplate` re-entrancy guard could get stuck - FIXED 2026-08-23.**
+   The per-patient note-build section ran with error handling turned off
+   (`On Error GoTo 0`), so an error there escaped **before** `gInTebraFill = False`,
+   leaving the guard stuck `True` and silently turning every later Tebra refresh into
+   a no-op for the session (invisible, because callers wrap the call in
+   `On Error Resume Next`). Fixed by routing that section to a `CleanExit:` label that
+   **always** clears the guard, even on error.
+
+2. **`RowPrintExtra` can double-print in the "Brother not found" fallback (open).**
+   When the QL-1100c isn't detected and the volunteer prints via the manual Windows
+   dialog (`Application.Dialogs(xlDialogPrint).Show`), the sub then **still** calls
+   `PrintLabelSurfaceSafe`, so it can emit the manual print **and** the label-surface
+   print (the manual dialog also prints whatever sheet is active, not the hidden label
+   surface). `PrintLabel` avoids this by exiting right after the manual dialog. Only
+   triggers when the printer isn't found. Fix: `Exit Sub` after the manual dialog in
+   `RowPrintExtra`. (Left as-is for now, per review scope.)
+
+3. **`LogColumnsValid` checks 9 of 16 Log columns (by design).** It validates the
+   identity / critical columns (Timestamp, Encounter, Patient, DOB, Medication,
+   Expiration, Lot, Source, Print #) before Edit Encounter reads the Log by position,
+   but not Strength / Directions / Qty / Refills / RxDate / DosageForm. A pasted-in Log
+   that scrambled only those could restore them into the wrong fields without a
+   warning. Reasonable trade-off; extend the check if messy pasted logs become common.
+
+4. **Print-count column lags by one after "edit -> reprint" (cosmetic).** In
+   `SaveEditedEncounter` the meds are re-logged (copying the current `# of Prints`)
+   **before** `PrintEncounterLabelsNoLog` -> `MarkPrinted` bumps the count, so an
+   edited-and-reprinted encounter shows a Print # one behind reality until the next
+   save. No functional impact.
+
+5. **Custom `IIf` shadows VBA's built-in with a String-only version (maintainability).**
+   Every current call works (numeric args like `IIf(medWrap, 30, 20)` and the MsgBox
+   icon at `RunParserTests` coerce through String and back), but a future call passing
+   an object or a value that doesn't cleanly coerce would misbehave. Harmless today.
+
+**Reviewed and confirmed correct:** `CheckAllToggle` + the injected
+`Worksheet_BeforeDoubleClick` (double-clicking the "Check Med" header B2 checks /
+unchecks all), the live Log-driven Edit Encounter list, blank-encounter
+auto-numbering (`AssignBlankEncounters`), the column-mismatch bail-out,
+`LoadEncounterFromLog` / `LoadEncounterFromSnapshot` pre-checking every restored row
+(with `ClearMedArea` wiping stale checks first), `ValidateMedications` not clobbering
+the checked (green) state, the gallery 2x2 button math + `CallerRow` shape-name
+parsing, the printer-detection cache with self-heal, and `PrintLabelSurfaceSafe`'s
+`Resume CleanExit` (always re-hides the label sheet).
+
+---
+
 **Bottom line:** parsing, validation, checkbox-driven selection/printing/removal,
 the dispense log, multi-patient flow, and the **redesigned DK-1202 label** (emblem,
 header typography, width, single-page print) are built and **verified on screen

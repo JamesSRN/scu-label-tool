@@ -722,7 +722,10 @@ Public Sub FillTebraTemplate()
         tb.Line.ForeColor.RGB = RGB(255, 255, 255)
         tb.Line.Weight = 1
     End If
-    On Error GoTo 0
+    ' Route any error from the note build below to CleanExit so the gInTebraFill
+    ' re-entrancy guard is ALWAYS cleared. Previously an escaping error here left the
+    ' guard stuck True, silently turning every later Tebra refresh into a no-op.
+    On Error GoTo CleanExit
 
     ws.Cells(4, 1).Value = "Each boxed note below = one patient. Select that box's lines in column A (top to bottom), press Ctrl+C, and paste into that patient's Tebra chart."
     ws.Cells(4, 1).Font.Italic = True
@@ -752,9 +755,11 @@ Public Sub FillTebraTemplate()
     End If
 
     ws.Cells(1, 1).Select
+CleanExit:
+    On Error Resume Next
     If Not gBuilding Then Application.ScreenUpdating = True
     On Error GoTo 0
-    gInTebraFill = False
+    gInTebraFill = False        ' ALWAYS reset the guard - even if the build errored above
 End Sub
 
 Public Sub SetupWorkbook()
@@ -6999,4 +7004,4 @@ End Function
 
 ' ============================================================
 '  AUTO-RUN on workbook open
-' ===========================================
+' ===========================================

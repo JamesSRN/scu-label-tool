@@ -8,6 +8,9 @@ Medication uses the `frmMedEdit` form, live yellow<->white highlighting with a c
 white -> blue -> green row state, Parse clears the previous list first, Medications &
 Print Labels banners redesigned, and the clipboard-popup source removed.
 
+**Fix: Tebra note refresh could get stuck off after an error (2026-08-23)**
+- `FillTebraTemplate`'s re-entrancy guard (`gInTebraFill`) is now **always cleared**, even if the per-patient note build errors. Previously that section ran with `On Error GoTo 0`, so an escaping error left the guard stuck `True` and silently turned every later Tebra refresh into a no-op for the rest of the session (invisible, since callers wrap the call in `On Error Resume Next`). The build now routes to a `CleanExit:` label that resets the guard on all paths. Found in the 2026-08-23 static code review (see `HANDOFF.md` section 10 for the full findings list).
+
 **Label shows the Source; long patient names shrink to fit (2026-07-24)**
 - The label's **form/qty line now includes the Source** (IN HOUSE / DOH / RxAPS / Other) between Qty and Refills, dot-separated: `Tablet  .  Qty 30  .  IN HOUSE  .  Refills 2`. Applies to both the print label (`UpdateLabelPreviewForMedRow`) and the gallery cards (`BuildAllLabelsPreview`).
 - The **patient name on the label auto-shrinks** for long names via a new `LabelNameFontSize` helper (12 -> 11 -> 10 -> 9 -> 8 pt by length), on both the single preview and the gallery cards, so a long name no longer overflows/clips its half-width name cell. (An absurdly long name still can't fully fit a 62 mm label - that's test data, not a real patient.)
