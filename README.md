@@ -22,8 +22,8 @@ Saturday Clinic for the Uninsured · Medical College of Wisconsin
 ---
 
 > **Are you trying to print lab labels?** That's a different tool.  
-> → **[Lab Label Printer](https://github.com/JamesSRN/lab-label-printer)** — name, DOB, and date on the small DK-1201 address roll.  
-> This page is the **Dispensary** tool (medication labels, DK-1202 shipping roll).
+> → **[SCU Lab Label Tool](https://github.com/JamesSRN/lab-label-printer)** — name, DOB, and date on the small DK-1201 address roll.  
+> This page is the **Dispensary** tool (medication labels on Hermione, DK-1202 shipping roll).
 
 ---
 

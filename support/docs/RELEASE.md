@@ -7,7 +7,7 @@ Latest releases: <https://github.com/JamesSRN/scu-label-tool/releases>
 
 ## Download & install (clinics / volunteers)
 
-This is the **Dispensary** tool (medication labels). Lab / specimen labels are a different repo: [lab-label-printer](https://github.com/JamesSRN/lab-label-printer).
+This is the **Dispensary** tool (medication labels on Hermione). Lab / specimen labels are a different repo: [SCU Lab Label Tool](https://github.com/JamesSRN/lab-label-printer).
 
 1. Open the **[latest release](https://github.com/JamesSRN/scu-label-tool/releases/latest)** and, under **Assets**, download **`SCU-Label-Printing-vX.Y.zip`**.
 2. **Move the ZIP to the Desktop** (out of Downloads / OneDrive). **Right-click → Extract All…** — do not open files from inside the ZIP window. Keep **`MedicationDispensing.xlsm`**, **`scu_emblem.png`**, and **`OPEN LABEL TOOL (double-click me).cmd`** together in that extracted folder.

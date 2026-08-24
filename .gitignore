@@ -24,3 +24,6 @@ tools/*.generated.txt
 dist/
 
 # (The workbook itself is now tracked - see the *.xlsm note at the top of this file.)
+
+# Local clone of the Lab GitHub repo (separate project; do not commit)
+_lab_work/
