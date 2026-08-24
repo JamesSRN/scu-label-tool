@@ -168,17 +168,25 @@ Each print is one **encounter**:
 
 The Log includes timestamp, patient, DOB, medication details, **source**, initials, print count, and **Encounter #**. It clears on close, so it always opens blank with no leftover highlighting.
 
+**The Log is the source of truth** for Tebra Notes and for **Edit Encounter**. If a row is wrong or missing, you can fix it here by hand.
+
+- Edit a Log cell (name, drug, SIG, qty, source, etc.), add a row, or delete a row.
+- Open **5 · Tebra Notes** — it rebuilds from whatever is in the Log *right now*. Copy the boxed note into Tebra. You do **not** have to re-print.
+- Click **Edit Enc.** and pick that encounter — it reloads the patient and **every med from the Log**, including your hand-edits. Then you can fix, uncheck, save, and reprint as usual.
+
+**Print extra (no log)** does not add a Log row, so it will not show up in Tebra Notes or Edit Encounter. Drafts that were never printed live only in the snapshot store, not the Log.
+
 ![Dispense Log](support/assets/screenshots/log-v2.png)
 
 ### 5 · Tebra Notes  (teal)
 
-A ready-to-paste note for **each patient**, grouped by source.
+A ready-to-paste note for **each patient**, grouped by source. Built **from the Log** — including any rows you typed or corrected by hand.
 
 1. Select a boxed note.
 2. Copy it.
 3. Paste it into that patient's Tebra chart.
 
-The notes are built **from the Log** and **rebuild every time you open this tab** — so anything in the Log (even a row you typed in by hand) shows up here automatically.
+The notes **rebuild every time you open this tab**, so they always match the Log. Need to change a note? Fix the Log first, then come back here.
 
 ![Tebra Notes](support/assets/screenshots/tebra-notes-v2.png)
 
@@ -200,7 +208,7 @@ The notes are built **from the Log** and **rebuild every time you open this tab*
 - **Print extra (no log)** per-card button for spare labels a patient needs — printed without touching the dispense Log or the print count.
 - **Complete dispense log** with numbered, color-banded **encounters** and a divider between each.
 - **Edit past encounters** — reopen any logged visit (the list is pulled live from the Log), fix it, and re-save as a new version; tolerant of pasted-in logs (auto-numbers blank encounters, warns on column mismatches).
-- **Tebra notes** sheet: paste-ready session notes grouped by source, one boxed note per patient, rebuilt from the Log whenever you open the tab.
+- **Tebra notes** sheet: paste-ready session notes grouped by source, one boxed note per patient, rebuilt from the Log whenever you open the tab (fix the Log by hand if needed, then copy).
 - **Brother QL-1100c (Hermione) auto-select** with a load-the-roll confirmation.
 
 ---
