@@ -46,7 +46,7 @@ Use native Windows Git/GitHub Desktop for this repo. Avoid managing a OneDrive-b
 
 ## 4. Install and configure the Brother printer
 
-1. Plug in and power on the Brother QL-1100c (Hermione).
+1. Plug in the USB cable and power on the Brother QL-1100c (Hermione). Hermione is USB-only — do not try to pair her over Bluetooth.
 2. Install the Brother full driver/software package if Windows does not configure it correctly.
 3. Confirm the printer appears in Windows printer settings.
 4. Set the printer default media to DK-1202 / 62 x 100 mm.

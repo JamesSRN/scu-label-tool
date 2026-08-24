@@ -85,7 +85,7 @@ It runs `Build-Release.vbs` for you — rebuilds from the latest `MedParser.bas`
 
 </details>
 
-Printer: **Brother QL-1100c (Hermione)** with a **DK-1202 (62 × 100 mm)** roll loaded. The workbook opens to the **Start Here** guide.
+Printer: **Brother QL-1100c (Hermione)** with a **DK-1202 (62 × 100 mm)** roll loaded. Hermione needs a **USB cable** — she is not Bluetooth. The workbook opens to the **Start Here** guide.
 
 <details>
 <summary>When the roll runs out</summary>
