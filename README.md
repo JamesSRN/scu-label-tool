@@ -69,15 +69,31 @@ If a yellow **Enable Content** bar appears the first time the workbook opens, cl
 | **Open the tool** (every time) | Double-click **`OPEN LABEL TOOL (double-click me).cmd`** — that's the "click me" file |
 | **If the click-me file doesn't work** | Double-click **`Build-Release.vbs`** instead |
 
-> Close the workbook first, then use the click-me file. It runs `Build-Release.vbs` for you — rebuilds from the latest `MedParser.bas` and opens Excel — so you're never on stale code.
->
-> - If that file does nothing (Windows blocks `.cmd`, a window flashes and vanishes, etc.), skip it and double-click **`Build-Release.vbs`** yourself.
-> - Don't open the `.xlsm` by hand unless both of those fail.
-> - Leave the rest of the folder alone (`support/`, `tools/`, the `.bas` source, the emblem, and the bootstrap workbook) — the build needs it.
+> Close the workbook first, then use the click-me file.
+
+<details>
+<summary>Why the click-me file? (and what if it fails)</summary>
+
+<br>
+
+It runs `Build-Release.vbs` for you — rebuilds from the latest `MedParser.bas` and opens Excel — so you're never on stale code.
+
+- If that file does nothing (Windows blocks `.cmd`, a window flashes and vanishes, etc.), skip it and double-click **`Build-Release.vbs`** yourself.
+- Don't open the `.xlsm` by hand unless both of those fail.
+- Leave the rest of the folder alone (`support/`, `tools/`, the `.bas` source, the emblem, and the bootstrap workbook) — the build needs it.
+
+</details>
 
 Printer: **Brother QL-1100c (Hermione)** with a **DK-1202 (62 × 100 mm)** roll loaded. The workbook opens to the **Start Here** guide.
 
-When the roll is empty, **keep the plastic spool** — don't throw it away. New DK-1202 labels load onto that same spool.
+<details>
+<summary>When the roll runs out</summary>
+
+<br>
+
+**Keep the plastic spool** — don't throw it away. New DK-1202 labels load onto that same spool.
+
+</details>
 
 ---
 
@@ -95,7 +111,14 @@ _All screenshots below use randomly generated test patients — no real patient 
 2. Paste the prescription text into the big box.
 3. Click **PARSE MEDICATIONS** (or press `Ctrl+Shift+P`).
 
+<details>
+<summary>What Parse does with the previous patient</summary>
+
+<br>
+
 Parse **clears the previous patient's list first** (keeping the name/DOB and the Log) so a new patient never mixes with old rows.
+
+</details>
 
 ### 2 · Medications  (green)
 
@@ -124,22 +147,27 @@ Each drug becomes one row: name, strength, form, directions (SIG), quantity, ref
 
 ![Medication Review — errors listed under each drug, missing cells highlighted yellow](support/assets/screenshots/review-dialog-v2.png)
 
-> **Row colors at a glance**
->
-> - **Yellow cell** — missing
-> - **White** — filled, not yet reviewed
-> - **Blue** — reviewed OK
-> - **Green** — checked to print
->
-> **+ Add Medication** and **Edit this med** share the same one-dialog editor.
+<details>
+<summary>Row colors at a glance</summary>
 
-> **Saving & editing a visit.** The toolbar's right side manages **encounters** — one patient visit.
->
-> - **Save Enc.** — stores the current patient
-> - **Save Draft** — parks an unfinished one (drafts are never printed)
-> - **Edit Enc.** — reopens a past encounter to fix and re-print it (re-saved edits show up in the Log as `1 (v2)`, `1 (v3)`, …)
->
-> The edit list is pulled **straight from the Log**, so it always matches what you see there. If you pasted a Log in from elsewhere, it offers to **auto-number** any blank encounters and **warns you instead of guessing** if the columns are out of order.
+<br>
+
+- **Yellow cell** — missing
+- **White** — filled, not yet reviewed
+- **Blue** — reviewed OK
+- **Green** — checked to print
+
+**+ Add Medication** and **Edit this med** share the same one-dialog editor.
+
+</details>
+
+**Saving & editing a visit.** The toolbar's right side manages **encounters** — one patient visit.
+
+- **Save Enc.** — stores the current patient
+- **Save Draft** — parks an unfinished one (drafts are never printed)
+- **Edit Enc.** — reopens a past encounter to fix and re-print it (re-saved edits show up in the Log as `1 (v2)`, `1 (v3)`, …)
+
+The edit list is pulled **straight from the Log**, so it always matches what you see there. If you pasted a Log in from elsewhere, it offers to **auto-number** any blank encounters and **warns you instead of guessing** if the columns are out of order.
 
 ### 3 · Print Labels  (orange)
 
@@ -162,13 +190,7 @@ Each label card also has its own buttons on the right:
 
 Every printed label is recorded automatically. Nothing to do here — it's your record.
 
-Each print is one **encounter**:
-
-- Numbered
-- Shaded in cycling light green / light blue / white
-- Separated by a divider so each patient reads as one block
-
-The Log includes timestamp, patient, DOB, medication details, **source**, initials, print count, and **Encounter #**. It clears on close, so it always opens blank with no leftover highlighting.
+Each print is one **encounter**: numbered, color-banded, and separated by a divider so each patient reads as one block.
 
 **The Log is the source of truth** for Tebra Notes and for **Edit Encounter**. If a row is wrong or missing, you can fix it here by hand.
 
@@ -182,13 +204,18 @@ The Log includes timestamp, patient, DOB, medication details, **source**, initia
 
 ### 5 · Tebra Notes  (teal)
 
-A ready-to-paste note for **each patient**, grouped by source. Built **from the Log** — including any rows you typed or corrected by hand.
-
 1. Select a boxed note.
 2. Copy it.
 3. Paste it into that patient's Tebra chart.
 
-The notes **rebuild every time you open this tab**, so they always match the Log. Need to change a note? Fix the Log first, then come back here.
+<details>
+<summary>If a note is wrong</summary>
+
+<br>
+
+The notes are built **from the Log** (including any rows you typed or corrected by hand) and **rebuild every time you open this tab**. Fix the Log first, then come back here. You do not have to re-print.
+
+</details>
 
 ![Tebra Notes](support/assets/screenshots/tebra-notes-v2.png)
 
