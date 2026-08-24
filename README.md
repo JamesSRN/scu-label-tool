@@ -69,7 +69,11 @@ If a yellow **Enable Content** bar appears the first time the workbook opens, cl
 | **Open the tool** (every time) | Double-click **`OPEN LABEL TOOL (double-click me).cmd`** — that's the "click me" file |
 | **If the click-me file doesn't work** | Double-click **`Build-Release.vbs`** instead |
 
-> Close the workbook first, then use the click-me file. It runs `Build-Release.vbs` for you — rebuilds from the latest `MedParser.bas` and opens Excel — so you're never on stale code. If that file does nothing (Windows blocks `.cmd`, a window flashes and vanishes, etc.), skip it and double-click **`Build-Release.vbs`** yourself. Don't open the `.xlsm` by hand unless both of those fail. Everything else in the folder (`support/`, `tools/`, the `.bas` source, the emblem, and the bootstrap workbook) is support material the build needs — don't move it.
+> Close the workbook first, then use the click-me file. It runs `Build-Release.vbs` for you — rebuilds from the latest `MedParser.bas` and opens Excel — so you're never on stale code.
+>
+> - If that file does nothing (Windows blocks `.cmd`, a window flashes and vanishes, etc.), skip it and double-click **`Build-Release.vbs`** yourself.
+> - Don't open the `.xlsm` by hand unless both of those fail.
+> - Leave the rest of the folder alone (`support/`, `tools/`, the `.bas` source, the emblem, and the bootstrap workbook) — the build needs it.
 
 Printer: **Brother QL-1100c (Hermione)** with a **DK-1202 (62 × 100 mm)** roll loaded. The workbook opens to the **Start Here** guide.
 
@@ -85,45 +89,103 @@ _All screenshots below use randomly generated test patients — no real patient 
 
 ### 1 · Patient & Input  (blue)
 
-Enter the patient's **name + DOB**, paste the prescription text into the big box, and click **PARSE MEDICATIONS** (or press `Ctrl+Shift+P`). Parse **clears the previous patient's list first** (keeping the name/DOB and the Log) so a new patient never mixes with old rows.
+1. Enter the patient's **name + DOB**.
+2. Paste the prescription text into the big box.
+3. Click **PARSE MEDICATIONS** (or press `Ctrl+Shift+P`).
+
+Parse **clears the previous patient's list first** (keeping the name/DOB and the Log) so a new patient never mixes with old rows.
 
 ### 2 · Medications  (green)
 
-Each drug becomes one row — name, strength, form, directions (SIG), quantity, refills, expiration, and lot. **Refills default to 0** and a **Source** dropdown (DOH / IN HOUSE / RxAPS / Other) is required.
+Each drug becomes one row: name, strength, form, directions (SIG), quantity, refills, expiration, and lot.
 
-Highlights update **live as you type** — a missing **Quantity / Expiration / Lot / Source** cell is **yellow** and clears to **white** the instant you fill it. Then click **Review**: complete rows validate to **blue**. Review does not auto-check anything — you choose what prints: **double-click a Check Med cell** to check one (it turns **green**), or **double-click the "Check Med" column header** to check / uncheck the whole list at once. The Review pop-up lists each drug's **name + strength in bold** with any issues stacked beneath.
+- **Refills** default to **0**.
+- **Source** is required — pick DOH / IN HOUSE / RxAPS / Other.
+
+**Fill in missing cells (live as you type)**
+
+- A missing **Quantity / Expiration / Lot / Source** cell is **yellow**.
+- It clears to **white** the instant you fill it.
+
+**Then click Review**
+
+- Complete rows validate to **blue**.
+- Review does **not** auto-check anything — you choose what prints.
+- The Review pop-up lists each drug's **name + strength in bold**, with any issues stacked beneath.
+
+**Choose what prints**
+
+- Double-click a **Check Med** cell (or the medication name) to check one — it turns **green**.
+- Double-click the **"Check Med" column header** to check / uncheck the whole list at once.
 
 ![Medications tab](support/assets/screenshots/medications-tab-v2.png)
 
 ![Medication Review — errors listed under each drug, missing cells highlighted yellow](support/assets/screenshots/review-dialog-v2.png)
 
-> **Row colors at a glance:** yellow cell = missing · **white** = filled, not yet reviewed · **blue** = reviewed OK · **green** = checked to print. Double-click a **Check Med** box (or the medication name) to check/uncheck one, or **double-click the Check Med header** to check/uncheck all. **+ Add Medication** and **Edit this med** share the same one-dialog editor.
+> **Row colors at a glance**
+>
+> - **Yellow cell** — missing
+> - **White** — filled, not yet reviewed
+> - **Blue** — reviewed OK
+> - **Green** — checked to print
+>
+> **+ Add Medication** and **Edit this med** share the same one-dialog editor.
 
-> **Saving & editing a visit.** The toolbar's right side manages **encounters** — one patient visit. **Save Enc.** stores the current patient, **Save Draft** parks an unfinished one (drafts are never printed), and **Edit Enc.** reopens a past encounter to fix and re-print it (re-saved edits show up in the Log as `1 (v2)`, `1 (v3)`, …). The edit list is pulled **straight from the Log**, so it always matches what you see there — and it even handles a Log you pasted in from elsewhere: it offers to **auto-number** any blank encounters and **warns you instead of guessing** if the Log's columns are out of order.
+> **Saving & editing a visit.** The toolbar's right side manages **encounters** — one patient visit.
+>
+> - **Save Enc.** — stores the current patient
+> - **Save Draft** — parks an unfinished one (drafts are never printed)
+> - **Edit Enc.** — reopens a past encounter to fix and re-print it (re-saved edits show up in the Log as `1 (v2)`, `1 (v3)`, …)
+>
+> The edit list is pulled **straight from the Log**, so it always matches what you see there. If you pasted a Log in from elsewhere, it offers to **auto-number** any blank encounters and **warns you instead of guessing** if the columns are out of order.
 
 ### 3 · Print Labels  (orange)
 
-Every checked med auto-previews as a real label — drug + strength, directions, `form · qty · source · refills`, and Exp/Lot pinned to the bottom row (long patient names shrink to fit). Click **Print Checked Labels** — **2 copies of each** — enter your initials, and confirm. The confirmation lists exactly what's about to print and flags any row skipped for missing Exp/Lot.
+Every checked med auto-previews as a real label — drug + strength, directions, `form · qty · source · refills`, and Exp/Lot pinned to the bottom row (long patient names shrink to fit).
 
-Each label card also has its own buttons to the right — **Check / Uncheck this label**, **Edit this med**, **Remove this med**, and **Print extra (no log)** — so you can fix or drop a single label right from the gallery.
+1. Click **Print Checked Labels**.
+2. Enter your initials and confirm. **2 copies of each** print.
+3. The confirmation lists exactly what's about to print and flags any row skipped for missing Exp/Lot.
 
-> **Need a spare?** **Print extra (no log)** prints one more copy of just that label on demand — for extra physical labels a patient needs. It's **not** added to the dispense Log and does **not** change the print count.
+Each label card also has its own buttons on the right:
+
+- **Check / Uncheck this label**
+- **Edit this med**
+- **Remove this med**
+- **Print extra (no log)** — spare physical labels only; **not** added to the Log and does **not** change the print count
 
 ![Label Previews gallery](support/assets/screenshots/print-gallery-v2.png)
 
 ### 4 · Log  (purple)
 
-Every printed label is recorded automatically — timestamp, patient, DOB, medication details, **source**, initials, print count, and **Encounter #**. Each print is one **encounter**: numbered, shaded by encounter in **cycling light green / light blue / white**, and separated by a divider line so each patient reads as one block. Nothing to do here — it's your record. (The Log clears on close, so it always opens blank with no leftover highlighting.)
+Every printed label is recorded automatically. Nothing to do here — it's your record.
+
+Each print is one **encounter**:
+
+- Numbered
+- Shaded in cycling light green / light blue / white
+- Separated by a divider so each patient reads as one block
+
+The Log includes timestamp, patient, DOB, medication details, **source**, initials, print count, and **Encounter #**. It clears on close, so it always opens blank with no leftover highlighting.
 
 ![Dispense Log](support/assets/screenshots/log-v2.png)
 
 ### 5 · Tebra Notes  (teal)
 
-A ready-to-paste note for **each patient**, grouped by source, with each note **boxed** so you can select it, copy, and paste straight into that patient's Tebra chart. The notes are built **from the Log** and **rebuild every time you open the Tebra Notes tab** — so anything in the Log (even a row you typed in by hand) shows up here automatically.
+A ready-to-paste note for **each patient**, grouped by source.
+
+1. Select a boxed note.
+2. Copy it.
+3. Paste it into that patient's Tebra chart.
+
+The notes are built **from the Log** and **rebuild every time you open this tab** — so anything in the Log (even a row you typed in by hand) shows up here automatically.
 
 ![Tebra Notes](support/assets/screenshots/tebra-notes-v2.png)
 
-> **Between patients:** **Start NEW Patient** clears the patient + med list but keeps the Log (run patient after patient). **Reset Session** wipes everything — Log included — for a fresh day.
+> **Between patients**
+>
+> - **Start NEW Patient** — clears the patient + med list but keeps the Log (run patient after patient)
+> - **Reset Session** — wipes everything, Log included, for a fresh day
 
 ---
 
