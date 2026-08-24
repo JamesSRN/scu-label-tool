@@ -3,7 +3,7 @@
 
 <img src="support/assets/scu-emblem-badge-v2.png" alt="Saturday Clinic for the Uninsured emblem" width="130">
 
-# SCU Dispensary Label Tool
+# 💊 SCU Dispensary Label Tool
 
 </div>
 
