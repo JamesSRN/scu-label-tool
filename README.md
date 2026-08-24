@@ -77,6 +77,8 @@ If a yellow **Enable Content** bar appears the first time the workbook opens, cl
 
 Printer: **Brother QL-1100c (Hermione)** with a **DK-1202 (62 × 100 mm)** roll loaded. The workbook opens to the **Start Here** guide.
 
+When the roll is empty, **keep the plastic spool** — don't throw it away. New DK-1202 labels load onto that same spool.
+
 ---
 
 ## How it works — five numbered tabs
