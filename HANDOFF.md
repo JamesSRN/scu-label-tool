@@ -1,6 +1,6 @@
 # SCU Label Printing (Dispensary) — Session Handoff
 
-_Last updated: 2026‑08‑13. This captures the current state, what changed, what's broken, and what to do next. The user‑facing walkthrough lives in [README.md](README.md); this is the maintainer's picture._
+_Last updated: 2026‑08‑23. This captures the current state, what changed, what's broken, and what to do next. The user‑facing walkthrough lives in [README.md](README.md); this is the maintainer's picture._
 
 > Sister tool: the **lab‑label‑printer** repo (small patient‑ID labels) is a separate, simpler app, released at **v1.0**. Its only pending change is the same launcher fix described below. Don't confuse the two — this tool is the medication dispensary tool (large DK‑1202 labels, full logging).
 

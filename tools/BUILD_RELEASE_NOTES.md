@@ -1,4 +1,4 @@
-# Build Release Notes
+# SCU Dispensary Label Tool — Build Release Notes
 
 `Build-Release.vbs` (repo root) re-imports `MedParser.bas`, runs `SetupWorkbook`, and saves **`MedicationDispensing.xlsm`**.
 

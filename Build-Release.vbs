@@ -1,5 +1,6 @@
 ' ============================================================
-'  Build-Release.vbs  (robust: never leaves a stray Excel process)
+'  SCU Dispensary Label Tool — Build-Release.vbs
+'  (robust: never leaves a stray Excel process)
 '  Produces the definitive MedicationDispensing.xlsm:
 '    1. opens MedicationDispensing.xlsm (bootstraps from
 '       Broken_PrettyPrint_MedicationDispensing.xlsm only if missing)

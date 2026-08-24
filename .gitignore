@@ -1,3 +1,4 @@
+# SCU Dispensary Label Tool
 # Patient data / PHI - never commit
 # NOTE: *.xlsm is intentionally NOT ignored - MedicationDispensing.xlsm auto-wipes
 # all patient data + the Log on close, so the tracked copy carries no PHI. Commit a

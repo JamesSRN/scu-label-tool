@@ -1,4 +1,4 @@
-# SCU Label Printing — Download & Releases
+# SCU Dispensary Label Tool — Download & Releases
 
 Repository: <https://github.com/JamesSRN/scu-label-tool>
 Latest releases: <https://github.com/JamesSRN/scu-label-tool/releases>

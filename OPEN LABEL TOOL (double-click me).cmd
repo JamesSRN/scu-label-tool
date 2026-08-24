@@ -1,8 +1,8 @@
 @echo off
-title SCU Label Tool
+title SCU Dispensary Label Tool
 cd /d "%~dp0"
 echo ============================================================
-echo    SCU LABEL TOOL
+echo    SCU DISPENSARY LABEL TOOL
 echo ============================================================
 echo.
 echo    This opens the label tool with the latest code applied.
