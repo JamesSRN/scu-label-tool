@@ -2,7 +2,7 @@
 
 <img src="support/assets/scu-emblem-badge-v2.png" alt="Saturday Clinic for the Uninsured emblem" width="130">
 
-# SCU Label Printing Tool
+# SCU Dispensary Label Tool
 
 </div>
 
@@ -20,22 +20,58 @@ Saturday Clinic for the Uninsured · Medical College of Wisconsin
 
 ---
 
-## Start here
+> **Are you trying to print lab labels?** That's a different tool.  
+> → **[Lab Label Printer](https://github.com/JamesSRN/lab-label-printer)** — name, DOB, and date on the small DK-1201 address roll.  
+> This page is the **Dispensary** tool (medication labels, DK-1202 shipping roll).
 
-This is an Excel + VBA tool for the **Saturday Clinic for the Uninsured (SCU)** free pharmacy. It turns a block of pasted prescription text into printed medication labels and keeps a dispense log.
+---
 
-It's built to be **robust for high-turnover volunteers**: it parses, checks, and flags every entry, so a first-time user is guided toward correct labels — and caught before a mistake reaches a patient.
+<div align="center">
 
-**How do I open it?** Always start the tool with one launcher — it applies the latest code and opens the workbook for you.
+## Download — start here
+
+### [⬇  Get the latest release](https://github.com/JamesSRN/scu-label-tool/releases/latest)
+
+That's the ZIP a clinic manager needs. On the Releases page, under **Assets**, download **`SCU-Label-Printing-vX.Y.zip`**.
+
+</div>
+
+### 1 · Put it on the Desktop and Extract All
+
+Windows will *look* like it opened the ZIP if you just double-click it — that is not enough, and Excel will misbehave.
+
+1. **Move the ZIP onto the Desktop** (out of Downloads / OneDrive / email).
+2. **Right-click the ZIP → Extract All… → Extract.**  
+   You should get a real folder on the Desktop, with `OPEN LABEL TOOL (double-click me).cmd` inside it.
+3. Keep that folder together. Don't scatter the files, and don't run anything from *inside* the ZIP window.
+
+### 2 · One-time Excel Trust Center (required)
+
+The tool rebuilds itself from source **every time you open it**, so Excel has to trust this folder and the VBA project. Do this once on the clinic PC:
+
+1. Open Excel (a blank workbook is fine).
+2. **File → Options → Trust Center → Trust Center Settings…**
+3. **Macro Settings** — check **Trust access to the VBA project object model**.  
+   *(That's what lets the click-me file apply the latest code.)*
+4. **Trusted Locations → Add new location…**  
+   Browse to the folder you extracted on the Desktop.  
+   Check **Subfolders of this location are also trusted**. OK out of every window.
+5. Close Excel completely.
+
+If a yellow **Enable Content** bar appears the first time the workbook opens, click it.
+
+> Don't add Downloads (or a random folder) as a Trusted Location — only this tool's folder.
+
+### 3 · Every time you use it
 
 | | Do this |
 |---|---|
-| **Open the tool** (every time) | Double-click **`OPEN LABEL TOOL (double-click me).cmd`** |
-| **Fallback** (if the launcher won't run) | Double-click **`Build-Release.vbs`** — it does the same rebuild-and-open |
+| **Open the tool** (every time) | Double-click **`OPEN LABEL TOOL (double-click me).cmd`** — that's the "click me" file |
+| **If the click-me file doesn't work** | Double-click **`Build-Release.vbs`** instead |
 
-> The launcher runs `Build-Release.vbs`, which rebuilds the workbook from the latest `MedParser.bas` and opens it — so you're never on stale code. If the launcher itself won't run, **double-click `Build-Release.vbs`** to do the exact same rebuild-and-open. (Opening `MedicationDispensing.xlsm` directly is a last resort only — it skips the rebuild, so it may be on older code.) Make sure the workbook is **closed** first. Everything else (`support/`, `tools/`, the `.bas` source, the emblem, and the bootstrap workbook) is support material the build needs — don't move it.
+> Close the workbook first, then use the click-me file. It runs `Build-Release.vbs` for you — rebuilds from the latest `MedParser.bas` and opens Excel — so you're never on stale code. If that file does nothing (Windows blocks `.cmd`, a window flashes and vanishes, etc.), skip it and double-click **`Build-Release.vbs`** yourself. Don't open the `.xlsm` by hand unless both of those fail. Everything else in the folder (`support/`, `tools/`, the `.bas` source, the emblem, and the bootstrap workbook) is support material the build needs — don't move it.
 
-> **Install:** grab the latest `SCU-Label-Printing-vX.Y.zip` from the **[Releases page](https://github.com/JamesSRN/scu-label-tool/releases)**, unzip, and open `MedicationDispensing.xlsm`. Full steps in **[RELEASE.md](support/docs/RELEASE.md)**.
+Printer: **Brother QL-1100c** with a **DK-1202 (62 × 100 mm)** roll loaded. The workbook opens to the **Start Here** guide.
 
 ---
 
@@ -55,7 +91,7 @@ Enter the patient's **name + DOB**, paste the prescription text into the big box
 
 Each drug becomes one row — name, strength, form, directions (SIG), quantity, refills, expiration, and lot. **Refills default to 0** and a **Source** dropdown (DOH / IN HOUSE / RxAPS / Other) is required.
 
-Highlights update **live as you type** — a missing **Quantity / Expiration / Lot / Source** cell is **yellow** and clears to **white** the instant you fill it. Then click **Review**: complete rows validate to **blue**. Review no longer auto-checks anything — you choose what prints: **double-click a Check Med cell** to check one (it turns **green**), or **double-click the "Check Med" column header** to check / uncheck the whole list at once. The Review pop-up lists each drug's **name + strength in bold** with any issues stacked beneath.
+Highlights update **live as you type** — a missing **Quantity / Expiration / Lot / Source** cell is **yellow** and clears to **white** the instant you fill it. Then click **Review**: complete rows validate to **blue**. Review does not auto-check anything — you choose what prints: **double-click a Check Med cell** to check one (it turns **green**), or **double-click the "Check Med" column header** to check / uncheck the whole list at once. The Review pop-up lists each drug's **name + strength in bold** with any issues stacked beneath.
 
 ![Medications tab](support/assets/screenshots/medications-tab-v2.png)
 
@@ -100,46 +136,47 @@ A ready-to-paste note for **each patient**, grouped by source, with each note **
 - **Checkbox-driven** selection that drives printing, row color, and removal alike.
 - **2 copies per label**, batch or single, with detailed confirmations and fit-to-page so the bottom row never clips.
 - **Print extra (no log)** per-card button for spare labels a patient needs — printed without touching the dispense Log or the print count.
-- **Complete dispense log** with numbered, green-banded **encounters** and a divider between each.
+- **Complete dispense log** with numbered, color-banded **encounters** and a divider between each.
 - **Edit past encounters** — reopen any logged visit (the list is pulled live from the Log), fix it, and re-save as a new version; tolerant of pasted-in logs (auto-numbers blank encounters, warns on column mismatches).
-- **Tebra notes** sheet: paste-ready session notes grouped by source, one boxed note per patient.
+- **Tebra notes** sheet: paste-ready session notes grouped by source, one boxed note per patient, rebuilt from the Log whenever you open the tab.
 - **Brother QL-1100c auto-select** with a load-the-roll confirmation.
 
 ---
 
-## Updates happen on open
+## Privacy
 
-There's no separate "apply updates" step. Every time you open the tool with **`OPEN LABEL TOOL`**, it rebuilds the workbook from the latest `MedParser.bas` and opens it — so the newest code is always applied. After a `git pull`, just open the tool the usual way.
-
-Requires, one-time in Excel's Trust Center:
-
-- **Trust access to the VBA project object model**
-- this folder registered as a **Trusted Location** (so macros aren't blocked)
-
-<details>
-<summary>Manual build, emblem updates, and event handlers</summary>
-
-- **Manual build (VBA editor):** remove the `MedParser` module, **Import** `MedParser.bas`, run `SetupWorkbook`, save.
-- **After changing the emblem crop:** run `tools/Build-ScuEmblem.ps1` first, then `Build-Release.vbs`.
-- The two worksheet event handlers are pasted once into the sheet modules — see `HANDOFF.md` §5.
-- Everything lives in **one folder** (outside OneDrive): `C:\Users\ringo\Documents\GitHub\GIT_VERSION_SCU Label Printing`. Code + docs are version-controlled; the `.xlsm` and `support\_backups\` are git-ignored so patient data stays local.
-
-</details>
+**This repo holds code and docs only.** The working `.xlsm` contains patient information and is kept **local** — excluded via `.gitignore`, never committed (as is `support/_backups/`). All screenshots in this README use **randomly generated test patients**.
 
 ---
 
-## What's in the folder
+<details>
+<summary>If something won't open (macros blocked, click-me file errors)</summary>
+
+<br>
+
+- **Yellow bar / macros disabled** — click **Enable Content**. If that never appears, the folder isn't a Trusted Location yet (step 2 above). Close Excel and add it.
+- **Click-me file does nothing** — Windows sometimes blocks `.cmd` files. Double-click **`Build-Release.vbs`** instead; that's the same rebuild, just without the helper script.
+- **It says it can't access the VBA project** — the **Trust access to the VBA project object model** box isn't checked. That's required because we rebuild on every open.
+- **You double-clicked the ZIP, not the extracted folder** — go back, **Extract All** onto the Desktop, then use the click-me file in *that* folder.
+- **Workbook already open** — close `MedicationDispensing.xlsm` first (and any leftover Excel in Task Manager), then try the click-me file again.
+- **OneDrive / cloud folder** — don't keep this tool in a synced folder. Desktop (not OneDrive Desktop) is the intended home.
+
+Full notes: **[TROUBLESHOOTING.md](support/docs/TROUBLESHOOTING.md)**.
+
+</details>
 
 <details>
-<summary>Full contents (click to expand)</summary>
+<summary>What's in the folder</summary>
+
+<br>
 
 **Main folder**
 
 | File | What it is |
 |---|---|
-| `OPEN LABEL TOOL (double-click me).cmd` | **The everyday launcher** — rebuilds from `MedParser.bas` and opens the tool. |
-| `MedicationDispensing.xlsm` | The clinic workbook the launcher builds + opens (local, git-ignored). Opening it directly is a last resort — it skips the rebuild, so it may be stale. |
-| `Build-Release.vbs` | Imports `MedParser.bas`, runs `SetupWorkbook`, saves + opens the `.xlsm`. **Double-click it directly if the launcher won't run** — it's the fallback way in. |
+| `OPEN LABEL TOOL (double-click me).cmd` | **The everyday "click me" file** — rebuilds from `MedParser.bas` and opens the tool. |
+| `Build-Release.vbs` | Same rebuild, used if the click-me file doesn't run. Imports `MedParser.bas`, runs `SetupWorkbook`, saves + opens the `.xlsm`. |
+| `MedicationDispensing.xlsm` | The clinic workbook the click-me file / Build-Release builds + opens (local, git-ignored). Opening it directly skips the rebuild. |
 | `MedParser.bas` | The VBA source of truth (parser, validation, label layout, printing, logging). |
 | `scu_emblem.png` | SC emblem for the label header (loaded at print time; must stay here). |
 | `README.md` | This file. |
@@ -152,30 +189,30 @@ Requires, one-time in Excel's Trust Center:
 
 </details>
 
----
+<details>
+<summary>Coding, manual build, and maintainer notes</summary>
 
-## Quick reference
+<br>
+
+There's no separate "apply updates" step. Every time you open the tool with the **click-me file** (`OPEN LABEL TOOL`), it rebuilds the workbook from the latest `MedParser.bas` and opens it. After a `git pull`, just open the tool the usual way. If the click-me file doesn't run, double-click **`Build-Release.vbs`**.
+
+- **Manual build (VBA editor):** remove the `MedParser` module, **Import** `MedParser.bas`, run `SetupWorkbook`, save.
+- **After changing the emblem crop:** run `tools/Build-ScuEmblem.ps1` first, then `Build-Release.vbs`.
+- The two worksheet event handlers are pasted once into the sheet modules — see `HANDOFF.md` §5.
+- Everything lives in **one folder** (outside OneDrive). Code + docs are version-controlled; the `.xlsm` and `support/_backups/` are git-ignored so patient data stays local.
 
 | I want to… | Go to |
 |---|---|
-| Install / update the tool | [RELEASE.md](support/docs/RELEASE.md) |
+| Cut a GitHub release | [RELEASE.md](support/docs/RELEASE.md) |
 | Understand the code (routine map) | [HANDOFF.md](support/docs/HANDOFF.md) |
 | See what changed | [CHANGELOG.md](support/docs/CHANGELOG.md) |
-| Fix a problem | [TROUBLESHOOTING.md](support/docs/TROUBLESHOOTING.md) |
+| De-novo PC setup | [SETUP_INSTRUCTIONS.md](support/docs/SETUP_INSTRUCTIONS.md) |
 | Read the PHI / privacy rules | [PRIVACY_AND_PHI.md](support/docs/PRIVACY_AND_PHI.md) |
 
-<details>
-<summary>Known open items</summary>
+**Known open items**
 
-- **Trusted Location** — register the folder in Excel Trust Center so macros aren't blocked.
 - **Print width** — `LABEL_WIDTH_PT = 242` uses more of the 100 mm die-cut; re-test on the clinic Brother that labels still fit one die-cut (228 pt was the prior no-bleed value).
 - **Bold clinic title on thermal** — may still look subtle; `ShrinkToFit` can limit apparent size.
 - **Physical regression test** — spot-check the emblem and header on the Brother thermal (screen + print path verified).
 
 </details>
-
----
-
-## Privacy
-
-**This repo holds code and docs only.** The working `.xlsm` contains patient information and is kept **local** — excluded via `.gitignore`, never committed (as is `support/_backups/`). All screenshots in this README use **randomly generated test patients**.

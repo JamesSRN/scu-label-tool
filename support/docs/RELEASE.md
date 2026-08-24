@@ -7,14 +7,16 @@ Latest releases: <https://github.com/JamesSRN/scu-label-tool/releases>
 
 ## Download & install (clinics / volunteers)
 
-1. Open the **[Releases page](https://github.com/JamesSRN/scu-label-tool/releases)** and, under the newest release, download **`SCU-Label-Printing-vX.Y.zip`** (under *Assets*).
-2. **Unzip** it to a folder on the clinic PC. Keep **`MedicationDispensing.xlsm`** and **`scu_emblem.png`** together in that folder.
-3. Open **`MedicationDispensing.xlsm`** in Microsoft Excel (Windows).
-4. One-time Excel setup:
-   - **Enable macros** when prompted (the tool is macro-driven).
-   - Recommended: add the folder as a **Trusted Location** (*File → Options → Trust Center → Trust Center Settings → Trusted Locations*) so macros aren't blocked each time.
+This is the **Dispensary** tool (medication labels). Lab / specimen labels are a different repo: [lab-label-printer](https://github.com/JamesSRN/lab-label-printer).
+
+1. Open the **[latest release](https://github.com/JamesSRN/scu-label-tool/releases/latest)** and, under **Assets**, download **`SCU-Label-Printing-vX.Y.zip`**.
+2. **Move the ZIP to the Desktop** (out of Downloads / OneDrive). **Right-click → Extract All…** — do not open files from inside the ZIP window. Keep **`MedicationDispensing.xlsm`**, **`scu_emblem.png`**, and **`OPEN LABEL TOOL (double-click me).cmd`** together in that extracted folder.
+3. One-time in Excel (**File → Options → Trust Center → Trust Center Settings…**):
+   - **Macro Settings** — check **Trust access to the VBA project object model** (the click-me file rebuilds the workbook on every open).
+   - **Trusted Locations → Add new location…** — the extracted Desktop folder. Check **Subfolders of this location are also trusted**.
+4. **Every time:** close the workbook, then double-click **`OPEN LABEL TOOL (double-click me).cmd`** (the click-me file). If that file doesn't run, double-click **`Build-Release.vbs`** instead. Don't open the `.xlsm` by hand unless both of those fail.
 5. Make sure the **Brother QL-1100c** driver is installed and the **DK-1202 (62 × 100 mm)** roll is loaded.
-6. The workbook opens to the **Start Here** guide — follow the 4 steps. A printable copy, **`SCU_QuickStart_Card.pdf`**, is included in the ZIP.
+6. The workbook opens to the **Start Here** guide — follow the numbered tabs. A printable copy, **`SCU_QuickStart_Card.pdf`**, is included in the ZIP.
 
 **Privacy:** patient info and the on-screen Log clear when you close the file; a dated CSV copy of each day's dispensing is saved locally in a `dispense-log` folder next to the workbook and never leaves the PC.
 
