@@ -4,7 +4,7 @@ Reference for the current printed label layout in `MedParser.bas` (`BuildLabelPr
 
 ## Physical target
 
-- **Printer:** Brother QL-1100c
+- **Printer:** Brother QL-1100c (Hermione)
 - **Media:** DK-1202 continuous die-cut labels, **62 x 100 mm**, **landscape**
 - **Print area:** `A1:H15` on the `Label Preview` sheet (hidden from normal view)
 

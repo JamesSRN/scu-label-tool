@@ -82,13 +82,13 @@ sizes that match the detected roll.
 
 ## Printer sends 4.07 x 6.4 (or 4x6) instead of DK-1202
 
-Cause: the QL-1100c supports both DK-1202 (62 x 100) and larger 4x6 media, and its
+Cause: the Brother QL-1100c (Hermione) supports both DK-1202 (62 x 100) and larger 4x6 media, and its
 **default** is sitting on the wrong one.
 
 Fix - set it in the place applications actually inherit from:
 
 ```text
-Control Panel -> Devices and Printers -> right-click Brother QL-1100c
+Control Panel -> Devices and Printers -> right-click Brother QL-1100c (Hermione)
   -> Printer properties -> Advanced tab -> Printing Defaults... -> Paper Size = Shipping Label (62 x 100 mm)
 ```
 

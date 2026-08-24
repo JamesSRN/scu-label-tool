@@ -439,7 +439,7 @@ Private Sub BuildQuickStartSheet()
         "-   'Save for Later' stores a patient to finish later; reopen it with 'Edit Past Encounter'.", _
         "-   'Start NEW Patient' clears the screen for the next patient (the Log is kept).", _
         "-   Closing the file clears patient info and the Log; a dated CSV backup is saved next to the workbook.", _
-        "-   Labels print on the Brother QL-1100c with the DK-1202 (62 x 100 mm) roll.")
+        "-   Labels print on the Brother QL-1100c (Hermione) with the DK-1202 (62 x 100 mm) roll.")
     Dim gi As Integer
     For gi = 0 To UBound(gk)
         ws.Range(ws.Cells(32 + gi, 2), ws.Cells(32 + gi, 8)).Merge
@@ -1443,7 +1443,7 @@ Private Sub BuildLabelPreviewLayout(ws As Worksheet)
     Call SetMiniValue(ws.Cells(15, 5), "LOT", "--", 12, "R")
 
     ws.Cells(17, 1).Value = "Auto-fills from the Medications tab. Print via 'Print Checked Labels'."
-    ws.Cells(18, 1).Value = "Brother QL-1100c  " & Chr(183) & "  DK-1202 62 x 100 mm  " & Chr(183) & "  Landscape"
+    ws.Cells(18, 1).Value = "Brother QL-1100c (Hermione)  " & Chr(183) & "  DK-1202 62 x 100 mm  " & Chr(183) & "  Landscape"
 
     Call FmtLblClinicName(ws.Cells(2, 1), CLINIC_NAME_FONT_PRINT)
     Call FmtLblNameSub(ws.Cells(3, 1), CLINIC_NAMESUB_FONT_PRINT)
@@ -2158,11 +2158,11 @@ Public Sub RowPrintExtra()
     Call UpdateLabelPreviewForMedRow(r, True)
     Call ApplyLabelPageSetup(wsL)
 
-    ' Auto-select the Brother QL-1100c, with a manual-picker fallback (same as PrintLabel).
+    ' Auto-select the Brother QL-1100c (Hermione), with a manual-picker fallback (same as PrintLabel).
     Dim brotherName As String
     brotherName = SelectBrotherPrinter()
     If brotherName = "" Then
-        If MsgBox("The Brother QL-1100c label printer was not found." & vbCrLf & vbCrLf & _
+        If MsgBox("The Brother QL-1100c (Hermione) label printer was not found." & vbCrLf & vbCrLf & _
             "Click OK to choose a printer manually, or Cancel to stop.", _
             vbOKCancel + vbExclamation, "Brother Printer Not Found") = vbCancel Then Exit Sub
         On Error Resume Next
@@ -4161,7 +4161,7 @@ Public Sub PrintCheckedLabels()
         frmReview.Show
         If frmReview.Result <> "OK" Then Exit Sub
     Else
-        If MsgBox("Ready to process these " & cnt & " checked medication(s) (labels print " & LABEL_COPIES & " copies each) on the Brother QL-1100c:" & vbCrLf & vbCrLf & _
+        If MsgBox("Ready to process these " & cnt & " checked medication(s) (labels print " & LABEL_COPIES & " copies each) on the Brother QL-1100c (Hermione):" & vbCrLf & vbCrLf & _
                   IIf(gEditingEncounter > 0, "Editing encounter " & gEditingEncounter & ": ALL meds stay in the Log; only the checked ones print." & vbCrLf & vbCrLf, "") & _
                   listMsg & vbCrLf & _
                   "Make sure the DK-1202 (62 x 100 mm) roll is loaded." & vbCrLf & vbCrLf & _
@@ -4178,12 +4178,12 @@ Public Sub PrintCheckedLabels()
             "Print LABELS for them too?", vbYesNo + vbQuestion, "DOH Medications - Print Labels?") = vbYes)
     End If
 
-    Call BusyShow(15, "Locating the Brother QL-1100c...")
+    Call BusyShow(15, "Locating the Brother QL-1100c (Hermione)...")
     Dim brother As String
     brother = SelectBrotherPrinter()
     If brother = "" Then
         Call BusyHide
-        MsgBox "Brother QL-1100c not found. Make sure it is plugged in, powered on," & vbCrLf & _
+        MsgBox "Brother QL-1100c (Hermione) not found. Make sure it is plugged in, powered on," & vbCrLf & _
                "and loaded with the DK-1202 roll, then try again.", _
                vbExclamation, "Printer Not Found"
         Exit Sub
@@ -4390,17 +4390,17 @@ Public Sub ReprintLastBatch()
         If Trim(rowArr(i)) <> "" Then nRows = nRows + 1
     Next i
 
-    If MsgBox("Reprint the last " & nRows & " medication(s), " & LABEL_COPIES & " copies each, on the Brother QL-1100c?" & vbCrLf & vbCrLf & _
+    If MsgBox("Reprint the last " & nRows & " medication(s), " & LABEL_COPIES & " copies each, on the Brother QL-1100c (Hermione)?" & vbCrLf & vbCrLf & _
               "Make sure the DK-1202 (62 x 100 mm) roll is loaded." & vbCrLf & vbCrLf & _
               "YES = reprint       NO = cancel", _
               vbYesNo + vbQuestion, "Reprint Last Batch") = vbNo Then Exit Sub
 
-    Call BusyShow(15, "Locating the Brother QL-1100c...")
+    Call BusyShow(15, "Locating the Brother QL-1100c (Hermione)...")
     Dim brother As String
     brother = SelectBrotherPrinter()
     If brother = "" Then
         Call BusyHide
-        MsgBox "Brother QL-1100c not found. Make sure it is plugged in, powered on," & vbCrLf & _
+        MsgBox "Brother QL-1100c (Hermione) not found. Make sure it is plugged in, powered on," & vbCrLf & _
                "and loaded with the DK-1202 roll, then try again.", _
                vbExclamation, "Printer Not Found"
         Exit Sub
@@ -5196,13 +5196,13 @@ Public Sub PrintLabel()
     Call RefreshPrintLabelLogo(wsL)
     Call ApplyLabelPageSetup(wsL)
 
-    ' Auto-select the Brother QL-1100c label printer
+    ' Auto-select the Brother QL-1100c (Hermione) label printer
     Dim brotherName As String
     brotherName = SelectBrotherPrinter()
 
     If brotherName = "" Then
         Dim resp As Integer
-        resp = MsgBox("The Brother QL-1100c label printer was not found." & vbCrLf & vbCrLf & _
+        resp = MsgBox("The Brother QL-1100c (Hermione) label printer was not found." & vbCrLf & vbCrLf & _
             "Please check that it is:" & vbCrLf & _
             "   - plugged in and powered on" & vbCrLf & _
             "   - loaded with the DK-1202 (62 x 100 mm) label roll" & vbCrLf & _
@@ -5254,7 +5254,7 @@ Private Sub MarkPrinted(ByVal medRow As Long)
     End If
 End Sub
 
-' Find the Brother QL-1100c and make it Excel's active printer.
+' Find the Brother QL-1100c (Hermione) and make it Excel's active printer.
 ' Returns the printer name on success, "" if not found / not selectable.
 Private Function SelectBrotherPrinter() As String
     ' Session cache (B7): the WMI lookup + port probing is the slow part, so once we know
@@ -6224,7 +6224,7 @@ Private Sub PrintEncounterLabelsNoLog()
     Dim brotherName As String
     brotherName = SelectBrotherPrinter()
     If brotherName = "" Then
-        If MsgBox("Brother QL-1100c not found. Choose a printer manually?", _
+        If MsgBox("Brother QL-1100c (Hermione) not found. Choose a printer manually?", _
             vbOKCancel + vbExclamation, "Reprint") = vbCancel Then Exit Sub
         On Error Resume Next
         Application.Dialogs(xlDialogPrint).Show

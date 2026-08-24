@@ -7,7 +7,7 @@ These instructions are for setting up the SCU Label Tool on a new Windows comput
 This setup creates a local Excel/VBA medication label workflow:
 
 ```text
-Tebra medication text -> Excel paste box -> VBA parser -> reviewed rows -> Brother QL-1100C label printing
+Tebra medication text -> Excel paste box -> VBA parser -> reviewed rows -> Brother QL-1100c (Hermione) label printing
 ```
 
 Everything should run locally in Excel/VBA. No PHI should be committed to GitHub.
@@ -16,7 +16,7 @@ Everything should run locally in Excel/VBA. No PHI should be committed to GitHub
 
 - Windows PC
 - Microsoft Excel desktop app
-- Brother QL-1100C label printer
+- Brother QL-1100c (Hermione) label printer
 - Brother DK-1202 labels, 62 x 100 mm / approximately 2.4 in x 3.9 in
 - GitHub Desktop recommended
 - Clean no-PHI `MedicationDispensing.xlsm` workbook template from the project owner
@@ -46,7 +46,7 @@ Use native Windows Git/GitHub Desktop for this repo. Avoid managing a OneDrive-b
 
 ## 4. Install and configure the Brother printer
 
-1. Plug in and power on the Brother QL-1100C.
+1. Plug in and power on the Brother QL-1100c (Hermione).
 2. Install the Brother full driver/software package if Windows does not configure it correctly.
 3. Confirm the printer appears in Windows printer settings.
 4. Set the printer default media to DK-1202 / 62 x 100 mm. In the Brother driver this
@@ -59,7 +59,7 @@ Check both places if Windows exposes both:
 ```text
 Control Panel
 -> Devices and Printers
--> Brother QL-1100C
+-> Brother QL-1100c (Hermione)
 -> Printing preferences
 -> DK-1202 / 62 x 100 mm
 ```

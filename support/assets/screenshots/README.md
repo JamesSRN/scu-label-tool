@@ -17,7 +17,7 @@ Optional extras (reference them in the README if you add them):
 | Filename | What to capture |
 |---|---|
 | `input-tab.png` | The **1. Patient & Input** tab with the STEP boxes. |
-| `printed-label.jpg` | A **photo of a real printed label** on the Brother QL-1100c. |
+| `printed-label.jpg` | A **photo of a real printed label** on the Brother QL-1100c (Hermione). |
 
 How to capture on Windows: **Win + Shift + S** (Snip & Sketch), select the area, then
 paste into Paint and **Save As** PNG into this folder with the name above - or use the

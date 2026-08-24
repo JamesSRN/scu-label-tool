@@ -60,7 +60,7 @@ SCU Label Printing  -  v$Version
 ================================
 
 WHAT THIS IS
-  An offline Excel tool for printing medication labels on a Brother QL-1100c
+  An offline Excel tool for printing medication labels on a Brother QL-1100c (Hermione)
   (DK-1202 62 x 100 mm) for the Saturday Clinic for the Uninsured.
 
 INSTALL (one time)
@@ -69,7 +69,7 @@ INSTALL (one time)
   3. If prompted, ENABLE MACROS - the tool is macro-driven.
   4. Recommended: add this folder as a Trusted Location
      (File > Options > Trust Center > Trust Center Settings > Trusted Locations).
-  5. Install the Brother QL-1100c driver and load the DK-1202 (62 x 100 mm) roll.
+  5. Install the Brother QL-1100c (Hermione) driver and load the DK-1202 (62 x 100 mm) roll.
 
 USE
   The workbook opens to a "Start Here" guide - follow the 4 steps.

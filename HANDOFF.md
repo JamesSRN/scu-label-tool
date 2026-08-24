@@ -68,4 +68,4 @@ All in `MedParser.bas` unless noted. **Committed:** the "encounter logic" commit
 - **The `.xlsm` is disposable** — it's rebuilt from `MedParser.bas` each launch and is git‑ignored. Edits go in `MedParser.bas`.
 - **Compile check** happens automatically during a build (`SetupWorkbook` runs). If it fails, Build‑Release leaves Excel open and tells you to `Alt+F11` → Debug → Compile.
 - **What gets pushed:** source only (`.bas`, `.vbs`, `.cmd`, `.md`, emblem). Never the `.xlsm` or `dispense-log/`.
-- **Printer:** Brother QL‑1100c, DK‑1202 (62 × 100 mm) roll, 2 copies per label.
+- **Printer:** Brother QL-1100c (Hermione), DK‑1202 (62 × 100 mm) roll, 2 copies per label.

@@ -4,7 +4,7 @@ Last updated: 2026-07-24 (**v2.1 label + banner tweaks**: the label's qty line n
 
 An Excel + VBA tool for the **Saturday Clinic for the Uninsured (SCU)** free
 pharmacy. It turns pasted prescription text into a validated medication table and
-prints professional labels on a **Brother QL-1100C** (DK-1202, 62 x 100 mm,
+prints professional labels on a **Brother QL-1100c (Hermione)** — DK-1202, 62 x 100 mm,
 landscape). It runs **100% offline** and is built to be robust for high-turnover
 volunteers.
 
@@ -138,7 +138,7 @@ Label Previews.
 - **Print Checked Labels** prints every checked med in sequence (skips any checked
   row missing Exp/Lot). Print confirmations list exactly what will print (single =
   full detail block; batch = numbered list flagging skips).
-- **Brother auto-select** (`SelectBrotherPrinter`) finds the QL-1100C via WMI and
+- **Brother auto-select** (`SelectBrotherPrinter`) finds the Brother QL-1100c (Hermione) via WMI and
   confirms before printing.
 - **Progress popup** (`frmBusy` + `BusyShow`/`BusyHide`) covers the printer-lookup
   and page-setup delay after the confirm dialog, hiding just before the initials
@@ -541,7 +541,7 @@ items below are minor / edge-case (all Low severity).
    **always** clears the guard, even on error.
 
 2. **`RowPrintExtra` can double-print in the "Brother not found" fallback (open).**
-   When the QL-1100c isn't detected and the volunteer prints via the manual Windows
+   When the Brother QL-1100c (Hermione) isn't detected and the volunteer prints via the manual Windows
    dialog (`Application.Dialogs(xlDialogPrint).Show`), the sub then **still** calls
    `PrintLabelSurfaceSafe`, so it can emit the manual print **and** the label-surface
    print (the manual dialog also prints whatever sheet is active, not the hidden label

@@ -23,7 +23,7 @@ For now, I added setup documentation making clear that developers should start f
 Suggested response:
 
 ```text
-Agreed. Added `SETUP_INSTRUCTIONS.md` with de novo setup steps: Windows/Excel requirements, Brother QL-1100C driver/default media setup, cloning the repo, using the clean no-PHI workbook template, importing `MedParser.bas`, compiling, installing sheet event handlers, running `SetupWorkbook`, testing with no-PHI sample data, and printing a physical DK-1202 test label.
+Agreed. Added `SETUP_INSTRUCTIONS.md` with de novo setup steps: Windows/Excel requirements, Brother QL-1100c (Hermione) driver/default media setup, cloning the repo, using the clean no-PHI workbook template, importing `MedParser.bas`, compiling, installing sheet event handlers, running `SetupWorkbook`, testing with no-PHI sample data, and printing a physical DK-1202 test label.
 ```
 
 ## Issue: Need stable branch and working branch

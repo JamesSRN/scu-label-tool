@@ -10,11 +10,11 @@
 
 <div align="center">
 
-**Paste a patient's prescriptions → get clean, validated medication labels — printed on a Brother QL-1100c, with a running dispense log and paste-ready Tebra notes.**
+**Paste a patient's prescriptions → get clean, validated medication labels — printed on a Brother QL-1100c (Hermione), with a running dispense log and paste-ready Tebra notes.**
 
 Saturday Clinic for the Uninsured · Medical College of Wisconsin
 
-`Excel + VBA` · `Brother QL-1100c — DK-1202` · `offline — no PHI committed` · `v2.1`
+`Excel + VBA` · `Brother QL-1100c (Hermione) — DK-1202` · `offline — no PHI committed` · `v2.1`
 
 </div>
 
@@ -71,7 +71,7 @@ If a yellow **Enable Content** bar appears the first time the workbook opens, cl
 
 > Close the workbook first, then use the click-me file. It runs `Build-Release.vbs` for you — rebuilds from the latest `MedParser.bas` and opens Excel — so you're never on stale code. If that file does nothing (Windows blocks `.cmd`, a window flashes and vanishes, etc.), skip it and double-click **`Build-Release.vbs`** yourself. Don't open the `.xlsm` by hand unless both of those fail. Everything else in the folder (`support/`, `tools/`, the `.bas` source, the emblem, and the bootstrap workbook) is support material the build needs — don't move it.
 
-Printer: **Brother QL-1100c** with a **DK-1202 (62 × 100 mm)** roll loaded. The workbook opens to the **Start Here** guide.
+Printer: **Brother QL-1100c (Hermione)** with a **DK-1202 (62 × 100 mm)** roll loaded. The workbook opens to the **Start Here** guide.
 
 ---
 
@@ -139,7 +139,7 @@ A ready-to-paste note for **each patient**, grouped by source, with each note **
 - **Complete dispense log** with numbered, color-banded **encounters** and a divider between each.
 - **Edit past encounters** — reopen any logged visit (the list is pulled live from the Log), fix it, and re-save as a new version; tolerant of pasted-in logs (auto-numbers blank encounters, warns on column mismatches).
 - **Tebra notes** sheet: paste-ready session notes grouped by source, one boxed note per patient, rebuilt from the Log whenever you open the tab.
-- **Brother QL-1100c auto-select** with a load-the-roll confirmation.
+- **Brother QL-1100c (Hermione) auto-select** with a load-the-roll confirmation.
 
 ---
 
