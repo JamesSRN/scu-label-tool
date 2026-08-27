@@ -167,3 +167,47 @@ If a bad `git init` created a broken local repo, the safest fix is usually:
 2. Clone the GitHub repo into a clean folder.
 3. Copy source/docs over, excluding the old `.git` folder.
 4. Commit from the clean clone.
+
+
+## Build aborts: "Source pre-check FAILED - encoding or structure problem"
+
+`Build-Release.vbs` runs `tools\check-encoding.ps1` before building and aborts if
+`MedParser.bas` is not **pure ASCII with CRLF line endings**. The usual cause is a
+non-ASCII typographic character that slipped into `MedParser.bas` - an em-dash (—), a
+curly quote (’ “ ”), an ellipsis (…), an arrow (→), or × - often pasted from a word
+processor, a browser, or an AI/code assistant.
+
+Fix:
+
+- Run the checker directly to see the offending file and line:
+  `powershell -ExecutionPolicy Bypass -File tools\check-encoding.ps1`
+- Replace the character with its ASCII equivalent (`-`, `'`, `"`, `...`, `->`, `x`) and rebuild.
+
+Only `MedParser.bas` is enforced - it is imported into the VBA project, where non-ASCII
+breaks the import. `Build-Release.vbs` runs under Windows Script Host and may keep
+non-ASCII in its comments, so it is intentionally **not** ASCII-checked (that also keeps
+its bytes stable for antivirus reputation - see below).
+
+## Windows Defender or Chrome flags the download / the tool as a "virus"
+
+This is a **false positive**, not real malware. `Build-Release.vbs` opens Excel and writes
+code into the workbook's VBA project on every run - a legitimate part of how the tool
+rebuilds itself from source, but the same behavior antivirus heuristics use to spot
+script-based malware. Defender/SmartScreen and Chrome also lean on **file reputation**: the
+released launcher is a known, trusted file, but a freshly-edited copy (even a one-character
+change) becomes an unknown script and gets flagged until it earns reputation. That is why an
+identical-behaving tool can suddenly be blocked right after a source edit.
+
+What to do (do **not** disable antivirus wholesale - a folder exclusion is enough):
+
+- Prefer the **official release ZIP**, and don't re-edit `Build-Release.vbs` - keeping its
+  bytes stable keeps it a trusted file. Only `MedParser.bas` ever needs editing.
+- **Chrome refused the download:** open `chrome://downloads`, find the blocked item, open its
+  menu, and choose **Keep**.
+- **Right-click the extracted `.vbs`/`.cmd` -> Properties -> Unblock** if Windows added a
+  "downloaded from the internet" mark.
+- **Add the tool's folder (or the Desktop) as a Defender exclusion:** Windows Security ->
+  Virus & threat protection -> Manage settings -> Exclusions -> Add or remove exclusions ->
+  Add a folder.
+- **Report the false positive to Microsoft** at <https://www.microsoft.com/wdsi/filesubmission>
+  so it stops flagging on clinic PCs.

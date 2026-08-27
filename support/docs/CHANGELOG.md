@@ -1,5 +1,20 @@
 # Changelog
 
+## v2.3 - 2026-08-27
+
+Distribution + build-safety fixes on top of v2.2. No workflow changes.
+
+**Build pre-check hardened and scoped (2026-08-27)**
+- A typographic em-dash (—) had slipped into the header comments of `MedParser.bas` and `Build-Release.vbs`, so `tools\check-encoding.ps1` (which requires pure ASCII) aborted `Build-Release` on a fresh release download with *"Source pre-check FAILED - encoding or structure problem."* Replaced it with an ASCII hyphen in `MedParser.bas`.
+- **The ASCII pre-check now targets `MedParser.bas` only** - the file imported into the VBA project, where non-ASCII actually breaks the import. `Build-Release.vbs` is a Windows Script Host launcher (never imported), so it is no longer ASCII-checked, which also lets its bytes stay stable (below).
+
+**Antivirus / download false-positive avoided (2026-08-27)**
+- `Build-Release.vbs` opens Excel and injects VBA code, a pattern Windows Defender/SmartScreen and Chrome download-protection watch, trusting the long-standing launcher by **file reputation**. *Editing* it - even one character - produced an unknown script that got flagged as a "virus" and blocked from download. Fix: the launcher is kept byte-for-byte identical to its known-good version; only `MedParser.bas` is ever edited. See `TROUBLESHOOTING.md` if a clinic PC still flags it.
+
+**Release packaging (2026-08-27)**
+- The GitHub release ships the **full working folder** as `SCU-Label-Printing-v2.3.zip` (source + docs + tools + the click-me launcher) so `Build-Release` can rebuild on the clinic PC. The ZIP extracts to a single clean folder (files at the root, no double-nested layer).
+- Trust Center setup now points at the **Desktop** (with subfolders trusted), so every version extracted there is trusted without re-adding a location per release. Updated `README.md`, `RELEASE.md`, and `TROUBLESHOOTING.md`.
+
 ## v2.1 - 2026-07-23
 
 UI/UX polish pass on top of V2 (`APP_VERSION = "2.1"`). Headline changes: readable

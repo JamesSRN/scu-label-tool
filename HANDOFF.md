@@ -69,3 +69,26 @@ All in `MedParser.bas` unless noted. **Committed:** the "encounter logic" commit
 - **Compile check** happens automatically during a build (`SetupWorkbook` runs). If it fails, Build‑Release leaves Excel open and tells you to `Alt+F11` → Debug → Compile.
 - **What gets pushed:** source only (`.bas`, `.vbs`, `.cmd`, `.md`, emblem). Never the `.xlsm` or `dispense-log/`.
 - **Printer:** Brother QL-1100c (Hermione), DK‑1202 (62 × 100 mm) roll, 2 copies per label.
+
+
+---
+
+## 11. Source encoding & antivirus reputation (read before touching the launcher)
+
+- **Only `MedParser.bas` must be pure ASCII + CRLF.** It is imported into the VBA project,
+  where non-ASCII mojibakes or fails the import. `tools\check-encoding.ps1` enforces this and
+  `Build-Release.vbs` aborts the build on failure. The checker defaults to `MedParser.bas`
+  only.
+- **Watch for typographic characters** (—, ’, “, ”, …, →, ×) sneaking into `MedParser.bas`
+  from word processors, browsers, or AI assistants. Run the checker before every release. (A
+  stray em-dash in the header comment is exactly what broke the v2.3 build pre-check.)
+- **Keep `Build-Release.vbs` byte-stable.** It is a Windows Script Host launcher, not imported
+  into VBA, so it does not need to be ASCII. More importantly it opens Excel and injects VBA
+  code - a pattern Defender/SmartScreen/Chrome flag. The long-standing file is a trusted hash;
+  editing it (even one character) makes a new unknown script that gets flagged as a
+  false-positive virus and blocked from download until it re-earns reputation. Do not churn it.
+  If you truly must change it, expect AV false positives on fresh downloads and report the new
+  hash to Microsoft.
+- **Release ZIP:** ship the full working folder, flat (files at the ZIP root) so Windows
+  "Extract All" yields one clean folder, not a double-nested one. Confirm `check-encoding.ps1`
+  passes before publishing.
