@@ -1,5 +1,21 @@
 # Changelog
 
+## v2.4 - 2026-08-27
+
+Per-row action buttons on the Dispense Log, plus two print-flow safety/UX fixes. No change to the parse / validate / print-batch workflow.
+
+**Per-row Print / Edit / Remove buttons on the 4. Log tab (2026-08-27)**
+- Every Log data row now carries three buttons to the right of the record: **Print**, **Edit**, **Remove**. New `RefreshLogRowButtons` lays them out (shapes named `lg_<action>_<row>`, resolved by the existing `CallerRow()`), and is called after every Log change via `ApplyLogEncounterBorders`, `ShowLogSheet`, and `ClearLogSilent`, so the button set always tracks the row set. Buttons live to the right of the last Log column (`LG_LAST + 1`), left of the existing "Save Log" button.
+- **Print** (`PrintLogRow`) reprints that one row's label from the row's OWN patient/DOB + med fields (new `RenderLabelSurfaceFromLog`, modeled on `UpdateLabelPreviewForMedRow` but Log-fed, so the proven Meds/Input print path is left untouched). It prints **one** label and, like "Print extra (no log)", does **not** add a Log row or bump any print count (`PRINT_COPIES = 1`).
+- **Edit** (`EditLogRow`) opens the same `frmMedEdit` dialog used on the review page (via `EditLogRowWithForm`), pre-filled from the row, and writes changes back into the Log columns (Exp/Lot re-forced to text).
+- **Remove** (`RemoveLogRow`) deletes the row after a named confirm, then redraws the encounter dividers.
+- **The Log stays the source of truth for the CSV backup:** editing or removing a row now mirrors the change into that row's dated `dispense-log\YYYY-MM-DD.csv` (`UpdateCsvLineForLogRow` + helpers `BuildCsvLineFromLogRow`, `CsvKeyMatch`, `ParseCsvLine`, `CsvDateStampFromTimestamp`). It's a **surgical, line-level** edit keyed on Timestamp + Encounter + Medication + Lot, so other rows are never disturbed — deliberately not a whole-file rewrite, since a day's CSV can span multiple sessions (the Log is wiped on close; the CSV is append-only history). Best-effort: any CSV failure is swallowed and never blocks the edit/remove.
+- **Edit and Print stay on the Log** — neither forces the Tebra tab open (that tab already rebuilds its note from the Log when activated, so nothing is lost).
+- Log data rows are set to **22 pt** with vertically-centered text and buttons (`LGB_ROWH`), for a little breathing room between rows.
+
+**Cancelling the initials prompt no longer prints or logs (2026-08-27)**
+- If the volunteer cancels (or leaves blank) the "Enter your initials" prompt, **nothing is printed and nothing is logged**. On **Print Checked Labels** they're returned to the **3. Print Labels** review page; the single **Print Label** and **Save Edited Encounter** paths abort the same way (Save Edited Encounter aborts before any rows are deleted). Previously a blank was accepted and the row logged with no initials.
+
 ## v2.3 - 2026-08-27
 
 Distribution + build-safety fixes on top of v2.2. No workflow changes.

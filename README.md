@@ -178,6 +178,8 @@ Every checked med auto-previews as a real label — drug + strength, directions,
 2. Enter your initials and confirm. **2 copies of each** print.
 3. The confirmation lists exactly what's about to print and flags any row skipped for missing Exp/Lot.
 
+> **Cancel = nothing prints.** If you cancel (or leave blank) the initials prompt, **nothing is printed or logged** and you're returned to this review page to try again. The same is true for the single **Print Label** and **Save Edited Encounter**.
+
 Each label card also has its own buttons on the right:
 
 - **Check / Uncheck this label**
@@ -194,6 +196,16 @@ Every printed label is recorded automatically. Nothing to do here — it's your 
 Each print is one **encounter**: numbered, color-banded, and separated by a divider so each patient reads as one block.
 
 **The Log is the source of truth** for Tebra Notes and for **Edit Encounter**. If a row is wrong or missing, you can fix it here by hand.
+
+**Per-row buttons.** Each Log row has three buttons on the right:
+
+- **Print** — reprints that one row's label (a **single** copy). It's a reprint only: nothing is added to the Log again and no print count changes.
+- **Edit** — opens the same one-dialog editor used on the Print Labels page, pre-filled from the row, and writes your changes back into the Log **and into that day's CSV backup** so the two stay in sync.
+- **Remove** — deletes that row from the Log **and the CSV backup**, after a confirm.
+
+Edit and Print keep you on the Log — they don't jump you to the Tebra tab.
+
+You can also still edit the cells directly:
 
 - Edit a Log cell (name, drug, SIG, qty, source, etc.), add a row, or delete a row.
 - Open **5 · Tebra Notes** — it rebuilds from whatever is in the Log *right now*. Copy the boxed note into Tebra. You do **not** have to re-print.
@@ -237,6 +249,8 @@ The notes are built **from the Log** (including any rows you typed or corrected 
 - **2 copies per label**, batch or single, with detailed confirmations and fit-to-page so the bottom row never clips.
 - **Print extra (no log)** per-card button for spare labels a patient needs — printed without touching the dispense Log or the print count.
 - **Complete dispense log** with numbered, color-banded **encounters** and a divider between each.
+- **Per-row Log buttons** — **Print** (single reprint, not logged again), **Edit** (same one-dialog editor, writes back to the Log **and** its CSV backup), and **Remove** (row + CSV backup) on every Log row.
+- **Cancel-safe initials** — cancelling the initials prompt prints and logs nothing and returns you to the review page.
 - **Edit past encounters** — reopen any logged visit (the list is pulled live from the Log), fix it, and re-save as a new version; tolerant of pasted-in logs (auto-numbers blank encounters, warns on column mismatches).
 - **Tebra notes** sheet: paste-ready session notes grouped by source, one boxed note per patient, rebuilt from the Log whenever you open the tab (fix the Log by hand if needed, then copy).
 - **Brother QL-1100c (Hermione) auto-select** with a load-the-roll confirmation.

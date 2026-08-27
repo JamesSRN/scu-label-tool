@@ -155,6 +155,40 @@ Label Previews.
 - **# of Prints** auto-increments on each print and is protected from manual edits.
 - **Start NEW Patient** clears patient + meds but keeps the Log (back-to-back
   patients). **Reset Session** is a full wipe (patient + meds + Log) with confirmation.
+- **Cancelling the initials prompt aborts** — `AskInitials` returns `""` on Cancel
+  (or an empty entry), and the print/log paths now treat that as "do nothing":
+  `PrintCheckedLabels` returns to the **3. Print Labels** page, `PrintLabel` and
+  `SaveEditedEncounter` abort (the latter *before* deleting the old encounter rows).
+  Nothing prints and nothing is logged with blank initials.
+
+### Log row buttons (Print / Edit / Remove)
+- Each **4. Log** data row carries three buttons to the right of the record:
+  **Print**, **Edit**, **Remove**. `RefreshLogRowButtons` clears every `lg_*` shape
+  and re-adds `lg_print_<row>` / `lg_edit_<row>` / `lg_remove_<row>` for the current
+  rows (geometry from `LGB_*` consts; row height forced to `LGB_ROWH` = 22 pt with
+  vertically-centered text/buttons). The row number is recovered by the existing
+  `CallerRow()`. It's called after **every** Log change — wired into
+  `ApplyLogEncounterBorders`, `ShowLogSheet`, and `ClearLogSilent` — so the button
+  set always tracks the row set.
+- **Print** (`PrintLogRow`) reprints that one row from the row's OWN patient/DOB +
+  med fields via `RenderLabelSurfaceFromLog` (a Log-fed mirror of the surface-writing
+  half of `UpdateLabelPreviewForMedRow` — the proven Meds/Input print path is left
+  untouched). One label, **no** new Log row and **no** print-count bump
+  (`PRINT_COPIES = 1`), i.e. it behaves like "Print extra (no log)".
+- **Edit** (`EditLogRow` -> `EditLogRowWithForm`) reuses the same `frmMedEdit` form as
+  the Medications/gallery editor, pre-filled from the Log columns and written back
+  (Exp/Lot re-forced to text). Input-box fallback if the form is unavailable.
+- **Remove** (`RemoveLogRow`) deletes the row (named confirm) and redraws dividers.
+- **CSV mirroring (Log = source of truth for the backup).** Edit and Remove update
+  the matching line in that row's dated `dispense-log\YYYY-MM-DD.csv`
+  (`UpdateCsvLineForLogRow`; helpers `BuildCsvLineFromLogRow`, `CsvKeyMatch`,
+  `ParseCsvLine`, `CsvDateStampFromTimestamp`). **Surgical, line-level** match on
+  Timestamp + Encounter + Medication + Lot — *not* a whole-file rewrite, because a
+  day's CSV can span multiple sessions (the Log wipes on close; the CSV is append-only).
+  Best-effort under `On Error Resume Next`; a CSV miss never blocks the edit/remove.
+- **Edit/Print stay on the Log.** They deliberately do **not** call
+  `FillTebraTemplate` (which `.Activate`s the Tebra tab); the Tebra note refreshes
+  from the Log on tab-activate anyway, so the note stays correct without the jump.
 
 ### Data-entry forms & session hygiene
 
