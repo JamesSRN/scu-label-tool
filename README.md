@@ -15,7 +15,7 @@
 
 Saturday Clinic for the Uninsured · Medical College of Wisconsin
 
-`Excel + VBA` · `Brother QL-1100c (Hermione) — DK-1202` · `offline — no PHI committed` · `v2.1`
+`Excel + VBA` · `Brother QL-1100c (Hermione) — DK-1202` · `offline — no PHI committed` · `v2.4`
 
 </div>
 

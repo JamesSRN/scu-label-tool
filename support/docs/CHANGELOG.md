@@ -16,6 +16,9 @@ Per-row action buttons on the Dispense Log, plus two print-flow safety/UX fixes.
 **Cancelling the initials prompt no longer prints or logs (2026-08-27)**
 - If the volunteer cancels (or leaves blank) the "Enter your initials" prompt, **nothing is printed and nothing is logged**. On **Print Checked Labels** they're returned to the **3. Print Labels** review page; the single **Print Label** and **Save Edited Encounter** paths abort the same way (Save Edited Encounter aborts before any rows are deleted). Previously a blank was accepted and the row logged with no initials.
 
+**Version (2026-08-27)**
+- In-app version stamp bumped to **2.4** (`APP_VERSION`) and the README badge updated; earlier releases had left it at 2.1.
+
 ## v2.3 - 2026-08-27
 
 Distribution + build-safety fixes on top of v2.2. No workflow changes.

@@ -167,7 +167,7 @@ Private gInTebraFill As Boolean     ' re-entrancy guard: True while FillTebraTem
 Private Const DISPENSE_CSV_ENABLED As Boolean = True
 
 ' V2 app version - stamped into the workbook by SetupWorkbook so the loaded build is visible.
-Public Const APP_VERSION As String = "2.1"
+Public Const APP_VERSION As String = "2.4"
 
 ' V2 debug switch: when True, Dbg() writes a timestamped trace to the VBE Immediate
 ' window (Ctrl+G). Leave False for production (Dbg is then a no-op).
