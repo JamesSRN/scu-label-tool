@@ -31,8 +31,7 @@ param([string[]]$Files)
 $root = Split-Path -Parent $PSScriptRoot   # tools\ -> repo root
 if (-not $Files -or $Files.Count -eq 0) {
     $Files = @(
-        (Join-Path $root 'MedParser.bas'),
-        (Join-Path $root 'Build-Release.vbs')
+        (Join-Path $root 'MedParser.bas')
     )
 }
 
