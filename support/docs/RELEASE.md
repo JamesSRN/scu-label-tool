@@ -13,7 +13,7 @@ This is the **Dispensary** tool (medication labels on Hermione). Lab / specimen 
 2. **Move the ZIP to the Desktop** (out of Downloads / OneDrive). **Right-click → Extract All…** — do not open files from inside the ZIP window. Keep **`MedicationDispensing.xlsm`**, **`scu_emblem.png`**, and **`OPEN LABEL TOOL (double-click me).cmd`** together in that extracted folder.
 3. One-time in Excel (**File → Options → Trust Center → Trust Center Settings…**):
    - **Macro Settings** — check **Trust access to the VBA project object model** (the click-me file rebuilds the workbook on every open).
-   - **Trusted Locations → Add new location…** — the extracted Desktop folder. Check **Subfolders of this location are also trusted**.
+   - **Trusted Locations → Add new location…** — add the **Desktop** itself, and check **Subfolders of this location are also trusted**, so every version extracted to the Desktop is trusted without re-adding it each release.
 4. **Every time:** close the workbook, then double-click **`OPEN LABEL TOOL (double-click me).cmd`** (the click-me file). If that file doesn't run, double-click **`Build-Release.vbs`** instead. Don't open the `.xlsm` by hand unless both of those fail.
 5. Make sure the **Brother QL-1100c (Hermione)** is connected by **USB cable** (not Bluetooth), the driver is installed, and the **DK-1202 (62 × 100 mm)** roll is loaded.
 6. The workbook opens to the **Start Here** guide — follow the numbered tabs. A printable copy, **`SCU_QuickStart_Card.pdf`**, is included in the ZIP.

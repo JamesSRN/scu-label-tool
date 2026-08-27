@@ -54,11 +54,11 @@ Cause: Office Mark-of-the-Web or Trust Center policy.
 
 Fix:
 
-- Store the workbook in a known local SCU project folder.
-- Add that folder as an Excel Trusted Location.
+- Keep the extracted tool folder on your **Desktop** (not OneDrive or Downloads).
+- In Excel's Trust Center, add the **Desktop** as a Trusted Location with **Subfolders of this location are also trusted** — every version extracted to the Desktop is then trusted.
 - Reopen the workbook.
 
-Do not broadly trust Downloads or unknown folders.
+Trust the Desktop on the dedicated clinic PC; don't trust Downloads or synced/cloud folders.
 
 ## Run-time error 1004: Unable to set PaperSize
 

@@ -48,20 +48,20 @@ Windows will *look* like it opened the ZIP if you just double-click it — that 
 
 ### 2 · One-time Excel Trust Center (required)
 
-The tool rebuilds itself from source **every time you open it**, so Excel has to trust this folder and the VBA project. Do this once on the clinic PC:
+The tool rebuilds itself from source **every time you open it**, so Excel has to trust the **Desktop** (where you extract it) and the VBA project. Do this once on the clinic PC:
 
 1. Open Excel (a blank workbook is fine).
 2. **File → Options → Trust Center → Trust Center Settings…**
 3. **Macro Settings** — check **Trust access to the VBA project object model**.  
    *(That's what lets the click-me file apply the latest code.)*
 4. **Trusted Locations → Add new location…**  
-   Browse to the folder you extracted on the Desktop.  
+   Browse to your **Desktop** (e.g. `C:\Users\<you>\Desktop`) — trust the whole Desktop, not just this one folder.  
    Check **Subfolders of this location are also trusted**. OK out of every window.
 5. Close Excel completely.
 
 If a yellow **Enable Content** bar appears the first time the workbook opens, click it.
 
-> Don't add Downloads (or a random folder) as a Trusted Location — only this tool's folder.
+> Trusting the **Desktop** (with subfolders) means every version you extract there just works — you won't have to re-add a Trusted Location each release. Keep the tool on the real Desktop, not OneDrive Desktop or Downloads.
 
 ### 3 · Every time you use it
 
@@ -254,7 +254,7 @@ The notes are built **from the Log** (including any rows you typed or corrected 
 
 <br>
 
-- **Yellow bar / macros disabled** — click **Enable Content**. If that never appears, the folder isn't a Trusted Location yet (step 2 above). Close Excel and add it.
+- **Yellow bar / macros disabled** — click **Enable Content**. If that never appears, the Desktop isn't a Trusted Location yet (step 2 above). Close Excel and add it.
 - **Click-me file does nothing** — Windows sometimes blocks `.cmd` files. Double-click **`Build-Release.vbs`** instead; that's the same rebuild, just without the helper script.
 - **It says it can't access the VBA project** — the **Trust access to the VBA project object model** box isn't checked. That's required because we rebuild on every open.
 - **You double-clicked the ZIP, not the extracted folder** — go back, **Extract All** onto the Desktop, then use the click-me file in *that* folder.
