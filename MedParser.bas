@@ -1,6 +1,6 @@
 Attribute VB_Name = "MedParser"
 ' ============================================================
-'  Saturday Clinic for the Uninsured — Dispensary Label Tool
+'  Saturday Clinic for the Uninsured - Dispensary Label Tool
 '  Medication Parser  -  MedParser.bas  -  Version 1.0
 '
 '  INSTALL:  Developer -> Visual Basic -> File -> Import File
