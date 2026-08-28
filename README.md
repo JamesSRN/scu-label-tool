@@ -175,8 +175,8 @@ The edit list is pulled **straight from the Log**, so it always matches what you
 Every checked med auto-previews as a real label — drug + strength, directions, `form · qty · source · refills`, and Exp/Lot pinned to the bottom row (long patient names shrink to fit).
 
 1. Click **Print Checked Labels**.
-2. Enter your initials and confirm. **2 copies of each** print.
-3. The confirmation lists exactly what's about to print and flags any row skipped for missing Exp/Lot.
+2. Enter your initials and confirm. **2 copies of each** print. The confirmation lists exactly what's about to print and flags any row skipped for missing Exp/Lot.
+3. After it prints, you land on the **Log**.
 
 > **Cancel = nothing prints.** If you cancel (or leave blank) the initials prompt, **nothing is printed or logged** and you're returned to this review page to try again. The same is true for the single **Print Label** and **Save Edited Encounter**.
 
@@ -191,27 +191,27 @@ Each label card also has its own buttons on the right:
 
 ### 4 · Log  (purple)
 
-Every printed label is recorded automatically. Nothing to do here — it's your record.
+After **Print Checked Labels**, you land here. That's the record of what just printed.
 
 Each print is one **encounter**: numbered, color-banded, and separated by a divider so each patient reads as one block.
 
-**The Log is the source of truth** for Tebra Notes and for **Edit Encounter**. If a row is wrong or missing, you can fix it here by hand.
+**The Log is the source of truth** for Tebra Notes and for **Edit Encounter**. If a row is wrong or missing, fix it here.
 
-**Per-row buttons.** Each Log row has three buttons on the right:
+**If a Log row needs a fix**, use the three buttons on the right of that row. Those buttons **keep you on the Log** — they do not jump to Tebra.
 
-- **Print** — reprints that one row's label (a **single** copy). It's a reprint only: nothing is added to the Log again and no print count changes.
-- **Edit** — opens the same one-dialog editor used on the Print Labels page, pre-filled from the row, and writes your changes back into the Log **and into that day's CSV backup** so the two stay in sync.
-- **Remove** — deletes that row from the Log **and the CSV backup**, after a confirm.
+1. Find the row (wrong name, SIG, quantity, Exp/Lot, source, etc.).
+2. Click **Edit**. The same one-dialog editor as the Print Labels page opens, already filled from that row. Change what's wrong and click OK. The Log row updates, and so does that day's CSV backup.
+3. If you also need another physical sticker, click **Print** on that row. You get **one** copy. It is a reprint only — nothing is added to the Log again, and the print count does not change. You stay on the Log.
+4. If the row shouldn't be there at all, click **Remove**, confirm, and it is deleted from the Log and from the CSV backup.
 
-Edit and Print keep you on the Log — they don't jump you to the Tebra tab.
+You can still type in a Log cell directly if that's faster (name, drug, SIG, qty, source, etc.), or add / delete a row by hand.
 
-You can also still edit the cells directly:
+Then:
 
-- Edit a Log cell (name, drug, SIG, qty, source, etc.), add a row, or delete a row.
 - Open **5 · Tebra Notes** — it rebuilds from whatever is in the Log *right now*. Copy the boxed note into Tebra. You do **not** have to re-print.
-- Click **Edit Enc.** and pick that encounter — it reloads the patient and **every med from the Log**, including your hand-edits. Then you can fix, uncheck, save, and reprint as usual.
+- Click **Edit Enc.** and pick that encounter — it reloads the patient and **every med from the Log**, including your button-edits and hand-edits. Then you can fix, uncheck, save, and reprint as usual.
 
-**Print extra (no log)** does not add a Log row, so it will not show up in Tebra Notes or Edit Encounter. Drafts that were never printed live only in the snapshot store, not the Log.
+**Print extra (no log)** on the Print Labels page does not add a Log row, so it will not show up here, in Tebra Notes, or in Edit Encounter. Drafts that were never printed live only in the snapshot store, not the Log.
 
 ![Dispense Log](support/assets/screenshots/log-v2.png)
 
