@@ -1,6 +1,6 @@
 # Setup Instructions
 
-These instructions set up the **SCU Dispensary Label Tool** (v2.4) on a Windows PC. Source is `MedParser.bas` at the repo root. There is no `src/` folder.
+These instructions set up the **SCU Dispensary Label Tool** (v2.5) on a Windows PC. Source is `MedParser.bas` at the repo root. There is no `src/` folder.
 
 ## 1. What this setup creates
 

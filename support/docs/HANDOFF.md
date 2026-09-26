@@ -1,8 +1,8 @@
 # SCU Label Printing Tool - Handoff
 
-Last updated: 2026-09-26. **Current app is v2.4** (`APP_VERSION = "2.4"` in `MedParser.bas`). The short "where things stand" note is the repo-root [HANDOFF.md](../../HANDOFF.md). This file is the routine map.
+Last updated: 2026-09-26. **Current app is v2.5** (`APP_VERSION = "2.5"` in `MedParser.bas`). The short "where things stand" note is the repo-root [HANDOFF.md](../../HANDOFF.md). This file is the routine map.
 
-v2.4 adds per-row **Print / Edit / Remove** on the Log, and cancelling the initials prompt prints and logs nothing. Review does **not** auto-check. Missing Quantity / Expiration / Lot / Source cells are yellow (a bad expiration format is amber). The label qty line is form, qty, source, refills. The encounter box is one line.
+The workbook title is **Dispensary Tool v2.5** (Start Here header, and the small stamp on Patient & Input). v2.5 adds a Log-row **Add med** button and keeps the day's CSV in sync when the Log changes. Review does **not** auto-check. Missing Quantity / Expiration / Lot / Source cells are yellow (a bad expiration format is amber). The label qty line is form, qty, source, refills. The encounter box is one line.
 
 An Excel + VBA tool for the **Saturday Clinic for the Uninsured (SCU)** free
 pharmacy. It turns pasted prescription text into a validated medication table and
@@ -412,7 +412,7 @@ See `tools/BUILD_RELEASE_NOTES.md` for full detail.
 6. **`tools/make-release-zip.ps1`** still packages the old slim zip (workbook, emblem, quick-start card, `INSTALL.txt`). The zip actually published for v2.4 is the full working folder. Do not treat the script as the current release process until it is updated.
 7. **`LogoB64()`** is still in `MedParser.bas` and unused. Safe to delete later. Do not turn the embedded fallback back on in `LogoFilePath`.
 
-Verified in source as of v2.4: the release build, the five-tab workflow, Review without auto-check, Log row buttons, and the three-zone label header in `BuildLabelPreviewLayout`. The 242 pt width still needs a physical Brother check.
+Verified in source as of v2.5: the release build, the five-tab workflow, Review without auto-check, Log row buttons (Print / Edit / Add med / Remove), the day's CSV sync, and the three-zone label header in `BuildLabelPreviewLayout`. The 242 pt width still needs a physical Brother check.
 
 ---
 
@@ -564,4 +564,4 @@ parsing, the printer-detection cache with self-heal, and `PrintLabelSurfaceSafe`
 
 ---
 
-**Bottom line (2026-09-26):** v2.4 is what `master` and the GitHub v2.4 tag contain. Parse, review (no auto-check), checkbox printing, the Log (including per-row Print/Edit/Remove), Tebra-from-Log, and the DK-1202 label layout are in `MedParser.bas`. Remaining checks are the 242 pt width on the clinic Brother, the printer-not-found double print, and not running `Build-ScuEmblem.ps1`.
+**Bottom line (2026-09-26):** source on `master` is **v2.5** (`APP_VERSION = "2.5"`). The latest GitHub release tag is still **v2.4** until the next release is published. Parse, review (no auto-check), checkbox printing, the Log (Print / Edit / Add med / Remove, plus the day's CSV), Tebra-from-Log, and the DK-1202 label layout are in `MedParser.bas`. Remaining checks are the 242 pt width on the clinic Brother, the printer-not-found double print, and not running `Build-ScuEmblem.ps1`.

@@ -1,6 +1,6 @@
 # SCU Dispensary Label Tool — current state
 
-_Last updated: 2026-09-26. App version **2.4**. GitHub `JamesSRN/scu-label-tool`, branch `master`. The long routine map is [support/docs/HANDOFF.md](support/docs/HANDOFF.md). Volunteer steps are [README.md](README.md)._
+_Last updated: 2026-09-26. App version **2.5**. GitHub `JamesSRN/scu-label-tool`, branch `master`. The long routine map is [support/docs/HANDOFF.md](support/docs/HANDOFF.md). Volunteer steps are [README.md](README.md)._
 
 This is the medication-label tool (Brother QL-1100c, **Hermione**, USB, DK-1202). Lab labels are a different repo: [lab-label-printer](https://github.com/JamesSRN/lab-label-printer) (Brother QL-820NWB, **Harry**).
 
@@ -16,7 +16,7 @@ This is the medication-label tool (Brother QL-1100c, **Hermione**, USB, DK-1202)
 
 ## What the current code does
 
-Five numbered tabs: **1. Patient & Input**, **2. Medications**, **3. Print Labels**, **4. Log**, **5. Tebra Notes**. Hidden sheets: **Label Preview** (print surface), **EncounterData** (snapshots). **Developer Test** and **Setup & Help** sit after the workflow.
+Five numbered tabs: **1. Patient & Input**, **2. Medications**, **3. Print Labels**, **4. Log**, **5. Tebra Notes**. Hidden sheets: **Label Preview** (print surface), **EncounterData** (snapshots). **Developer Test** and **Setup & Help** sit after the workflow. The Start Here title, and the small stamp on Patient & Input, read **Dispensary Tool v2.5**.
 
 - Parse clears the previous medication list first (keeps name, DOB, and the Log) and asks before wiping a list that already has rows.
 - A check is a cell, not a control. Column 2 (`C_SEL`) holds a checkmark. `IsRowSelected` tests that the cell is non-empty.

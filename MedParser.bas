@@ -180,7 +180,7 @@ Private gLogWatchLot As String
 Private Const DISPENSE_CSV_ENABLED As Boolean = True
 
 ' V2 app version - stamped into the workbook by SetupWorkbook so the loaded build is visible.
-Public Const APP_VERSION As String = "2.4"
+Public Const APP_VERSION As String = "2.5"
 
 ' V2 debug switch: when True, Dbg() writes a timestamped trace to the VBE Immediate
 ' window (Ctrl+G). Leave False for production (Dbg is then a no-op).
@@ -428,7 +428,7 @@ Private Sub BuildQuickStartSheet()
     ws.Range("A1:H3").Interior.Color = RGB(55, 71, 79)
     ws.Range(ws.Cells(2, 1), ws.Cells(2, 8)).Merge
     With ws.Cells(2, 1)
-        .Value = "   SCU Label Printing"
+        .Value = "   Dispensary Tool v" & APP_VERSION
         .Font.Color = RGB(255, 255, 255)
         .Font.Bold = True
         .Font.Size = 22
@@ -436,7 +436,7 @@ Private Sub BuildQuickStartSheet()
     End With
     ws.Range(ws.Cells(3, 1), ws.Cells(3, 8)).Merge
     With ws.Cells(3, 1)
-        .Value = "   How to make medication labels  -  follow the numbered, colored tabs        v" & APP_VERSION
+        .Value = "   How to make medication labels  -  follow the numbered, colored tabs"
         .Font.Color = RGB(255, 255, 255)
         .Font.Size = 11
         .VerticalAlignment = xlCenter
@@ -1078,7 +1078,7 @@ Public Sub SetupWorkbook()
 
     ' Version stamp so the loaded build is visible at a glance (support / troubleshooting).
     On Error Resume Next
-    ws1.Cells(58, 2).Value = "SCU Label Tool  v" & APP_VERSION & "   -   built " & Format(Date, "YYYY-MM-DD")
+    ws1.Cells(58, 2).Value = "Dispensary Tool v" & APP_VERSION & "   -   built " & Format(Date, "YYYY-MM-DD")
     ws1.Cells(58, 2).Font.Size = 8
     ws1.Cells(58, 2).Font.Color = RGB(150, 150, 150)
     On Error GoTo 0

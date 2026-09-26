@@ -1,6 +1,6 @@
 # Setup Instructions (clinic PC notes)
 
-Use [SETUP_INSTRUCTIONS.md](SETUP_INSTRUCTIONS.md). That file is the current v2.4 procedure (click-me launcher, `MedParser.bas` at the repo root, Check Med in column 2, Review does not auto-check).
+Use [SETUP_INSTRUCTIONS.md](SETUP_INSTRUCTIONS.md). That file is the current v2.5 procedure (click-me launcher, `MedParser.bas` at the repo root, Check Med in column 2, Review does not auto-check).
 
 This page used to be a second copy of the setup guide. It drifted (it still described auto-check and a `src/MedParser.bas` path). The one clinic-specific detail that is still true, and is now also in the main setup doc:
 

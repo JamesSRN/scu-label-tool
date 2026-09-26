@@ -1,6 +1,6 @@
 # SCU Label Printing — Improvement Report
 
-> Historical proposal from 2026-07-09. It is not the current design. The dated CSV archive and several UX items here were built later. Current behavior is v2.4: repo-root `HANDOFF.md` and `README.md`.
+> Historical proposal from 2026-07-09. It is not the current design. The dated CSV archive and several UX items here were built later. Current behavior is v2.5: repo-root `HANDOFF.md` and `README.md`.
 
 _Prepared 2026-07-09 (evening) for morning review. No changes were made from this report — everything here is a proposal for you to accept, defer, or reject._
 

@@ -2,7 +2,7 @@
 
 ## What this repo actually uses
 
-The GitHub branch is **`master`**. There is no `main` or `dev` branch in the current history. Tags in use: `v2.1`, `v2.2`, `v2.3`, `v2.4`.
+The GitHub branch is **`master`**. There is no `main` or `dev` branch in the current history. Published tags: `v2.1`, `v2.2`, `v2.3`, `v2.4`. Source on `master` is **v2.5** (`APP_VERSION = "2.5"`); that tag is not published yet.
 
 Source of truth:
 

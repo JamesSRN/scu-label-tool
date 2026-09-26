@@ -28,12 +28,12 @@ This is the **Dispensary** tool (medication labels on Hermione). Lab / specimen 
 2. **Get a PHI-free workbook** to ship — a freshly built copy that has never had a patient entered (empty Log, no name/DOB). *Never ship a workbook that has held patient data.*
 3. **Build the download ZIP:**
    ```
-   powershell -ExecutionPolicy Bypass -File tools\make-release-zip.ps1 -Version 2.4
+   powershell -ExecutionPolicy Bypass -File tools\make-release-zip.ps1 -Version 2.5
    ```
-   That script still builds the **older slim zip** (`MedicationDispensing.xlsm`, `scu_emblem.png`, `SCU_QuickStart_Card.pdf`, `INSTALL.txt`). The zip attached to the **v2.4** GitHub release is the **full working folder** (source, click-me launcher, docs, tools, emblem, and the wiped workbook), flat at the ZIP root. Ship that full folder unless you have deliberately switched back to the slim script.
+   That script still builds the **older slim zip** (`MedicationDispensing.xlsm`, `scu_emblem.png`, `SCU_QuickStart_Card.pdf`, `INSTALL.txt`). The zip attached to the **v2.4** GitHub release is the **full working folder** (source, click-me launcher, docs, tools, emblem, and the wiped workbook), flat at the ZIP root. Ship that full folder unless you have deliberately switched back to the slim script. Name the next asset `SCU-Label-Printing-v2.5.zip`.
 4. **Publish on GitHub:** *Releases → Draft a new release*.
-   - **Choose a tag:** `v2.4` (select "Create new tag on publish").
-   - **Title:** `v2.4`.
+   - **Choose a tag:** `v2.5` (select "Create new tag on publish").
+   - **Title:** `v2.5`.
    - **Description:** paste the current version section from `CHANGELOG.md`. The published v2.4 page still tells people to download `SCU-Label-Printing-v2.3.zip`. The asset file is `SCU-Label-Printing-v2.4.zip`. The next release text should name the zip that is actually attached.
    - **Attach** the zip.
    - Click **Publish release**.
@@ -45,4 +45,4 @@ This is the **Dispensary** tool (medication labels on Hermione). Lab / specimen 
 
 ## Release notes
 
-Copy the top section of [CHANGELOG.md](CHANGELOG.md). Current version is **v2.4** (2026-08-27): Log row Print / Edit / Remove, and cancelling the initials prompt prints and logs nothing. Review does not auto-check. Do not paste the old v2.0 blurb (it still described auto-check, Reprint Last Batch, and a sheet named TEBRA TEMPLATE).
+Copy the top section of [CHANGELOG.md](CHANGELOG.md). Current source version is **v2.5** (2026-09-26): the workbook title is Dispensary Tool v2.5, Log rows have Add med, and the day's CSV stays in sync with Log edits. The latest published GitHub release is still v2.4 until this is tagged. Review does not auto-check. Do not paste the old v2.0 blurb (it still described auto-check, Reprint Last Batch, and a sheet named TEBRA TEMPLATE).

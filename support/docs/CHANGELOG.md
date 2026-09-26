@@ -1,8 +1,10 @@
 # Changelog
 
-## Unreleased
+## v2.5 - 2026-09-26
 
-**Day's CSV stays current when the Log changes (2026-09-26)**
+The workbook title is **Dispensary Tool v2.5** (`APP_VERSION = "2.5"`): the Start Here header, and the small stamp at the bottom of Patient & Input.
+
+**Day's CSV stays current when the Log changes**
 - A print still appends to `dispense-log/YYYY-MM-DD.csv`. The file date comes from the row's timestamp.
 - Editing a Log row (the Edit button, or typing in a cell) replaces that line. If the line is not in the file yet, the row is appended. Adding a row by hand does the same (`LogSheetChanged`, installed by `InstallLogSheetEvents`).
 - **Add med** on a Log row inserts a new medication directly under that patient (same encounter, name, and DOB) and appends it to the day's CSV.
