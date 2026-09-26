@@ -106,6 +106,11 @@ The whole workflow lives on **five color-coded, numbered tabs**. The workbook op
 
 _All screenshots below use randomly generated test patients — no real patient data._
 
+**Adding a medication without a pasted list**
+
+- **Add Manually** is on Patient & Input, under Parse. Use it for one drug when there is nothing to paste. If the name, date of birth, or date is blank, it asks for that first. Cancel adds nothing. Otherwise the Medications tab opens and you fill in that drug. Drugs already on the list stay.
+- **Add med** is on the right of each Log row. Use it when that patient is already in the Log and needs another drug on the same visit. The new row appears directly under the one you clicked, keeps that patient, and is saved to that day's CSV.
+
 ### 1 · Patient & Input  (blue)
 
 1. Enter the patient's **name**, **DOB**, and **date**.
