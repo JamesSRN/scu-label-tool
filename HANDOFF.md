@@ -19,6 +19,7 @@ This is the medication-label tool (Brother QL-1100c, **Hermione**, USB, DK-1202)
 Five numbered tabs: **1. Patient & Input**, **2. Medications**, **3. Print Labels**, **4. Log**, **5. Tebra Notes**. Hidden sheets: **Label Preview** (print surface), **EncounterData** (snapshots). **Developer Test** and **Setup & Help** sit after the workflow. The Start Here title, and the small stamp on Patient & Input, read **Dispensary Tool v2.5**.
 
 - Parse clears the previous medication list first (keeps name, DOB, and the Log) and asks before wiping a list that already has rows.
+- **Add Manually** on Patient & Input adds one medication without the paste box. If name, DOB, or Rx date is blank it asks for that field, then opens the add-medication dialog on the Medications tab. It does not clear medications already on the list.
 - A check is a cell, not a control. Column 2 (`C_SEL`) holds a checkmark. `IsRowSelected` tests that the cell is non-empty.
 - **Review does not auto-check.** It validates rows to blue. The volunteer checks what prints (green). Double-click the Check Med header to check or uncheck all.
 - Missing Quantity, Expiration, Lot, and Source cells are **yellow**. A filled expiration in the wrong format is **amber**. There is no red missing-field highlight.

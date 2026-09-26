@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+**Add Manually on Patient & Input**
+- A new **Add Manually** button sits under **PARSE MEDICATIONS**. It adds one medication without the paste box.
+- If patient name, DOB, or Date of Rx is blank, the volunteer is asked for that field. Cancel stops and adds nothing.
+- The Medications tab then opens the same add-medication dialog as **+ Add Medication**. Existing medication rows are kept.
+
 ## v2.5 - 2026-09-26
 
 The workbook title is **Dispensary Tool v2.5** (`APP_VERSION = "2.5"`): the Start Here header, and the small stamp at the bottom of Patient & Input.

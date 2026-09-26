@@ -74,7 +74,7 @@ Do not paste an older sheet module. Check Med is column 2. `# of Prints` is colu
 ## 8. Smoke test (no real patients)
 
 1. Developer Test → **Generate Test Patient**, or paste `support/test-data/sample_tebra_pastes_no_phi.txt`.
-2. **PARSE MEDICATIONS**.
+2. **PARSE MEDICATIONS**, or **Add Manually** (no paste; it asks if name, DOB, or date is blank).
 3. Fill Expiration, Lot, and Source. Yellow cells should turn white as you type.
 4. **Review**. Complete rows turn blue. They are not checked for you.
 5. Double-click Check Med (or the Check Med header) so the rows you want turn green.

@@ -443,7 +443,7 @@ Private Sub BuildQuickStartSheet()
     End With
 
     Call GuideStep(ws, 5, 1, RGB(21, 101, 192), "Patient & Input   (blue tab)", _
-        "Open the '1. Patient & Input' tab. Type the patient's NAME and DOB, paste the medication list into the big box, then click PARSE MEDICATIONS.")
+        "Open the '1. Patient & Input' tab. Type the patient's NAME, DOB, and date. Paste a list and click PARSE MEDICATIONS, or click Add Manually to enter one medication and go to the Medications tab. A blank name, DOB, or date is asked for first.")
     Call GuideStep(ws, 10, 2, RGB(46, 125, 50), "Medications   (green tab)", _
         "On the '2. Medications' tab, fill any RED cell (Expiration / Lot) and pick a SOURCE for any YELLOW cell. Click 'Review & Validate', then check the meds to print: double-click a 'Check Med' cell to (un)check one, or double-click the 'Check Med' HEADER to (un)check them all (green rows print).")
     Call GuideStep(ws, 15, 3, RGB(216, 67, 21), "Print Labels   (orange tab)", _
@@ -858,20 +858,24 @@ Public Sub SetupWorkbook()
     End With
 
     ' Action buttons: PARSE is DOUBLE height (the primary one to click); the rest match size.
+    ' Add Manually sits under PARSE: one medication, no paste, then the Medications tab.
     Call AddButtonToSheet(ws1, "btnParse", "PARSE MEDICATIONS", "ParseMedications", 14, 6, 240, 64, RGB(21, 101, 192))
-    Call AddButtonToSheet(ws1, "btnNewPt", "Start NEW Patient", "StartNewPatient",  18, 6, 240, 32, RGB(0, 121, 107))
-    Call AddButtonToSheet(ws1, "btnClear", "Clear Paste Area",  "ClearPasteArea",   21, 6, 240, 32, RGB(84, 110, 122))
+    Call AddButtonToSheet(ws1, "btnAddMan", "Add Manually", "AddManually", 18, 6, 240, 32, RGB(46, 125, 50))
+    Call AddButtonToSheet(ws1, "btnNewPt", "Start NEW Patient", "StartNewPatient",  21, 6, 240, 32, RGB(0, 121, 107))
+    Call AddButtonToSheet(ws1, "btnClear", "Clear Paste Area",  "ClearPasteArea",   24, 6, 240, 32, RGB(84, 110, 122))
     Call AddButtonToSheet(ws1, "btnReset", "Reset Session (clear all)", "ResetSession", 45, 6, 240, 32, RGB(191, 54, 12))
-    ' Exact positions: tall PARSE on top, two same-size buttons under it, Reset near row 45.
+    ' Exact positions: tall PARSE, then Add Manually, New Patient, Clear. Reset near row 45.
     Dim ix As Double
     ix = ws1.Columns(6).Left + 6
     On Error Resume Next
     ws1.Shapes("btnParse").Left = ix
     ws1.Shapes("btnParse").Top = ws1.Rows(11).Top + 18
+    ws1.Shapes("btnAddMan").Left = ix
+    ws1.Shapes("btnAddMan").Top = ws1.Rows(11).Top + 18 + 74
     ws1.Shapes("btnNewPt").Left = ix
-    ws1.Shapes("btnNewPt").Top = ws1.Rows(11).Top + 18 + 74
+    ws1.Shapes("btnNewPt").Top = ws1.Rows(11).Top + 18 + 116
     ws1.Shapes("btnClear").Left = ix
-    ws1.Shapes("btnClear").Top = ws1.Rows(11).Top + 18 + 116
+    ws1.Shapes("btnClear").Top = ws1.Rows(11).Top + 18 + 158
     ws1.Shapes("btnReset").Left = ix
     ws1.Shapes("btnReset").Top = ws1.Rows(45).Top
     On Error GoTo 0
@@ -2729,6 +2733,61 @@ Fail:
     MsgBox "Something went wrong while parsing the medications." & vbCrLf & _
         "Nothing was harmed - click a main button and try again." & vbCrLf & vbCrLf & _
         "Details: " & Err.Description, vbExclamation, "Parse error"
+End Sub
+
+' Enter one medication without the paste box. Asks for a blank name, DOB, or Rx date,
+' then opens the same add-medication dialog on the Medications tab.
+Public Sub AddManually()
+    Call AppReady
+    On Error GoTo Fail
+    Dim wsIn As Worksheet
+    Set wsIn = ThisWorkbook.Sheets(SH_INPUT)
+
+    Dim patName As String, dob As String, dateRx As String
+    patName = Trim(wsIn.Range("C5").Value)
+    dob = Trim(wsIn.Range("C6").Value)
+    dateRx = Trim(wsIn.Range("C7").Value)
+
+    If patName = "" Then
+        patName = Trim(InputBox("Patient name is missing." & vbCrLf & _
+                       "Enter patient name (from the Teams chat):", _
+                       "Patient Name Required", ""))
+        If patName = "" Then
+            MsgBox "Patient name is required.", vbExclamation, "Required"
+            Exit Sub
+        End If
+        wsIn.Range("C5").Value = patName
+    End If
+
+    If dob = "" Then
+        dob = Trim(InputBox("Date of Birth is missing." & vbCrLf & _
+                   "Enter DOB (MM/DD/YYYY):", "DOB Required", ""))
+        If dob = "" Then
+            MsgBox "Date of Birth is required.", vbExclamation, "Required"
+            Exit Sub
+        End If
+        wsIn.Range("C6").Value = dob
+    End If
+
+    If dateRx = "" Then
+        dateRx = Trim(InputBox("Date of Rx is missing." & vbCrLf & _
+                      "Enter the date (MM/DD/YYYY):", "Date Required", _
+                      Format(Now(), "MM/DD/YYYY")))
+        If dateRx = "" Then
+            MsgBox "Date of Rx is required.", vbExclamation, "Required"
+            Exit Sub
+        End If
+        wsIn.Range("C7").Value = dateRx
+    End If
+
+    ThisWorkbook.Sheets(SH_MEDS).Activate
+    Call AddMedicationRow
+    Exit Sub
+Fail:
+    Call AppReady
+    MsgBox "Something went wrong while adding the medication." & vbCrLf & _
+        "Nothing was harmed - click a main button and try again." & vbCrLf & vbCrLf & _
+        "Details: " & Err.Description, vbExclamation, "Add Manually error"
 End Sub
 
 Public Sub ClearPasteArea()

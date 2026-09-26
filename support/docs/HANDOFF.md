@@ -32,7 +32,9 @@ first in `SetupWorkbook`) + `ColorWorkflowTabs`. Hidden helper sheets: **Label P
 (print surface), **EncounterData** (snapshots). **Developer Test** is the last tab.
 
 - **1. Patient & Input** - patient name / DOB / Rx date + paste box. Buttons:
-  `PARSE MEDICATIONS`, `Clear Paste Area`, `Reset Session`, `Start NEW Patient`.
+  `PARSE MEDICATIONS`, `Add Manually`, `Clear Paste Area`, `Reset Session`, `Start NEW Patient`.
+  **Add Manually** (`AddManually`) asks for a blank name, DOB, or Rx date, then opens the
+  add-medication dialog on the Medications tab. It appends; it does not clear the list.
 - **2. Medications** - the parsed table. Columns, all driven by `C_*`:
   `#`(1), **Check Med**(2), Name(3), Strength(4), Dosage Form(5), SIG(6),
   Quantity(7), Expiration(8), Lot(9), **Source**(10), Rx Date(11), Refills(12),

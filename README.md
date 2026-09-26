@@ -108,9 +108,9 @@ _All screenshots below use randomly generated test patients — no real patient 
 
 ### 1 · Patient & Input  (blue)
 
-1. Enter the patient's **name + DOB**.
-2. Paste the prescription text into the big box.
-3. Click **PARSE MEDICATIONS** (or press `Ctrl+Shift+P`).
+1. Enter the patient's **name**, **DOB**, and **date**.
+2. Paste the prescription text into the big box, then click **PARSE MEDICATIONS** (or press `Ctrl+Shift+P`).
+3. Or click **Add Manually** to enter one medication with no paste. A blank name, DOB, or date is asked for first, then the Medications tab opens.
 
 <details>
 <summary>What Parse does with the previous patient</summary>
