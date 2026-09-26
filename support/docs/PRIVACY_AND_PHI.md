@@ -2,7 +2,7 @@
 
 ## Core rule
 
-Do not commit PHI to GitHub.
+Do not commit patient data to GitHub.
 
 This includes:
 
@@ -10,54 +10,48 @@ This includes:
 - DOBs
 - Medication lists linked to a patient
 - Lot/expiration records tied to a patient dispense
-- Dispense logs
+- A dispense log that still has rows
 - Clinic screenshots containing patient data
-- CSV/XLSX/XLSM exports from clinic workflows
+- CSV exports from a clinic day
 
-## Repository scope
+## What Git is allowed to hold
 
-This repository is for source code and documentation only. It is not the operational patient-data store.
+`MedicationDispensing.xlsm` is tracked **because close wipes it**. `Workbook_BeforeClose` clears the patient, the medication list, and the on-screen Log, then saves. Commit that workbook only after Excel has closed it.
 
-Allowed in Git:
+Also allowed:
 
 ```text
 MedParser.bas
-Build/release notes
-Setup documentation
-Troubleshooting notes
-No-PHI sample paste text
-No-PHI diagrams or screenshots
+Build-Release.vbs and the click-me launcher
+Setup and troubleshooting docs
+support/test-data/sample_tebra_pastes_no_phi.txt
+Screenshots of the Developer Test random patient
+scu_emblem.png
 ```
 
-Not allowed in Git:
+Not allowed:
 
 ```text
-MedicationDispensing.xlsm with real patients
-Excel logs
+A workbook that still has a patient on screen
+dispense-log/*.csv
+support/_backups/
 Tebra exports
-Screenshots with PHI
-Ad hoc backups from clinic days
+Screenshots with real patients
 ```
+
+`.gitignore` ignores `*.csv`, `*.xlsx`, `*.xls`, `dispense-log/`, and `support/_backups/`. It does **not** ignore `*.xlsm`.
 
 ## Local/offline design
 
-The current tool is intended to run locally in Excel + VBA. The parser should not call external AI APIs or web services. Local Windows components such as `VBScript.RegExp` and WMI printer lookup are acceptable for the current design.
+The tool runs in Excel + VBA on the clinic PC. The parser does not call an external API. Local Windows pieces (`VBScript.RegExp`, WMI printer lookup) are part of the design.
 
 ## AI and Teams caution
 
-Do not paste real patient medication data into consumer ChatGPT, Claude, or any external AI parser unless SCU leadership has approved the workflow and the vendor relationship is covered by the appropriate privacy/security agreement.
-
-Teams and Power Automate may be part of the future workflow, but any PHI-routing design should be reviewed before deployment.
-
-## No-PHI sample data
-
-Use fictional patients and no-PHI medication examples for testing. Provider/pharmacy names should also be fictionalized in test files unless there is a specific approved reason to include real operational references.
+Do not paste real patient medication data into an external AI tool unless SCU leadership has approved that workflow and the vendor is covered by the right agreement.
 
 ## Before every commit
 
-Check:
-
-- No workbook files are staged.
-- No CSV/log exports are staged.
-- No screenshots with patient data are staged.
-- `git diff --cached` contains only source/docs/no-PHI samples.
+- The workbook was closed in Excel first (so the wipe-and-save ran).
+- `dispense-log/` and `support/_backups/` are not staged.
+- Screenshots are the random test patient, or have no patient data.
+- `git diff --cached` has no names, DOBs, or lot numbers from a real visit.

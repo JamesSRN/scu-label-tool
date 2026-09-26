@@ -15,7 +15,7 @@
 3. Removes the existing `MedParser` module and imports `MedParser.bas` from the repo root.
 3b. Builds the `frmExpLot` and `frmMedEdit` UserForms (if missing) and installs the `ThisWorkbook` auto-reset handlers. See "Generated UserForms & handlers" below.
 4. Runs `'MedicationDispensing.xlsm'!SetupWorkbook` (compile check + rebuild buttons/label layout + `PreviewAllLabels`).
-5. **Saves the workbook and leaves it open** on the Start Here tab for immediate use.
+5. **Saves the workbook and leaves it open** on the Start Here tab. Failure paths call `CleanupQuit` (close without saving the failed attempt, then quit Excel). Success does **not** quit Excel.
 
 Click **OK** on the single **SCU Label Tool is ready** message at the end. The workbook is left open on the Start Here tab — go ahead and use it. (Volunteers normally launch this via **`OPEN LABEL TOOL (double-click me).cmd`**.)
 
@@ -25,34 +25,22 @@ The script cleans up on **every** exit (added 2026-07-02):
 
 - If the workbook opens **read-only** (already open in another window, or a stray Excel is holding it, or the file is marked read-only), it shows a plain-English message and quits **before changing anything**.
 - Every failure path (open failed, read-only, VBA project not accessible, `SetupWorkbook` compile error, save failed) shows a clear message **and quits Excel** via a shared cleanup — so no background `EXCEL.EXE` is left locking the file.
-- On success it saves, closes the workbook, and quits Excel.
+- On success it saves and **leaves the workbook open**. It quits Excel only on a failure path (`CleanupQuit`).
 
 If an **older** run already left stray Excel processes, end them once via **Task Manager** (any `Microsoft Excel` / `EXCEL.EXE`) so the `~$MedicationDispensing.xlsm` lock clears; after that the script keeps itself clean.
 
 ## Generated UserForms & handlers
 
-Build-Release generates UserForms **into the workbook** (so runtime needs no
-"Trust access to the VBA project object model" setting on volunteer PCs):
+Build-Release generates these UserForms into the workbook. The everyday volunteer path still needs **Trust access to the VBA project object model**, because `OPEN LABEL TOOL` rebuilds on every open:
 
-- **`frmExpLot`** — Expiration + Lot in one popup (used per medication).
-- **`frmMedEdit`** — prefilled "Edit medication" editor (Medication + Strength bold on
-  top; Dosage form, Quantity, Directions, Expiration, Lot).
-- **`frmBusy`** — "please wait" progress popup shown during the Print Checked Labels
-  delay (printer lookup + page setup). Has a `SetProgress(pct, msg)` method driven by
-  `BusyShow` / `BusyHide` in `MedParser.bas`; falls back to the status bar if absent.
+- **`frmExpLot`** — Expiration + Lot in one popup. Design size in `Build-Release.vbs`: 292 x 286.
+- **`frmMedEdit`** — add and edit (Medication + Strength bold on top; Dosage form, Quantity, Directions, Expiration, Lot).
+- **`frmBusy`** — "please wait" popup during Print Checked Labels. Design size 288 x 170. `SetProgress` is driven by `BusyShow` / `BusyHide`.
+- **`frmReview`** — scrolling list used for Review, print confirm, print complete, and remove confirm. Design size 470 x 560.
 
-It also installs `Workbook_Open` / `Workbook_BeforeClose` **auto-reset** handlers in
-`ThisWorkbook` (clear patient + meds on open/close, keep the Log), guarded so they
-are never duplicated.
+It also installs `Workbook_Open` / `Workbook_BeforeClose` in `ThisWorkbook`. Open clears the patient and meds and keeps the Log. Close clears the patient, the meds, and the Log, then saves. Build-Release replaces the whole ThisWorkbook module each run.
 
-**All three forms are self-healing (rebuilt every run) via `EnsureForm`.** You no
-longer need to delete a form to change its design — `EnsureForm` finds the existing
-form (or adds it), **clears its controls + code, resizes it, and the block re-adds
-everything fresh**, so an old cropped/renamed copy is corrected automatically on the
-next build. `EnsureForm` deliberately **never calls `VBComponents.Remove` on the
-form** (only `Designer.Controls.Remove` per control): removing the whole form
-component in the same run as the following `xl.Run SetupWorkbook` triggered an
-"Unknown runtime error" in an earlier version.
+**All four forms are rebuilt every run** via `EnsureForm` (code module reset; controls reused by name). `EnsureForm` does not call `VBComponents.Remove` on the form.
 
 Form-building notes for whoever edits the builder:
 
@@ -98,12 +86,12 @@ logo will not appear.
 ## Separation of concerns
 
 ```text
-GitHub repo        source, docs, scu_emblem.png, no-PHI samples
-Build-Release.vbs  developer convenience only
-MedicationDispensing.xlsm   local clinic workbook (git-ignored, may contain PHI)
+GitHub repo        MedParser.bas, docs, scu_emblem.png, no-PHI samples, and the wiped MedicationDispensing.xlsm
+Build-Release.vbs  runs on every open, via the click-me file
+dispense-log/      local CSV archive (git-ignored, PHI)
 ```
 
-Volunteers should open the built `.xlsm` only; they do not run the build script.
+Volunteers open the tool with **`OPEN LABEL TOOL (double-click me).cmd`**, which runs this build. Opening the `.xlsm` by itself skips the rebuild.
 
 ## Session fixes reflected in current build (2026-06-30)
 
@@ -123,7 +111,7 @@ Volunteers should open the built `.xlsm` only; they do not run the build script.
 | Emblem | Centered (`centerHoriz`); `scu_emblem.png` rebuilt after the blank-PNG bug (see Emblem asset warning) |
 | Bottom | Directions **3 lines**; **EXP/LOT on bottom row 15**; **Refills** on the qty line |
 | Gallery | Cards mirror the header; top-right `Print Checked Labels` / `Refresh Previews`; per-card `Check` / `Uncheck`; full shape-clear each rebuild; Rx over DOB |
-| Build-Release | Robust cleanup — never leaves a stray Excel; read-only guard; **saves and closes** on success |
+| Build-Release | Failure paths quit Excel. Success saves and leaves the workbook open on Start Here. |
 
 ## Session updates (2026-07-09)
 
@@ -131,7 +119,7 @@ Volunteers should open the built `.xlsm` only; they do not run the build script.
 |------|--------|
 | Print flow | `frmBusy` progress popup during the Print Checked Labels printer-lookup/page-setup delay (`BusyShow`/`BusyHide`, status-bar fallback) |
 | Label | Long med names (>38 chars) **wrap to two 11 pt lines** (row 7 -> 28 pt, spacers 13/14 -> 1 pt, print height preserved); EXP/LOT value shrinks by length |
-| Forms | `frmExpLot` **enlarged to 292 x 258** and `frmBusy` **enlarged to 288 x 152** to stop the bottom crop. Forms are now **self-healing** (`EnsureForm` rebuilds them every run) so **no manual delete is needed** — just rebuild and old cropped copies are corrected |
+| Forms | Four forms, rebuilt every run: `frmExpLot` 292 x 286, `frmMedEdit` 360 x 350, `frmBusy` 288 x 170, `frmReview` 470 x 560. `EnsureForm` resets code and reuses controls by name. It does not remove the form component. |
 | Build feedback | Excel opens **visible** and a filled-block **progress meter** runs in its status bar through every build phase (`Prog(pct, msg)`); the bar is released back to Excel when the build finishes |
 
 See `HANDOFF.md` and `CHANGELOG.md` for the full problem/solution list.

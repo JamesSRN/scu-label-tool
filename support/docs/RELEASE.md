@@ -28,43 +28,21 @@ This is the **Dispensary** tool (medication labels on Hermione). Lab / specimen 
 2. **Get a PHI-free workbook** to ship — a freshly built copy that has never had a patient entered (empty Log, no name/DOB). *Never ship a workbook that has held patient data.*
 3. **Build the download ZIP:**
    ```
-   powershell -ExecutionPolicy Bypass -File tools\make-release-zip.ps1 -Version 2.0
+   powershell -ExecutionPolicy Bypass -File tools\make-release-zip.ps1 -Version 2.4
    ```
-   This creates `dist\SCU-Label-Printing-v2.0.zip` (workbook + emblem + quick-start card + `INSTALL.txt`). It asks you to confirm the workbook is PHI-free first. To package a specific clean file: add `-Workbook "C:\path\clean.xlsm"`.
+   That script still builds the **older slim zip** (`MedicationDispensing.xlsm`, `scu_emblem.png`, `SCU_QuickStart_Card.pdf`, `INSTALL.txt`). The zip attached to the **v2.4** GitHub release is the **full working folder** (source, click-me launcher, docs, tools, emblem, and the wiped workbook), flat at the ZIP root. Ship that full folder unless you have deliberately switched back to the slim script.
 4. **Publish on GitHub:** *Releases → Draft a new release*.
-   - **Choose a tag:** `v2.0` (select "Create new tag on publish").
-   - **Title:** `v2.0`.
-   - **Description:** paste the notes below (or from `CHANGELOG.md`).
-   - **Attach** `dist\SCU-Label-Printing-v2.0.zip` (drag it into the *Attach binaries* area).
+   - **Choose a tag:** `v2.4` (select "Create new tag on publish").
+   - **Title:** `v2.4`.
+   - **Description:** paste the current version section from `CHANGELOG.md`. The published v2.4 page still tells people to download `SCU-Label-Printing-v2.3.zip`. The asset file is `SCU-Label-Printing-v2.4.zip`. The next release text should name the zip that is actually attached.
+   - **Attach** the zip.
    - Click **Publish release**.
 5. Done — the Download section above now points people to it.
 
-> The built `.xlsm` is git-ignored (PHI policy) and the ZIP lives in the git-ignored `dist\` folder. The workbook reaches users **only** through the release asset you attach — it is never committed to the repo.
+> `dist\` is git-ignored. `MedicationDispensing.xlsm` is tracked only after a close, which wipes patient data and the Log. Never attach a workbook that still has a patient in it.
 
 ---
 
-## Release notes — v2.0
+## Release notes
 
-Offline Excel + VBA tool for printing medication labels on a Brother QL-1100c (Hermione) — DK-1202 62 × 100 mm — for the Saturday Clinic for the Uninsured.
-
-**New in v2.0**
-- **2 copies per label** — Print Checked Labels (and Reprint / single Print) print two of each label; the Log still records one row per med.
-- **Source column** — a required DOH / IN HOUSE / RxAPS / Other dropdown, right of Lot #, mirrored into the Log and CSV.
-- **Auto-check on validate** — meds that pass Review & Validate are automatically checked for printing.
-- **Encounters** — each print is logged as one numbered Encounter, and its Log rows are shaded in one of three cycling greens.
-- **Add Medication prompts for Exp/Lot** — the manual add offers the same Expiration/Lot popup as parsing.
-- **TEBRA TEMPLATE sheet** — paste-ready session notes, one block per patient, grouped by source, name/DOB on the right.
-- **Clearer Medications tab** — full-width blue banner, boxed grid, centered columns, internal columns hidden, Refills default 0, and red (Exp/Lot) / yellow (Quantity/Source) missing-field highlights.
-- **Print reliability** — the label now fits to one page so the bottom Exp/Lot row can't clip on printers with a shorter printable area.
-- **Bullet-proof reset** — Reset / New Patient / on-open reset always clear the whole Medications area.
-- **Start Here guide** — the workbook opens to an in-app quick-start, plus a printable `SCU_QuickStart_Card.pdf`.
-- **Reprint Last Batch** — recover from a jam/misfeed without re-selecting.
-- **Named skips** — the print summary lists any label skipped for a missing Exp/Lot.
-- **Multiple bottles** — Expiration and Lot accept comma-separated values; dates are standardized (`.`/`-`/spaces → `/`, 2-digit years expanded); out-of-format expirations are flagged amber.
-- **Dispense-log archive** — each print is also saved to a dated local CSV so the day's record survives the on-close wipe (PHI, stays local).
-- **Faster batch printing** — the logo is placed once per batch instead of per label.
-- **Reliability** — version stamp, on-open structure check, session printer cache, and a debug toggle.
-- **Polish** — Exp field focused on open, bigger primary buttons, per-med remove confirmation, and it lands on the Log after printing.
-- **Safer builds** — a source encoding/structure pre-check runs before every build.
-
-See `CHANGELOG.md` for the full list.
+Copy the top section of [CHANGELOG.md](CHANGELOG.md). Current version is **v2.4** (2026-08-27): Log row Print / Edit / Remove, and cancelling the initials prompt prints and logs nothing. Review does not auto-check. Do not paste the old v2.0 blurb (it still described auto-check, Reprint Last Batch, and a sheet named TEBRA TEMPLATE).

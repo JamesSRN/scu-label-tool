@@ -1,5 +1,9 @@
 # Commit Commands
 
+> Archive. The repo uses branch `master` and `MedParser.bas` at the repo root. There is no `src/MedParser.bas` and no `dev` branch. Do not follow the commands below as the current release process.
+
+
+
 These commands assume you already cloned the repo locally and copied this update into the repo root.
 
 ## Recommended GitHub Desktop flow

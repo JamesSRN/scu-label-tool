@@ -1,250 +1,91 @@
 # Setup Instructions
 
-These instructions are for setting up the SCU Label Tool on a new Windows computer.
+These instructions set up the **SCU Dispensary Label Tool** (v2.4) on a Windows PC. Source is `MedParser.bas` at the repo root. There is no `src/` folder.
 
 ## 1. What this setup creates
-
-This setup creates a local Excel/VBA medication label workflow:
 
 ```text
 Tebra medication text -> Excel paste box -> VBA parser -> reviewed rows -> Brother QL-1100c (Hermione) label printing
 ```
 
-Everything should run locally in Excel/VBA. No PHI should be committed to GitHub.
+The tool runs locally in Excel. Dated dispense CSVs stay on the PC.
 
 ## 2. Requirements
 
 - Windows PC
-- Microsoft Excel desktop app
-- Brother QL-1100c (Hermione) label printer
-- Brother DK-1202 labels, 62 x 100 mm / approximately 2.4 in x 3.9 in
-- GitHub Desktop recommended
-- Clean no-PHI `MedicationDispensing.xlsm` workbook template from the project owner
+- Microsoft Excel desktop
+- Brother QL-1100c (Hermione), USB cable (not Bluetooth)
+- Brother DK-1202 labels, 62 x 100 mm. In the Brother driver this size is named **Shipping Label** (about 2.44 in x 3.93 in). There is no menu entry literally called "2.4 x 3.9".
+- The release ZIP, or a clone of `JamesSRN/scu-label-tool`
 
-This workflow is Windows-only. The parser uses Windows/Excel components such as `VBScript.RegExp`, and the print workflow targets the Windows Brother driver.
+## 3. Get the files
 
-## 3. Clone the repository
+Clinic PC (usual path):
 
-Using GitHub Desktop:
+1. Download `SCU-Label-Printing-vX.Y.zip` from the [latest release](https://github.com/JamesSRN/scu-label-tool/releases/latest).
+2. Move the ZIP to the Desktop. Right-click → **Extract All**. Do not run files from inside the ZIP window.
 
-1. Open GitHub Desktop.
-2. Clone `JamesSRN/scu-label-tool`.
-3. Choose a local folder outside OneDrive if possible, for example:
-
-```text
-C:\Users\<you>\source\scu-label-tool
-```
-
-Using command line:
+Maintainer clone:
 
 ```bash
 git clone https://github.com/JamesSRN/scu-label-tool.git
-cd scu-label-tool
 ```
 
-Use native Windows Git/GitHub Desktop for this repo. Avoid managing a OneDrive-backed `.git` folder from WSL or automation.
+Keep the folder outside OneDrive. Use GitHub Desktop or Windows Git, not a OneDrive-backed `.git` folder from WSL.
 
-## 4. Install and configure the Brother printer
+## 4. Brother printer
 
-1. Plug in the USB cable and power on the Brother QL-1100c (Hermione). Hermione is USB-only — do not try to pair her over Bluetooth.
-2. Install the Brother full driver/software package if Windows does not configure it correctly.
-3. Confirm the printer appears in Windows printer settings.
-4. Set the printer default media to DK-1202 / 62 x 100 mm.
+1. Plug in the USB cable and power on Hermione.
+2. Install the Brother driver if Windows does not set it up.
+3. Set the media to DK-1202 / Shipping Label in both **Printing preferences** and **Printer properties → Advanced → Printing Defaults**.
+4. Changing Printing Defaults needs admin rights. Without them, Apply can silently revert.
 
-Check both places if Windows exposes both:
+Fully close and reopen Excel after changing printer defaults. Excel caches media settings.
 
-```text
-Control Panel
--> Devices and Printers
--> Brother QL-1100c (Hermione)
--> Printing preferences
--> DK-1202 / 62 x 100 mm
-```
+## 5. One-time Excel trust
 
-and:
+The click-me file rebuilds the workbook from `MedParser.bas` every time it opens, so Excel has to trust the VBA project and the Desktop.
 
-```text
-Printer properties
--> Advanced
--> Printing Defaults
--> DK-1202 / 62 x 100 mm
-```
+1. Excel → **File → Options → Trust Center → Trust Center Settings**.
+2. **Macro Settings** — check **Trust access to the VBA project object model**.
+3. **Trusted Locations → Add new location** — the Desktop, with **Subfolders of this location are also trusted**.
+4. Close Excel.
 
-Fully close and reopen Excel after changing printer defaults. Excel can cache printer/media settings.
+## 6. Every open
 
-## 5. Prepare the workbook
+1. Close `MedicationDispensing.xlsm` if it is open.
+2. Double-click **`OPEN LABEL TOOL (double-click me).cmd`**.
+3. If that does nothing, double-click **`Build-Release.vbs`**.
+4. The workbook opens on **Start Here**. Click **Enable Content** if Excel asks.
 
-Do not import the VBA into a blank workbook unless you are intentionally testing bootstrap behavior.
+Do not start from a blank workbook. If `MedicationDispensing.xlsm` is missing, Build-Release copies `support/Broken_PrettyPrint_MedicationDispensing.xlsm` and warns that previous patient data is not restored.
 
-Start from the clean no-PHI `MedicationDispensing.xlsm` workbook template. The workbook should already contain these sheets:
+## 7. Manual import (only if the click-me file cannot run)
 
-```text
-Patient & Input
-Medications
-Label Preview
-Log
-Label Previews
-```
+1. Alt+F11. Remove the old `MedParser` module. Do not export it.
+2. **File → Import** `MedParser.bas` from the repo root (not `src/MedParser.bas`).
+3. Run `SetupWorkbook`. That compiles the project and re-installs the sheet handlers from the current column constants.
+4. Save.
 
-`Label Preview` is the hidden/internal print surface. Do not delete it.
+`MedParser.bas` must stay ASCII with Windows CRLF. `tools/check-encoding.ps1` checks that file.
 
-## 6. Trust the local workbook folder
+Do not paste an older sheet module. Check Med is column 2. `# of Prints` is column 14. The build injects `Worksheet_BeforeDoubleClick` and `Worksheet_Change` on Medications, `Worksheet_Activate` on Print Labels, and `Worksheet_Activate` on Tebra Notes.
 
-If macros are blocked:
+## 8. Smoke test (no real patients)
 
-1. In Excel: `File -> Options -> Trust Center -> Trust Center Settings`.
-2. Add the local SCU workbook folder as a Trusted Location.
-3. Close and reopen Excel.
+1. Developer Test → **Generate Test Patient**, or paste `support/test-data/sample_tebra_pastes_no_phi.txt`.
+2. **PARSE MEDICATIONS**.
+3. Fill Expiration, Lot, and Source. Yellow cells should turn white as you type.
+4. **Review**. Complete rows turn blue. They are not checked for you.
+5. Double-click Check Med (or the Check Med header) so the rows you want turn green.
+6. **Print Checked Labels**. Two copies of each. Cancelling the initials prompt prints nothing.
+7. You should land on the Log. Open Tebra Notes and confirm the note matches the Log.
 
-Only do this for the known local project folder. Do not broadly trust Downloads or random folders.
+## 9. Before a release
 
-## 7. Import the VBA source
-
-Manual method:
-
-1. Open the clean no-PHI workbook in Excel.
-2. Click `Enable Content` if appropriate.
-3. Press `Alt + F11`.
-4. In Project Explorer, expand the workbook.
-5. Under `Modules`, remove the old `MedParser` module if present. Choose `No` when asked to export.
-6. Import `src/MedParser.bas`.
-7. Run `Debug -> Compile VBAProject`.
-8. Save as `.xlsm`.
-
-Important: `src/MedParser.bas` must remain ASCII with Windows CRLF line endings. This repo includes `.gitattributes` to help preserve CRLF for `.bas` files.
-
-## 8. Install worksheet event handlers once
-
-`SetupWorkbook` no longer modifies the VBA project at runtime. The two sheet event handlers should be installed once in the workbook and then saved.
-
-### Medications sheet module
-
-In the VBA editor, double-click the sheet module for **Medications** under `Microsoft Excel Objects`. Replace anything there with:
-
-```vb
-Private mP15Addr As String
-Private mP15Val As Variant
-
-Private Sub Worksheet_SelectionChange(ByVal Target As Range)
-    If Target.Cells.Count = 1 And Target.Column = 15 And Target.Row > 3 Then
-        mP15Addr = Target.Address
-        mP15Val = Target.Value
-    Else
-        mP15Addr = ""
-    End If
-End Sub
-
-Private Sub Worksheet_Change(ByVal Target As Range)
-    ' Protect the auto-managed "# of Prints" column from manual edits
-    If mP15Addr = "" Then Exit Sub
-    Dim c As Range
-    For Each c In Target.Cells
-        If c.Address = mP15Addr Then
-            Application.EnableEvents = False
-            c.Value = mP15Val
-            Application.EnableEvents = True
-            MsgBox "The '# of Prints' column updates automatically and cannot be edited by hand.", _
-                   vbInformation, "Protected column"
-            Exit Sub
-        End If
-    Next c
-End Sub
-
-Private Sub Worksheet_BeforeDoubleClick(ByVal Target As Range, Cancel As Boolean)
-    If Target.Column = 15 Then        ' # of Prints - read-only
-        Cancel = True
-        Exit Sub
-    End If
-    If Target.Column = 16 And Target.Row > 3 Then   ' Print? - toggle the check
-        If Trim(Me.Cells(Target.Row, 2).Value) <> "" Then
-            Cancel = True
-            ToggleRowSelect Target.Row
-        End If
-    End If
-End Sub
-```
-
-Current column layout:
-
-```text
-N = Printed?
-O = # of Prints
-P = Print?
-```
-
-### Label Previews sheet module
-
-In the VBA editor, double-click the sheet module for **Label Previews**. If the workbook has not yet migrated the name, it may still appear as **All Labels**. Paste:
-
-```vb
-Private Sub Worksheet_Activate()
-    On Error Resume Next
-    Application.EnableEvents = False
-    PreviewAllLabels
-    Application.EnableEvents = True
-End Sub
-```
-
-Then save the workbook.
-
-## 9. Run SetupWorkbook
-
-In Excel:
-
-1. Press `Alt + F8`.
-2. Select `SetupWorkbook`.
-3. Click `Run`.
-4. Save the workbook.
-
-Expected result:
-
-- Buttons are created/refreshed.
-- `Print?` and `# of Prints` columns exist.
-- `Label Preview` internal print surface is built and hidden.
-- `Label Previews` gallery is available.
-- Row coloring and validation behaviors are ready.
-
-## 10. Test with no-PHI sample text
-
-Use:
-
-```text
-test-data/sample_tebra_pastes_no_phi.txt
-```
-
-Minimum test:
-
-1. Enter fake patient data.
-2. Paste sample medication text.
-3. Click `PARSE MEDICATIONS`.
-4. Review/correct rows.
-5. Enter fake Expiration and Lot.
-6. Double-click the `Print?` cell for one or more rows.
-7. Click `Print Checked Labels`.
-8. Confirm a physical test label prints correctly.
-
-Do not test with real patient data until setup and printing have been validated locally.
-
-## 11. Known setup failure: run-time error 9
-
-If `SetupWorkbook` fails on:
-
-```vb
-Set ws1 = ThisWorkbook.Sheets(SH_INPUT)
-```
-
-then the workbook is missing the expected sheet name. Use the clean template workbook or manually create/rename the required sheets exactly. The current source is not yet a complete blank-workbook bootstrapper.
-
-## 12. Release checklist
-
-Before merging to `main` or publishing a release:
-
-- No PHI in committed files.
-- `src/MedParser.bas` is ASCII and CRLF.
-- `Debug -> Compile VBAProject` passes.
-- `SetupWorkbook` runs cleanly.
-- Sheet handlers are installed.
-- Parser works with no-PHI samples.
-- Brother printer defaults are DK-1202 / 62 x 100 mm.
-- Physical label print is readable, landscape, not clipped, and not squished.
-- `HANDOFF.md`, `CHANGELOG.md`, and setup docs are updated.
+- `MedParser.bas` passes `tools/check-encoding.ps1`.
+- `SetupWorkbook` compiles.
+- Parser smoke test above, with fictional patients only.
+- Physical DK-1202 label is one die-cut, landscape, Exp/Lot visible.
+- `CHANGELOG.md` and `README.md` match the behavior you just shipped.
+- Commit `MedicationDispensing.xlsm` only after Excel has closed it (close wipes the patient and the Log). Never commit `dispense-log/` or `support/_backups/`.

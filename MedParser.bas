@@ -99,9 +99,10 @@ Private Const CLR_WHITE  As Long = 16777215
 Private Const LABEL_WIDTH_PT As Double = 242
 Private Const LABEL_COPIES   As Long = 2   ' every label prints this many copies
 
-' --- Log row buttons (add-on): per-row Print/Edit/Remove button geometry -----
+' --- Log row buttons (add-on): per-row Print/Edit/Add med/Remove geometry -----
 Private Const LGB_PRINT_W  As Double = 40    ' "Print" button width
 Private Const LGB_EDIT_W   As Double = 36    ' "Edit"  button width
+Private Const LGB_ADD_W    As Double = 52    ' "Add med" button width
 Private Const LGB_REMOVE_W As Double = 52    ' "Remove" button width
 Private Const LGB_GAP      As Double = 3     ' gap between buttons
 Private Const LGB_PAD      As Double = 6     ' gap from the last Log column to button 1
@@ -160,6 +161,18 @@ Private gEditingEncounter As Long   ' >0 while a past encounter is loaded for ed
 Private gEncLabel As String         ' Encounter-column display label ("1" or "1 (v2)"); "" = use the number
 Private gBuilding As Boolean        ' True only while SetupWorkbook runs (fast-build mode)
 Private gInTebraFill As Boolean     ' re-entrancy guard: True while FillTebraTemplate runs
+
+' Programmatic Log writes (print, edit button, close-wipe) bump this so the Log
+' sheet's change handler does not also write the CSV. Restores EnableEvents after.
+Private gLogWriteDepth As Long
+Private gLogEventsBefore As Boolean
+' Last Log row the volunteer selected, and its CSV key before they type. A hand-edit
+' of the name or lot still finds the old line instead of appending a second one.
+Private gLogWatchRow As Long
+Private gLogWatchTime As String
+Private gLogWatchEnc As String
+Private gLogWatchName As String
+Private gLogWatchLot As String
 
 ' V2: append each print to a dated local CSV archive (PHI - stays on this machine,
 ' git-ignored) so the day's dispensing record survives the on-close Log wipe.
@@ -1023,6 +1036,7 @@ Public Sub SetupWorkbook()
     wsLog.Columns(LG_CNT).ColumnWidth = 7    ' Print #
     wsLog.Cells(2, LG_ENC).HorizontalAlignment = xlCenter
     Call ApplyLogEncounterBorders            ' dividers between encounters (if the Log has rows)
+    Call InstallLogSheetEvents(wsLog)        ' hand-edits and hand-added rows mirror into the day's CSV
 
     ' "Save Log" export button, to the RIGHT of the Log (col LG_LAST + 2). Saves the whole
     ' Log to a new dated .xlsx in a folder the volunteer chooses (ExportLogCopy). Re-created
@@ -2548,10 +2562,23 @@ End Sub
 ' any interrupted prior action. Called at the top of every main button + each Fail handler.
 Private Sub AppReady()
     On Error Resume Next
+    gLogWriteDepth = 0
     Application.EnableEvents = True
     Application.ScreenUpdating = True
     Application.StatusBar = False
     On Error GoTo 0
+End Sub
+
+' Hold off the Log sheet's CSV mirror while code itself is writing the Log.
+Private Sub BeginLogWrite()
+    If gLogWriteDepth = 0 Then gLogEventsBefore = Application.EnableEvents
+    gLogWriteDepth = gLogWriteDepth + 1
+    Application.EnableEvents = False
+End Sub
+
+Private Sub EndLogWrite()
+    If gLogWriteDepth > 0 Then gLogWriteDepth = gLogWriteDepth - 1
+    If gLogWriteDepth = 0 Then Application.EnableEvents = gLogEventsBefore
 End Sub
 
 Public Sub ParseMedications()
@@ -2815,10 +2842,12 @@ Public Sub ResetSession()
     Dim lastLog As Long
     lastLog = wsLog.Cells(wsLog.Rows.Count, 1).End(xlUp).Row
     If lastLog > LOG_HDR_ROWS Then
+        Call BeginLogWrite
         With wsLog.Range(wsLog.Cells(LOG_HDR_ROWS + 1, 1), wsLog.Cells(lastLog, LG_LAST))
             .ClearContents
             .Interior.ColorIndex = xlNone
         End With
+        Call EndLogWrite
     End If
     Call ClearEncounterStore   ' wipe saved encounter snapshots on a full reset
 
@@ -2934,6 +2963,7 @@ Public Sub ClearLogSilent()
     Dim lastLog As Long
     lastLog = wsLog.Cells(wsLog.Rows.Count, 1).End(xlUp).Row
     If lastLog > LOG_HDR_ROWS Then
+        Call BeginLogWrite
         With wsLog.Range(wsLog.Cells(LOG_HDR_ROWS + 1, 1), wsLog.Cells(lastLog, LG_LAST))
             .ClearContents
             .Interior.ColorIndex = xlNone            ' drop encounter shading so a blank Log
@@ -2941,6 +2971,7 @@ Public Sub ClearLogSilent()
             .Borders(xlEdgeBottom).LineStyle = xlNone
             .Borders(xlInsideHorizontal).LineStyle = xlNone
         End With
+        Call EndLogWrite
     End If
     Call RefreshLogRowButtons  ' remove the per-row buttons now the Log is empty
     Call ClearEncounterStore   ' encounters share the Log's lifecycle (kept on New Patient, wiped on full reset/close)
@@ -4095,12 +4126,55 @@ Private Sub InstallMedSheetEvents(ws As Worksheet)
         "    seen = ""|""" & vbCrLf & _
         "    For Each c In rng.Cells" & vbCrLf & _
         "        If InStr(seen, ""|"" & c.Row & ""|"") = 0 Then" & vbCrLf & _
-        "            LiveRefreshRow c.Row" & vbCrLf & _
+            "            LiveRefreshRow c.Row" & vbCrLf & _
+            "            seen = seen & c.Row & ""|""" & vbCrLf & _
+            "        End If" & vbCrLf & _
+            "    Next c" & vbCrLf & _
+            "done:" & vbCrLf & _
+            "    Application.EnableEvents = True" & vbCrLf & _
+            "End Sub"
+    On Error GoTo 0
+End Sub
+
+' Log sheet: remember the row's CSV key on select, and mirror hand-edits and
+' hand-added rows into that day's CSV. Programmatic writes use BeginLogWrite.
+Private Sub InstallLogSheetEvents(ws As Worksheet)
+    On Error Resume Next
+    Dim cm As Object
+    Set cm = ThisWorkbook.VBProject.VBComponents(ws.CodeName).CodeModule
+    If cm Is Nothing Then Exit Sub
+    Dim startLine As Long, numLines As Long
+    startLine = cm.ProcStartLine("Worksheet_SelectionChange", 0)
+    If startLine > 0 Then
+        numLines = cm.ProcCountLines("Worksheet_SelectionChange", 0)
+        cm.DeleteLines startLine, numLines
+    End If
+    startLine = cm.ProcStartLine("Worksheet_Change", 0)
+    If startLine > 0 Then
+        numLines = cm.ProcCountLines("Worksheet_Change", 0)
+        cm.DeleteLines startLine, numLines
+    End If
+    cm.AddFromString _
+        "Private Sub Worksheet_SelectionChange(ByVal Target As Range)" & vbCrLf & _
+        "    On Error Resume Next" & vbCrLf & _
+        "    If Target.Row <= " & LOG_HDR_ROWS & " Then Exit Sub" & vbCrLf & _
+        "    If Target.Column < 1 Or Target.Column > " & LG_LAST & " Then Exit Sub" & vbCrLf & _
+        "    LogSheetSelection Target.Row" & vbCrLf & _
+        "End Sub" & vbCrLf & _
+        "Private Sub Worksheet_Change(ByVal Target As Range)" & vbCrLf & _
+        "    On Error GoTo done" & vbCrLf & _
+        "    Dim rng As Range" & vbCrLf & _
+        "    Set rng = Application.Intersect(Target, Me.Range(Me.Cells(" & (LOG_HDR_ROWS + 1) & ", 1), Me.Cells(Me.Rows.Count, " & LG_LAST & ")))" & vbCrLf & _
+        "    If rng Is Nothing Then Exit Sub" & vbCrLf & _
+        "    Dim c As Range, seen As String" & vbCrLf & _
+        "    seen = ""|""" & vbCrLf & _
+        "    For Each c In rng.Cells" & vbCrLf & _
+        "        If InStr(seen, ""|"" & c.Row & ""|"") = 0 Then" & vbCrLf & _
+        "            LogSheetChanged c.Row" & vbCrLf & _
         "            seen = seen & c.Row & ""|""" & vbCrLf & _
         "        End If" & vbCrLf & _
         "    Next c" & vbCrLf & _
         "done:" & vbCrLf & _
-        "    Application.EnableEvents = True" & vbCrLf & _
         "End Sub"
     On Error GoTo 0
 End Sub
@@ -4230,10 +4304,12 @@ Public Sub PrintCheckedLabels()
     End If
 
     ' Encounter number: reuse the one being edited / saved as a draft (replacing its prior
-    ' rows), otherwise start a new encounter.
+    ' rows), otherwise start a new encounter. Log writes stay inside BeginLogWrite so
+    ' deleting the old encounter rows cannot be mistaken for hand-edits of the CSV.
     Dim wsLg As Worksheet
     Set wsLg = ThisWorkbook.Sheets(SH_LOG)
     Dim encNum As Long
+    Call BeginLogWrite
     If gEditingEncounter > 0 Then
         encNum = gEditingEncounter
         ' Version the re-logged rows (compute BEFORE deleting the old ones).
@@ -4305,6 +4381,7 @@ Public Sub PrintCheckedLabels()
             End If
         End If
     Next r
+    Call EndLogWrite
     If Not gBuilding Then Application.ScreenUpdating = True
     gEncLabel = ""                                                 ' done logging; clear the version label
     Call ApplyLogEncounterBorders                                  ' redraw dividers between encounters
@@ -5490,6 +5567,7 @@ Private Sub LogPrint(ByVal medRow As Long, ByVal vol As String, ByVal encounter 
     nextLog = wsLg.Cells(wsLg.Rows.Count, 1).End(xlUp).Row + 1
     If nextLog <= LOG_HDR_ROWS Then nextLog = LOG_HDR_ROWS + 1
 
+    Call BeginLogWrite
     wsLg.Cells(nextLog, LG_TIME).Value = Format(Now(), "MM/DD/YYYY HH:MM:SS")
     ' Encounter #, right after Timestamp. When re-logging an EDITED encounter, gEncLabel
     ' carries a version suffix (e.g. "1 (v2)"); otherwise show the plain number.
@@ -5536,28 +5614,39 @@ Private Sub LogPrint(ByVal medRow As Long, ByVal vol As String, ByVal encounter 
     Next c
     wsLg.Cells(nextLog, LG_ENC).HorizontalAlignment = xlCenter
     wsLg.Cells(nextLog, LG_ENC).Font.Bold = True
+    Call EndLogWrite
 
     ' Mirror this row to the dated local CSV archive (best-effort; never blocks printing).
     Call ArchiveDispenseRow(wsLg, nextLog)
 End Sub
 
-' Append one dispense-Log row to a dated local CSV so the day's record survives the
-' on-close Log wipe. The file lives in a "dispense-log" folder next to the workbook and
-' is git-ignored (it contains PHI and must never leave this machine). Best-effort: any
-' failure here is swallowed so it can never interrupt printing.
+' Append one dispense-Log row to the CSV for that row's own day (the timestamp), so the
+' record survives an accidental close. Best-effort: any failure is swallowed.
 Private Sub ArchiveDispenseRow(wsLg As Worksheet, logRow As Long)
+    On Error Resume Next
+    Call AppendLogRowToDatedCsv(wsLg, logRow)
+    On Error GoTo 0
+End Sub
+
+' Create dispense-log\YYYY-MM-DD.csv if needed and append this Log row. The date comes
+' from the row's timestamp, then today if the timestamp is blank or not a date.
+Private Sub AppendLogRowToDatedCsv(wsLg As Worksheet, ByVal logRow As Long)
     On Error Resume Next
     If Not DISPENSE_CSV_ENABLED Then Exit Sub
     Dim basePath As String
     basePath = ThisWorkbook.Path
-    If basePath = "" Then Exit Sub          ' workbook never saved -> no place to write
+    If basePath = "" Then Exit Sub
 
     Dim folder As String
     folder = basePath & "\dispense-log"
     If Dir(folder, vbDirectory) = "" Then MkDir folder
 
+    Dim dpart As String
+    dpart = CsvDateStampFromTimestamp(CStr(wsLg.Cells(logRow, LG_TIME).Value))
+    If dpart = "" Then dpart = Format(Date, "YYYY-MM-DD")
+
     Dim fpath As String
-    fpath = folder & "\" & Format(Date, "YYYY-MM-DD") & ".csv"
+    fpath = folder & "\" & dpart & ".csv"
     Dim isNew As Boolean
     isNew = (Dir(fpath) = "")
 
@@ -5567,13 +5656,7 @@ Private Sub ArchiveDispenseRow(wsLg As Worksheet, logRow As Long)
     If isNew Then
         Print #ff, "Timestamp,Encounter,Patient,DOB,Medication,Strength,Directions,Qty,Refills,Expiration,Lot,Source,RxDate,Initials,DosageForm,PrintCount"
     End If
-    Dim ln As String, c As Integer
-    ln = ""
-    For c = 1 To LG_LAST
-        If c > 1 Then ln = ln & ","
-        ln = ln & CsvField(CStr(wsLg.Cells(logRow, c).Value))
-    Next c
-    Print #ff, ln
+    Print #ff, BuildCsvLineFromLogRow(wsLg, logRow)
     Close #ff
     On Error GoTo 0
 End Sub
@@ -6181,6 +6264,7 @@ Public Sub SaveEditedEncounter()
     Application.ScreenUpdating = False
     ' Version the re-logged rows (compute BEFORE deleting the old ones): 1 -> "1 (v2)" -> ...
     gEncLabel = EncLabel(encNum, EncounterNextVersion(encNum))
+    Call BeginLogWrite
     Call DeleteRowsByEncounter(wsLg, LG_ENC, encNum, LOG_HDR_ROWS + 1)   ' drop old Log rows
     Call SaveEncounterSnapshot(encNum)                                    ' refresh snapshot
     For r = MEDS_HDR_ROWS + 1 To lastMed                                  ' re-log ALL meds under same # (checked or not)
@@ -6188,6 +6272,7 @@ Public Sub SaveEditedEncounter()
             Call LogPrint(r, Trim(vol & " (edited)"), encNum)
         End If
     Next r
+    Call EndLogWrite
     gEncLabel = ""                                                        ' done logging; clear the label
     Call ApplyLogEncounterBorders                                         ' redraw dividers between encounters
     If Not gBuilding Then Application.ScreenUpdating = True
@@ -6499,6 +6584,7 @@ Private Sub WriteSeedLogRow(wsLg As Worksheet, ByVal encNum As Long, _
     Dim nextLog As Long
     nextLog = wsLg.Cells(wsLg.Rows.Count, 1).End(xlUp).Row + 1
     If nextLog <= LOG_HDR_ROWS Then nextLog = LOG_HDR_ROWS + 1
+    Call BeginLogWrite
     wsLg.Cells(nextLog, LG_TIME).Value = Format(Now(), "MM/DD/YYYY HH:MM:SS")
     wsLg.Cells(nextLog, LG_ENC).Value = encNum
     wsLg.Cells(nextLog, LG_PT).Value = pt
@@ -6533,6 +6619,8 @@ Private Sub WriteSeedLogRow(wsLg As Worksheet, ByVal encNum As Long, _
     Next c
     wsLg.Cells(nextLog, LG_ENC).HorizontalAlignment = xlCenter
     wsLg.Cells(nextLog, LG_ENC).Font.Bold = True
+    Call EndLogWrite
+    Call ArchiveDispenseRow(wsLg, nextLog)
 End Sub
 
 ' Fill the Input tab with a random patient + medication list (no Exp/Lot), ready to Parse.
@@ -7090,7 +7178,7 @@ End Function
 
 ' ---------------------------------------------------------------------------
 '  BUTTON LAYOUT
-'  Clear every lg_* shape, then re-add Print/Edit/Remove for each current data
+'  Clear every lg_* shape, then re-add Print/Edit/Add med/Remove for each current data
 '  row. Buttons are named lg_<action>_<row> so CallerRow() can recover the row.
 '  Called after any Log change (see install hooks above), so the button set and
 '  the row set always match even as rows are added, edited, or removed.
@@ -7119,10 +7207,11 @@ Public Sub RefreshLogRowButtons()
 
     Dim leftBase As Double
     leftBase = wsLg.Cells(1, LG_LAST + 1).Left + LGB_PAD
-    Dim lPrint As Double, lEdit As Double, lRemove As Double
+    Dim lPrint As Double, lEdit As Double, lAdd As Double, lRemove As Double
     lPrint = leftBase
     lEdit = lPrint + LGB_PRINT_W + LGB_GAP
-    lRemove = lEdit + LGB_EDIT_W + LGB_GAP
+    lAdd = lEdit + LGB_EDIT_W + LGB_GAP
+    lRemove = lAdd + LGB_ADD_W + LGB_GAP
 
     Dim r As Long, topPt As Double, hPt As Double, rowTop As Double, rowH As Double
     For r = LOG_HDR_ROWS + 1 To last
@@ -7137,6 +7226,7 @@ Public Sub RefreshLogRowButtons()
             topPt = rowTop + (rowH - hPt) / 2     ' center the button vertically in the taller row
             Call AddLogRowButton(wsLg, "lg_print_" & r, "Print", "PrintLogRow", lPrint, topPt, LGB_PRINT_W, hPt, RGB(0, 121, 107))
             Call AddLogRowButton(wsLg, "lg_edit_" & r, "Edit", "EditLogRow", lEdit, topPt, LGB_EDIT_W, hPt, RGB(21, 101, 192))
+            Call AddLogRowButton(wsLg, "lg_add_" & r, "Add med", "AddLogMed", lAdd, topPt, LGB_ADD_W, hPt, RGB(46, 125, 50))
             Call AddLogRowButton(wsLg, "lg_remove_" & r, "Remove", "RemoveLogRow", lRemove, topPt, LGB_REMOVE_W, hPt, RGB(191, 54, 12))
         End If
     Next r
@@ -7332,6 +7422,7 @@ Public Sub EditLogRow()
     oldLot = CStr(wsLg.Cells(r, LG_LOT).Value)
 
     Dim changed As Boolean
+    Call BeginLogWrite
     changed = EditLogRowWithForm(wsLg, r)
     If Not changed Then
         ' Fallback if the form is unavailable: sequential input boxes (same fields).
@@ -7355,9 +7446,10 @@ Public Sub EditLogRow()
     ' Keep Exp/Lot as text so leading zeros survive (same rule LogPrint uses).
     wsLg.Cells(r, LG_EXP).NumberFormat = "@"
     wsLg.Cells(r, LG_LOT).NumberFormat = "@"
+    Call EndLogWrite
 
-    ' Mirror the edit into the dated CSV: replace the old line with a fresh one
-    ' rebuilt from this row's current values.
+    ' Mirror the edit into the dated CSV: replace the old line, or append it if
+    ' that line was never archived (so a close cannot drop the correction).
     Call UpdateCsvLineForLogRow(wsLg, r, oldTime, oldEnc, oldName, oldLot, False)
 
     ' No Tebra rebuild here: the Tebra tab rebuilds its note from the Log when opened,
@@ -7413,6 +7505,113 @@ End Function
 
 
 ' ---------------------------------------------------------------------------
+'  ADD MED (this patient)  -  insert one new medication row directly under this
+'  Log row. Same encounter, patient, and DOB. Opens the same add dialog as the
+'  Medications tab. The new row is written to that day's CSV.
+' ---------------------------------------------------------------------------
+Public Sub AddLogMed()
+    Call AppReady
+    On Error GoTo Fail
+    Dim r As Long
+    r = CallerRow()
+    If r <= LOG_HDR_ROWS Then Exit Sub
+    Dim wsLg As Worksheet
+    Set wsLg = ThisWorkbook.Sheets(SH_LOG)
+    If Trim(wsLg.Cells(r, LG_PT).Value) = "" And Trim(wsLg.Cells(r, LG_NAME).Value) = "" Then Exit Sub
+
+    Dim rec As MedRecord
+    rec.MedName = ""
+    rec.Strength = ""
+    rec.DosageForm = ""
+    rec.SIG = ""
+    rec.Quantity = ""
+    rec.Refills = "0"
+    rec.Expiration = ""
+    rec.LotNumber = ""
+    rec.Confidence = "Manual"
+    rec.Warnings = ""
+    rec.RawText = ""
+
+    Dim gotForm As Boolean
+    gotForm = AddMedWithForm(rec)
+    If gotForm Then
+        If Trim(rec.MedName) = "" Then Exit Sub
+    Else
+        Dim nm As String
+        nm = Trim(InputBox("Enter the MEDICATION NAME to add:", "Add medication", ""))
+        If nm = "" Then Exit Sub
+        rec.MedName = nm
+        rec.Strength = Trim(InputBox("Strength for " & nm & "  (e.g. 10 mg)" & vbCrLf & _
+                        "Leave blank if unknown:", "Add medication - Strength", ""))
+        rec.DosageForm = Trim(InputBox("Dosage form for " & nm & "  (e.g. tablet):", _
+                        "Add medication - Form", ""))
+        rec.Quantity = Trim(InputBox("Quantity for " & nm & ":", "Add medication - Quantity", ""))
+        rec.SIG = Trim(InputBox("Instructions (SIG) for " & nm & vbCrLf & _
+                        "Leave blank if unknown:", "Add medication - Instructions", ""))
+        Call PromptExpLotPair(nm, rec.Expiration, rec.LotNumber)
+    End If
+
+    Dim newRow As Long
+    newRow = r + 1
+    Call BeginLogWrite
+    wsLg.Rows(newRow).Insert Shift:=xlDown
+
+    wsLg.Cells(newRow, LG_TIME).Value = Format(Now(), "MM/DD/YYYY HH:MM:SS")
+    wsLg.Cells(newRow, LG_ENC).Value = wsLg.Cells(r, LG_ENC).Value
+    wsLg.Cells(newRow, LG_PT).Value = wsLg.Cells(r, LG_PT).Value
+    wsLg.Cells(newRow, LG_DOB).Value = wsLg.Cells(r, LG_DOB).Value
+    wsLg.Cells(newRow, LG_NAME).Value = rec.MedName
+    wsLg.Cells(newRow, LG_STR).Value = rec.Strength
+    wsLg.Cells(newRow, LG_SIG).Value = rec.SIG
+    wsLg.Cells(newRow, LG_QTY).Value = rec.Quantity
+    wsLg.Cells(newRow, LG_REF).Value = "0"
+    wsLg.Cells(newRow, LG_EXP).NumberFormat = "@"
+    wsLg.Cells(newRow, LG_EXP).Value = rec.Expiration
+    wsLg.Cells(newRow, LG_LOT).NumberFormat = "@"
+    wsLg.Cells(newRow, LG_LOT).Value = rec.LotNumber
+    wsLg.Cells(newRow, LG_SRC).Value = wsLg.Cells(r, LG_SRC).Value
+    wsLg.Cells(newRow, LG_DATE).Value = wsLg.Cells(r, LG_DATE).Value
+    wsLg.Cells(newRow, LG_INIT).Value = wsLg.Cells(r, LG_INIT).Value
+    wsLg.Cells(newRow, LG_FORM).Value = rec.DosageForm
+    wsLg.Cells(newRow, LG_CNT).Value = 0
+
+    Dim encNum As Long
+    encNum = Val(wsLg.Cells(r, LG_ENC).Value)
+    If encNum <= 0 Then encNum = 1
+    Dim encColor As Long
+    Select Case (encNum - 1) Mod 3
+        Case 0:    encColor = RGB(226, 239, 218)
+        Case 1:    encColor = RGB(221, 235, 247)
+        Case Else: encColor = RGB(255, 255, 255)
+    End Select
+    Dim c As Integer
+    For c = 1 To LG_LAST
+        With wsLg.Cells(newRow, c)
+            .Font.Name = "Arial"
+            .Font.Size = 9
+            .Interior.Color = encColor
+        End With
+    Next c
+    wsLg.Cells(newRow, LG_ENC).HorizontalAlignment = xlCenter
+    wsLg.Cells(newRow, LG_ENC).Font.Bold = True
+    Call EndLogWrite
+
+    Call ArchiveDispenseRow(wsLg, newRow)
+    Call ApplyLogEncounterBorders
+
+    On Error Resume Next
+    wsLg.Activate
+    wsLg.Cells(newRow, LG_NAME).Select
+    On Error GoTo 0
+    Exit Sub
+Fail:
+    Call AppReady
+    MsgBox "Something went wrong while adding that medication." & vbCrLf & _
+        "Nothing was harmed - click a main button and try again." & vbCrLf & vbCrLf & _
+        "Details: " & Err.Description, vbExclamation, "Add med error"
+End Sub
+
+' ---------------------------------------------------------------------------
 '  REMOVE (this row)  -  delete the Log row + its CSV line, redraw dividers.
 ' ---------------------------------------------------------------------------
 Public Sub RemoveLogRow()
@@ -7442,9 +7641,9 @@ Public Sub RemoveLogRow()
     oldLot = CStr(wsLg.Cells(r, LG_LOT).Value)
     Call UpdateCsvLineForLogRow(wsLg, r, oldTime, oldEnc, oldName, oldLot, True)
 
-    Application.EnableEvents = False
+    Call BeginLogWrite
     wsLg.Rows(r).Delete Shift:=xlUp
-    Application.EnableEvents = True
+    Call EndLogWrite
 
     Call ApplyLogEncounterBorders     ' redraws dividers AND (via the hook) the row buttons
 
@@ -7463,14 +7662,68 @@ End Sub
 
 ' ---------------------------------------------------------------------------
 '  CSV MIRRORING
-'  Find the one line in the row's dated CSV that matches (Timestamp, Encounter,
-'  Medication, Lot) and either replace it with the row's current values (edit)
-'  or drop it (remove). Line-level so it never disturbs other rows in the file -
-'  important, because a day's CSV can span multiple sessions (the Log is wiped
-'  on close; the CSV is append-only history), so a whole-file rewrite from the
-'  in-memory Log would lose earlier rows. Best-effort: any failure is swallowed
-'  and never blocks the edit/remove itself.
+'  A printed row is appended. An edit replaces that line (same timestamp, encounter,
+'  medication, and lot). If the line is not in the file yet, the edit is appended
+'  instead, so a hand-edit or a hand-added row is not lost when the workbook closes.
+'  Closing the workbook still wipes the on-screen Log and does not delete the CSV.
 ' ---------------------------------------------------------------------------
+Public Sub LogSheetSelection(ByVal r As Long)
+    On Error Resume Next
+    If gLogWriteDepth > 0 Or gBuilding Then Exit Sub
+    If r <= LOG_HDR_ROWS Then
+        gLogWatchRow = 0
+        Exit Sub
+    End If
+    Dim ws As Worksheet
+    Set ws = ThisWorkbook.Sheets(SH_LOG)
+    gLogWatchRow = r
+    gLogWatchTime = CStr(ws.Cells(r, LG_TIME).Value)
+    gLogWatchEnc = CStr(ws.Cells(r, LG_ENC).Value)
+    gLogWatchName = CStr(ws.Cells(r, LG_NAME).Value)
+    gLogWatchLot = CStr(ws.Cells(r, LG_LOT).Value)
+    On Error GoTo 0
+End Sub
+
+' Hand-edit or hand-added Log row -> that day's CSV. Blank rows (the close wipe)
+' are ignored so the backup is not overwritten with empty lines.
+Public Sub LogSheetChanged(ByVal r As Long)
+    On Error Resume Next
+    If gLogWriteDepth > 0 Or gBuilding Then Exit Sub
+    If r <= LOG_HDR_ROWS Then Exit Sub
+    Dim ws As Worksheet
+    Set ws = ThisWorkbook.Sheets(SH_LOG)
+    If Trim(CStr(ws.Cells(r, LG_TIME).Value)) = "" And _
+       Trim(CStr(ws.Cells(r, LG_PT).Value)) = "" And _
+       Trim(CStr(ws.Cells(r, LG_NAME).Value)) = "" Then Exit Sub
+    If Trim(CStr(ws.Cells(r, LG_TIME).Value)) = "" And _
+       Trim(CStr(ws.Cells(r, LG_NAME).Value)) = "" Then Exit Sub
+
+    Dim keyTime As String, keyEnc As String, keyName As String, keyLot As String
+    If gLogWatchRow = r Then
+        keyTime = gLogWatchTime
+        keyEnc = gLogWatchEnc
+        keyName = gLogWatchName
+        keyLot = gLogWatchLot
+    Else
+        keyTime = CStr(ws.Cells(r, LG_TIME).Value)
+        keyEnc = CStr(ws.Cells(r, LG_ENC).Value)
+        keyName = CStr(ws.Cells(r, LG_NAME).Value)
+        keyLot = CStr(ws.Cells(r, LG_LOT).Value)
+    End If
+    Call UpdateCsvLineForLogRow(ws, r, keyTime, keyEnc, keyName, keyLot, False)
+    gLogWatchRow = r
+    gLogWatchTime = CStr(ws.Cells(r, LG_TIME).Value)
+    gLogWatchEnc = CStr(ws.Cells(r, LG_ENC).Value)
+    gLogWatchName = CStr(ws.Cells(r, LG_NAME).Value)
+    gLogWatchLot = CStr(ws.Cells(r, LG_LOT).Value)
+    On Error GoTo 0
+End Sub
+
+' Find the one line in the row's dated CSV that matches (Timestamp, Encounter,
+' Medication, Lot) and either replace it (edit) or drop it (remove). If an edit
+' does not find a line, append the row. A whole-file rewrite from the on-screen
+' Log is never used: a day's CSV can hold earlier sessions, and the Log is wiped
+' on close. Best-effort: any failure is swallowed.
 Private Sub UpdateCsvLineForLogRow(wsLg As Worksheet, ByVal r As Long, _
         ByVal keyTime As String, ByVal keyEnc As String, ByVal keyName As String, _
         ByVal keyLot As String, ByVal removeIt As Boolean)
@@ -7480,15 +7733,23 @@ Private Sub UpdateCsvLineForLogRow(wsLg As Worksheet, ByVal r As Long, _
     basePath = ThisWorkbook.Path
     If basePath = "" Then Exit Sub
 
-    ' The CSV file is dated by the row's OWN timestamp, not today.
     Dim dpart As String
     dpart = CsvDateStampFromTimestamp(keyTime)
-    If dpart = "" Then Exit Sub
+    If dpart = "" Then dpart = CsvDateStampFromTimestamp(CStr(wsLg.Cells(r, LG_TIME).Value))
+    If dpart = "" Then dpart = Format(Date, "YYYY-MM-DD")
     Dim fpath As String
     fpath = basePath & "\dispense-log\" & dpart & ".csv"
-    If Dir(fpath) = "" Then Exit Sub          ' no archive for that day -> nothing to mirror
+    If Dir(fpath) = "" Then
+        If Not removeIt Then Call AppendLogRowToDatedCsv(wsLg, r)
+        Exit Sub
+    End If
 
-    ' Slurp the file.
+    Dim newStamp As String
+    newStamp = CsvDateStampFromTimestamp(CStr(wsLg.Cells(r, LG_TIME).Value))
+    If newStamp = "" Then newStamp = Format(Date, "YYYY-MM-DD")
+    Dim moveDay As Boolean
+    moveDay = (Not removeIt) And (newStamp <> dpart)
+
     Dim ff As Integer, content As String
     ff = FreeFile
     Open fpath For Input As #ff
@@ -7498,7 +7759,7 @@ Private Sub UpdateCsvLineForLogRow(wsLg As Worksheet, ByVal r As Long, _
     lines = Split(content, vbCrLf)
 
     Dim newLine As String
-    If Not removeIt Then newLine = BuildCsvLineFromLogRow(wsLg, r)
+    If Not removeIt And Not moveDay Then newLine = BuildCsvLineFromLogRow(wsLg, r)
 
     Dim i As Long, fields() As String, matched As Boolean
     Dim outp As String, wrote As Boolean
@@ -7508,14 +7769,14 @@ Private Sub UpdateCsvLineForLogRow(wsLg As Worksheet, ByVal r As Long, _
             ' trailing empty element from the final vbCrLf - skip (re-added by Print #)
         Else
             Dim keep As Boolean: keep = True
-            If Not matched And i > 0 Then          ' i=0 is the header row; never touch it
+            If Not matched And i > 0 Then
                 fields = ParseCsvLine(lines(i))
                 If CsvKeyMatch(fields, keyTime, keyEnc, keyName, keyLot) Then
                     matched = True
-                    If removeIt Then
-                        keep = False               ' drop this line
+                    If removeIt Or moveDay Then
+                        keep = False
                     Else
-                        lines(i) = newLine          ' replace with edited values
+                        lines(i) = newLine
                     End If
                 End If
             End If
@@ -7527,13 +7788,16 @@ Private Sub UpdateCsvLineForLogRow(wsLg As Worksheet, ByVal r As Long, _
         End If
     Next i
 
-    If Not matched Then Exit Sub                    ' nothing to change; leave file as-is
+    If Not matched Then
+        If Not removeIt Then Call AppendLogRowToDatedCsv(wsLg, r)
+        Exit Sub
+    End If
 
-    ' Rewrite the file.
     ff = FreeFile
     Open fpath For Output As #ff
     Print #ff, outp
     Close #ff
+    If moveDay Then Call AppendLogRowToDatedCsv(wsLg, r)
     On Error GoTo 0
 End Sub
 

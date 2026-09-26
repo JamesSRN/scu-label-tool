@@ -1,85 +1,39 @@
 # Branching and Releases
 
-## Branch model
+## What this repo actually uses
 
-Use a simple branch model:
+The GitHub branch is **`master`**. There is no `main` or `dev` branch in the current history. Tags in use: `v2.1`, `v2.2`, `v2.3`, `v2.4`.
 
-```text
-main       stable, clinic-safe source/docs only
-dev        active integration branch
-feature/*  focused work branches from dev
-```
-
-Examples:
+Source of truth:
 
 ```text
-feature/setup-docs
-feature/brother-print-fix
-feature/parser-tests
-feature/bootstrap-sheets
-```
-
-## Rules
-
-1. `main` should always be safe to clone.
-2. Work in `dev` or `feature/*` branches.
-3. Merge to `main` only after the release checklist passes.
-4. Never commit PHI.
-5. Do not commit live clinic workbooks.
-6. Do not have two people independently edit the same `.xlsm` workbook and expect Git to merge it.
-
-## What belongs in Git
-
-Commit:
-
-```text
-src/MedParser.bas
-HANDOFF.md
+MedParser.bas          repo root (not src/MedParser.bas)
+Build-Release.vbs
+OPEN LABEL TOOL (double-click me).cmd
 README.md
-SETUP_INSTRUCTIONS.md
-CHANGELOG.md
-docs/*.md
-test-data/no-PHI samples
-.gitignore
-.gitattributes
-safe logo/source assets that contain no PHI
+HANDOFF.md
+support/docs/
 ```
+
+`MedicationDispensing.xlsm` is tracked. Commit it only after a close, which wipes patient data and the Log.
 
 Do not commit:
 
 ```text
-*.xlsm, *.xlsx, *.xls
-*.csv, *.tsv
-live dispense logs
+dispense-log/
+*.csv
+support/_backups/
 real patient screenshots
-OneDrive temp files
-backups with patient data
+dist/ release zips (attach those to a GitHub Release)
 ```
 
-## Release process
+## How to change the app
 
-1. Create a feature branch from `dev`.
-2. Update `src/MedParser.bas` and docs.
-3. Confirm `.bas` is ASCII + CRLF.
-4. Import into a clean no-PHI workbook.
-5. Compile the VBA project.
-6. Run `SetupWorkbook`.
-7. Confirm sheet event handlers are present.
-8. Test parser with no-PHI samples.
-9. Print a physical Brother DK-1202 label.
-10. Update `CHANGELOG.md`.
-11. Merge feature branch into `dev`.
-12. After integration testing, merge `dev` into `main`.
-13. Tag a release if appropriate.
+1. Edit `MedParser.bas`. Keep it ASCII + CRLF (`tools/check-encoding.ps1`).
+2. Leave `Build-Release.vbs` unchanged unless the build itself must change. A new hash can be flagged by Windows Defender on fresh downloads.
+3. Close the workbook, then run `OPEN LABEL TOOL (double-click me).cmd` so `SetupWorkbook` compiles.
+4. Smoke-test with `support/test-data/sample_tebra_pastes_no_phi.txt` or Developer Test. No real patients.
+5. Update `CHANGELOG.md` and `README.md` if volunteer-visible behavior changed.
+6. Commit on `master` (or a short-lived branch merged back to `master`) and tag a release when clinic PCs should pick it up.
 
-## Suggested tags
-
-```text
-v0.1.0  first local parser + label print workflow
-v0.2.0  checkbox-driven batch print + label previews
-v0.3.0  print log hardening + start-new-patient workflow
-```
-
-## Stable workbook vs source repository
-
-The source repository is not the live clinic system. The clinic workbook is built from the source and maintained locally. Keep a clean no-PHI workbook template in the approved clinic storage location, and keep source/docs in GitHub.
+The published release ZIP is the **full folder**, flat at the ZIP root. `tools/make-release-zip.ps1` still builds an older slim zip and is not what v2.4 shipped. See [RELEASE.md](RELEASE.md).

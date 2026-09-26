@@ -1,6 +1,8 @@
 # SCU Label Printing Tool - Handoff
 
-Last updated: 2026-07-24 (**v2.1 label + banner tweaks**: the label's qty line now prints the **Source** (IN HOUSE / DOH / RxAPS) before Refills; the label **patient name auto-shrinks** for long names (`LabelNameFontSize`, 12->8 pt); the Medications **encounter box is a single line** showing the encounter # + patient name - the two-line design was dropped because this Excel won't render a 2nd line in that shape. Earlier **v2.1**: Check Med column moved left + frozen panes; Medications & Print Labels banners redesigned; readable `frmReview` list dialog reused for Review / Print confirm / Print complete / Remove; Add Medication uses the `frmMedEdit` form; **live yellow<->white highlighting** with a clear **white -> blue (reviewed) -> green (checked)** state and an `EnableEvents` guard invariant; Parse clears the previous list first (keeps name/DOB); removed the only clipboard `Copy`/`PasteSpecial`. Earlier **V2** (2026-07-09): Source column (required) right of Lot #; Refills right of Rx Date + default 0; 2 copies per label; auto-check on validate; per-print **Encounters** (numbered + green-banded) in the Log; **TEBRA TEMPLATE** sheet; Medications banner/grid spruce-up + hidden internal columns; **fit-to-page** so Exp/Lot never clip; resilient `ClearMedArea`; Add Medication prompts for Exp/Lot; red/yellow missing-field highlights)
+Last updated: 2026-09-26. **Current app is v2.4** (`APP_VERSION = "2.4"` in `MedParser.bas`). The short "where things stand" note is the repo-root [HANDOFF.md](../../HANDOFF.md). This file is the routine map.
+
+v2.4 adds per-row **Print / Edit / Remove** on the Log, and cancelling the initials prompt prints and logs nothing. Review does **not** auto-check. Missing Quantity / Expiration / Lot / Source cells are yellow (a bad expiration format is amber). The label qty line is form, qty, source, refills. The encounter box is one line.
 
 An Excel + VBA tool for the **Saturday Clinic for the Uninsured (SCU)** free
 pharmacy. It turns pasted prescription text into a validated medication table and
@@ -12,30 +14,11 @@ volunteers.
 
 ## 1. Where everything lives (IMPORTANT - read first)
 
-Everything is in **one folder** (code, docs, workbook, backups, and Git):
+Keep the repo in **one folder outside OneDrive**. Clinic PCs should use the release ZIP extracted onto the real Desktop (Trusted Location, subfolders included), then open it with `OPEN LABEL TOOL (double-click me).cmd`.
 
-```
-C:\Users\ringo\Documents\GitHub\GIT_VERSION_SCU Label Printing
-```
+Remote: `JamesSRN/scu-label-tool`, branch `master`. Source is `MedParser.bas` at the repo root (there is no `src/` folder).
 
-This folder is **outside OneDrive** (Documents was moved off OneDrive sync in
-June 2026). It contains the code, docs, the SC emblem, the workbook
-(`MedicationDispensing.xlsm`), and `_backups\`. It is also the local Git repo
-(remote: `JamesSRN/scu-label-tool`). The `.xlsm` and `_backups\` are git-ignored,
-so patient data can never be committed.
-
-**Two open setup items:**
-
-1. **Trusted Location.** The old `Desktop\SCU Label Printing` folder (the prior
-   Excel Trusted Location) was removed. The new folder is **not trusted yet**, so
-   macros will be blocked until you add it:
-   `Excel > File > Options > Trust Center > Trust Center Settings > Trusted
-   Locations > Add new location > browse to the folder above > OK`.
-2. **Easy access (optional).** Right-click the folder > Send to > Desktop
-   (create shortcut). It can be renamed in place to drop the `GIT_VERSION_`
-   prefix (then re-point GitHub Desktop with Locate).
-
-Code/docs are version-controlled; the `.xlsm` (PHI) is local-only by design.
+`MedicationDispensing.xlsm` **is tracked**. `Workbook_BeforeClose` clears the patient, the med list, and the Log, then saves, so the committed workbook is the wiped copy. Commit it only after a close. `dispense-log/`, `*.csv`, and `support/_backups/` stay git-ignored.
 
 ---
 
@@ -50,31 +33,26 @@ first in `SetupWorkbook`) + `ColorWorkflowTabs`. Hidden helper sheets: **Label P
 
 - **1. Patient & Input** - patient name / DOB / Rx date + paste box. Buttons:
   `PARSE MEDICATIONS`, `Clear Paste Area`, `Reset Session`, `Start NEW Patient`.
-- **2. Medications** - the parsed table (**V2 column order**, all driven by `C_*`
-  constants). Columns A-Q: `#`(1), Name(2), Strength(3), Dosage Form(4), SIG(5),
-  Quantity(6), **Expiration**(7), **Lot**(8), **Source**(9), Rx Date(10),
-  Refills(11), Confidence(12), Warnings(13), Raw Text(14, **hidden**),
-  Printed?(15, **hidden**), **"# of Prints"**(16, auto-increments, edit-protected),
-  **"Check Med"**(17, double-click toggles a checkmark; formerly "Print?"). **Source**
-  is a required dropdown (DOH / IN HOUSE / RxAPS / Other), blank by default. A full-width
-  blue banner (row 1) and a light box-grid are drawn in code by `SetupWorkbook`.
-  Missing-field highlights: **red** = Exp/Lot, **yellow** = Quantity/Source.
-  Buttons (col S / 19): `+ Add Medication`, `- Remove Selected`, `Review & Validate`,
-  `Preview ALL Labels`, `Save for Later (draft)`, `Edit Past Encounter`, `Save Edited
-  Encounter`. **Printing is done only from the gallery** (Preview ALL Labels -> Print
-  Checked Labels).
-- **3. Print Labels** - auto-generated gallery, one card per medication (cards mirror
-  the print label's three-zone header). **Top-right buttons** (code-created each
-  rebuild): `Print Checked Labels`, `Refresh Previews`. **Per-card buttons**:
-  **`Check this label` / `Uncheck this label`** (state-aware; toggles the med's
-  `Print?` checkbox on the Medications tab via `RowCheck` -> `ToggleRowSelect`),
-  `Edit this med`, `Remove this med`. Rebuilds on tab activate; the rebuild sweeps
-  stray/manually-placed buttons (deletes all `al_*` shapes and loose autoshapes).
-- **4. Log** - running dispense log. Columns 1-16: timestamp, patient, DOB, med,
-  strength, directions, qty, refills, expiration, lot, **source**, Rx date,
-  initials, dosage form, print #, **Encounter**. Each print is one **Encounter**
-  (numbered, and its rows shaded in one of three cycling greens). Mirrored to a
-  dated local CSV.
+- **2. Medications** - the parsed table. Columns, all driven by `C_*`:
+  `#`(1), **Check Med**(2), Name(3), Strength(4), Dosage Form(5), SIG(6),
+  Quantity(7), Expiration(8), Lot(9), **Source**(10), Rx Date(11), Refills(12),
+  Warnings(13), **# of Prints**(14, auto-increments), Raw Text(15, hidden),
+  Printed?(16, hidden), Confidence(17). **Source** is a required dropdown
+  (DOH / IN HOUSE / RxAPS / Other). Missing Quantity, Expiration, Lot, and Source
+  cells are **yellow**. A bad expiration format is **amber**.
+  The toolbar is inside the green banner: Add / Remove / Review on the left,
+  Save Draft / Edit Enc. / Save Enc. on the right. **Printing is done from the
+  Print Labels tab.**
+- **3. Print Labels** - gallery, one card per medication. Banner buttons:
+  `Print Checked Labels`, `Refresh Previews`. Per-card buttons, to the right of
+  the card: Check / Uncheck, Edit this med, Remove this med, **Print extra (no log)**.
+  Rebuilds on tab activate.
+- **4. Log** - columns 1-16 via `LG_*`: Timestamp, **Encounter #**, Patient, DOB,
+  Medication, Strength, Directions, Quantity, Refills, Expiration, Lot, Source,
+  Rx Date, Initials, Dosage Form, Print #. Encounters are numbered, color-banded
+  (green / blue / white), and separated by a divider. Each data row has **Print**,
+  **Edit**, and **Remove** buttons to the right of the row. Each print also appends
+  to `dispense-log/YYYY-MM-DD.csv`.
 - **5. Tebra Notes** - paste-ready session notes built from the Log: one block per
   patient, grouped by source (IN HOUSE / DOH & Outside / RxAPs), with name/DOB on
   the right. Rebuilt by `FillTebraTemplate` (also has a "Refresh from session log" button).
@@ -84,8 +62,7 @@ first in `SetupWorkbook`) + `ColorWorkflowTabs`. Hidden helper sheets: **Label P
 - **EncounterData** (HIDDEN) - full per-encounter snapshots (one row per med) that power
   Edit Past Encounter. Cleared on full reset / close. Do NOT delete it.
 
-Shortcuts: `Ctrl+Shift+P` parse, `Ctrl+Shift+R` reset, `Ctrl+Shift+L` refresh
-Label Previews.
+Shortcuts: `Ctrl+Shift+P` parse, `Ctrl+Shift+R` reset, `Ctrl+Shift+L` refresh the Print Labels gallery.
 
 ---
 
@@ -94,10 +71,10 @@ Label Previews.
 ### V2 highlights (2026-07-09)
 - **Source** column (required): DOH / IN HOUSE / RxAPS / Other dropdown, blank by
   default, right of Lot #; missing = yellow; `ApplySourceValidation` keeps it the
-  only dropdown in the grid. Mirrored into the Log (col 11) and CSV.
+  only dropdown in the grid. Mirrored into the Log (`LG_SRC`, column 12) and the dated CSV.
 - **Refills** sits right of Rx Date and **defaults to 0**.
-- **2 copies per label** via `LABEL_COPIES = 2` (one Log row per med regardless).
-- **Auto-check on validate**: passing meds get their Print? checkmark automatically.
+- **2 copies per label** via `LABEL_COPIES = 2` (one Log row per med regardless). The per-row Log Print and gallery Print extra use 1 copy and are not logged.
+- **Review does not auto-check** (this replaced the 2026-07-09 auto-check). Passing rows turn blue. The volunteer checks them.
 - **Add Medication** offers the same Exp/Lot popup the parse flow uses.
 - **Encounters**: each print action is one numbered Encounter (`NextEncounter`),
   Log rows shaded in 3 cycling greens.
@@ -112,10 +89,10 @@ Label Previews.
   lines between drugs.
 - Per-drug **Confidence** (High / Medium / Low / Manual) from how cleanly it parsed.
 - **Validation** flags missing strength/SIG/quantity/Exp/Lot/**Source**, bad Exp
-  format, and possible duplicates -> Warnings column. Missing-field cell highlights:
-  **red** = Exp/Lot, **yellow** = Quantity/Source.
+  format, and possible duplicates -> Warnings column. Missing Quantity, Expiration,
+  Lot, and Source cells are **yellow**. A filled expiration in a bad format is **amber**.
 - Add / Remove / Renumber medications manually. **Remove Selected removes every
-  checked (Print?) row**, not just the clicked one.
+  checked row**, not just the clicked one. The check lives in column 2 (`C_SEL`), header **Check Med**.
 - Exp/Lot forced to text.
 
 ### Selection, color, printing (checkbox-driven)
@@ -128,10 +105,10 @@ Label Previews.
 - **Live highlighting:** the Medications `Worksheet_Change` handler calls `LiveRefreshRow`
   on the edited row(s) so yellow clears to white the instant a value is entered (and
   returns to yellow if cleared) - **without** turning the row blue. Blue is only set when
-  **Review** (`ValidateMedications`) runs; Review then auto-checks OK rows to green.
+  **Review** (`ValidateMedications`) runs. Review does **not** auto-check. The volunteer checks rows (or double-clicks the Check Med header).
 - **Event-guard invariant:** anything that programmatically writes a Medications table
   cell whose result must survive - `ValidateMedications` (Warnings "OK" + Exp normalize),
-  the Review auto-check, `ToggleRowSelect` (Check Med), `ClearMedArea` - runs with
+  `ToggleRowSelect` (Check Med), `ClearMedArea` - runs with
   `Application.EnableEvents = False`, because otherwise the write re-fires
   `Worksheet_Change` -> `LiveRefreshRow`, which clears the "OK" (dropping the row to
   white). Unchecking a reviewed med therefore goes green -> blue, not green -> white.
@@ -161,10 +138,10 @@ Label Previews.
   `SaveEditedEncounter` abort (the latter *before* deleting the old encounter rows).
   Nothing prints and nothing is logged with blank initials.
 
-### Log row buttons (Print / Edit / Remove)
-- Each **4. Log** data row carries three buttons to the right of the record:
-  **Print**, **Edit**, **Remove**. `RefreshLogRowButtons` clears every `lg_*` shape
-  and re-adds `lg_print_<row>` / `lg_edit_<row>` / `lg_remove_<row>` for the current
+### Log row buttons (Print / Edit / Add med / Remove)
+- Each **4. Log** data row carries four buttons to the right of the record:
+  **Print**, **Edit**, **Add med**, **Remove**. `RefreshLogRowButtons` clears every `lg_*` shape
+  and re-adds `lg_print_<row>` / `lg_edit_<row>` / `lg_add_<row>` / `lg_remove_<row>` for the current
   rows (geometry from `LGB_*` consts; row height forced to `LGB_ROWH` = 22 pt with
   vertically-centered text/buttons). The row number is recovered by the existing
   `CallerRow()`. It's called after **every** Log change — wired into
@@ -178,14 +155,9 @@ Label Previews.
 - **Edit** (`EditLogRow` -> `EditLogRowWithForm`) reuses the same `frmMedEdit` form as
   the Medications/gallery editor, pre-filled from the Log columns and written back
   (Exp/Lot re-forced to text). Input-box fallback if the form is unavailable.
-- **Remove** (`RemoveLogRow`) deletes the row (named confirm) and redraws dividers.
-- **CSV mirroring (Log = source of truth for the backup).** Edit and Remove update
-  the matching line in that row's dated `dispense-log\YYYY-MM-DD.csv`
-  (`UpdateCsvLineForLogRow`; helpers `BuildCsvLineFromLogRow`, `CsvKeyMatch`,
-  `ParseCsvLine`, `CsvDateStampFromTimestamp`). **Surgical, line-level** match on
-  Timestamp + Encounter + Medication + Lot — *not* a whole-file rewrite, because a
-  day's CSV can span multiple sessions (the Log wipes on close; the CSV is append-only).
-  Best-effort under `On Error Resume Next`; a CSV miss never blocks the edit/remove.
+- **Add med** (`AddLogMed`) opens the same add dialog as the Medications tab and inserts the new medication on the next row. It copies that row's encounter, patient, DOB, source, Rx date, and initials. Print count is 0. The new row is appended to that day's CSV. Cancel leaves the Log unchanged.
+- **Remove** (`RemoveLogRow`) deletes the row after a named confirm and redraws the encounter dividers. The matching CSV line is removed too.
+- **CSV mirroring (Log = source of truth for the backup).** A print appends a line. Edit, a hand-typed cell, and a hand-added row update that day's `dispense-log\YYYY-MM-DD.csv` (`LogSheetChanged` / `UpdateCsvLineForLogRow`). The match is Timestamp + Encounter + Medication + Lot. If the line is not there yet, the row is appended. Remove drops the line. The file is chosen from the row's timestamp. A day's CSV can span multiple sessions (the Log wipes on close; the wipe does not delete the CSV). Best-effort under `On Error Resume Next`; a CSV miss never blocks the edit.
 - **Edit/Print stay on the Log.** They deliberately do **not** call
   `FillTebraTemplate` (which `.Activate`s the Tebra tab); the Tebra note refreshes
   from the Log on tab-activate anyway, so the note stays correct without the jump.
@@ -231,10 +203,10 @@ Label Previews.
   `Workbook_Open` can't block it). Note: **in-progress work is discarded on close by design.**
 
 All four UserForms (`frmExpLot`, `frmMedEdit`, `frmBusy`, `frmReview`) and the
-auto-reset handlers are **generated by `Build-Release.vbs`** into the workbook (so
-volunteers need no VBA-project-trust setting). The forms are referenced **late-bound**
-in `MedParser.bas`, so the module compiles even without them. See §5 (build) and §7
-(gotchas).
+auto-reset handlers are **generated by `Build-Release.vbs`** into the workbook.
+The forms are referenced **late-bound** in `MedParser.bas`, so the module compiles
+even without them. The everyday open path still needs **Trust access to the VBA
+project object model**, because the click-me file rebuilds the workbook on every open.
 
 ---
 
@@ -392,14 +364,13 @@ See `tools/BUILD_RELEASE_NOTES.md` for full detail.
 1. VBA editor (Alt+F11): remove the old `MedParser` module, **Import
    `MedParser.bas`**, run **`SetupWorkbook`**, save. (`SetupWorkbook` running is
    the compile check.)
-2. **Handlers:** the **Medications** `Worksheet_BeforeDoubleClick` (toggle Print? /
-   block # of Prints) **and** `Worksheet_Change` (live highlight refresh: any table-cell
-   edit re-runs `ValidateMedications`, guarded by `EnableEvents = False`) are both
-   **re-installed at build time** by `SetupWorkbook` -> `InstallMedSheetEvents`, built
-   from the `C_*` constants (injected as literals, since a sheet module can't see the
-   module's `Private Const`s) so they stay correct after column reorders (needs
-   VBA-project trust, which Build-Release has). The **Label Previews**
-   `Worksheet_Activate` -> `PreviewAllLabels` handler is preinstalled in that sheet module.
+2. **Handlers:** `SetupWorkbook` re-installs them at build time. Medications gets
+   `Worksheet_BeforeDoubleClick` (Check Med header = check all; Check Med cell or
+   medication name = toggle that row; `# of Prints` is blocked) and `Worksheet_Change`
+   (calls `LiveRefreshRow`, not a full re-validate). Print Labels gets
+   `Worksheet_Activate` → `PreviewAllLabels`. Tebra Notes gets `Worksheet_Activate` →
+   `FillTebraTemplate`. Do not paste an older handler that treats column 16 or 17 as
+   the checkbox.
 3. Keep `scu_emblem.png` beside the workbook so the logo embeds on SetupWorkbook.
 
 ### Problems solved (2026-06-30 session)
@@ -433,33 +404,15 @@ See `tools/BUILD_RELEASE_NOTES.md` for full detail.
 
 ## 6. TASKS STILL TO COMPLETE / VERIFY
 
-1. **Add the consolidated folder as an Excel Trusted Location** (section 1) so
-   macros run without prompts. Without this, content is blocked.
-2. **(Optional) Desktop access:** make a Desktop shortcut to the folder; rename
-   to drop `GIT_VERSION_` and re-point GitHub Desktop.
-3. **`LABEL_WIDTH_PT = 242`** — user wanted a wider template; confirm on the clinic
-   Brother that labels still fit **one** die-cut (228 pt was the prior no-bleed
-   sweet spot).
-4. **Bold clinic title on thermal** — bold may still look subtle on the Brother;
-   `ShrinkToFit` can limit apparent size on long clinic name text.
-5. **Physical print regression** — spot-check emblem size/position and header
-   after the latest logo/header changes (user confirmed screen + print path OK
-   at end of session).
-6. **Bootstrap / data loss** — if `MedicationDispensing.xlsm` was ever missing
-   during a build, the bootstrap copy overwrote it; recover from `_backups\` if
-   needed.
-7. **Dead code cleanup (optional):** `LogoB64()` remains in `MedParser.bas` but is
-   unused after fallback removal — safe to delete later to shrink the module.
-8. **Repair `tools/Build-ScuEmblem.ps1`** — it currently **blanks** `scu_emblem.png`
-   (zeros the alpha channel), which made the logo invisible everywhere on 2026-07-02.
-   Until it's fixed, do **not** run it. Correct behavior: force ink to solid black
-   **while keeping the alpha channel** (or emit black-on-white fully opaque).
-   `scu_emblem.png` has been regenerated by hand for now.
+1. **`LABEL_WIDTH_PT = 242`** — confirm on the clinic Brother that a label still fits one DK-1202 die-cut. 228 pt was the earlier no-bleed width.
+2. **Bold clinic title on thermal** — bold can look subtle; `ShrinkToFit` can limit apparent size.
+3. **Printer-not-found double print.** If Hermione is not detected, `RowPrintExtra` and `PrintLogRow` show `xlDialogPrint` and then still call `PrintLabelSurfaceSafe`. `PrintLabel` returns after the dialog. Fix is `Exit Sub` after the manual dialog in those two routines.
+4. **Do not run `tools/Build-ScuEmblem.ps1`.** It zeros the alpha channel and blanks `scu_emblem.png`. The PNG in the repo is the hand-rebuilt emblem.
+5. **v2.4 GitHub release text** still says to download `SCU-Label-Printing-v2.3.zip`. The asset on that release is `SCU-Label-Printing-v2.4.zip`.
+6. **`tools/make-release-zip.ps1`** still packages the old slim zip (workbook, emblem, quick-start card, `INSTALL.txt`). The zip actually published for v2.4 is the full working folder. Do not treat the script as the current release process until it is updated.
+7. **`LogoB64()`** is still in `MedParser.bas` and unused. Safe to delete later. Do not turn the embedded fallback back on in `LogoFilePath`.
 
-**Done / verified (2026-06-30):** release build (`Build-Release.vbs`); label layout
-and typography; emblem (aspect, pure black, print + gallery sync); one label per
-print (no blank follow-on label); logo/header layout on screen and print path
-(user confirmed working at end of session).
+Verified in source as of v2.4: the release build, the five-tab workflow, Review without auto-check, Log row buttons, and the three-zone label header in `BuildLabelPreviewLayout`. The 242 pt width still needs a physical Brother check.
 
 ---
 
@@ -542,7 +495,8 @@ print (no blank follow-on label); logo/header layout on screen and print path
 | `InstallMedSheetEvents` | Re-inject the Medications double-click handler at build (uses `C_*` constants). |
 | `StartNewPatient` | Clear patient + meds (via `ClearMedArea`), keep the Log. |
 | `PreviewAllLabels` / `BuildAllLabelsPreview` / `EnsureAllLabelsSheet` | Label Previews gallery (three-zone cards mirroring the print label; top-right `Print Checked Labels` / `Refresh Previews` created each rebuild; rebuild sweeps stray autoshapes). |
-| `RowCheck` / `RowEdit` / `RowRemove` (`RowPrint` legacy) / `EditMedWithForm` | Per-card gallery actions. `RowCheck` -> `ToggleRowSelect` toggles the med's `Print?` selection; `RowEdit` -> `EditMedWithForm` opens the prefilled `frmMedEdit` editor (input-box fallback); both rebuild the gallery. |
+| `RefreshLogRowButtons` / `PrintLogRow` / `EditLogRow` / `RemoveLogRow` / `RenderLabelSurfaceFromLog` / `UpdateCsvLineForLogRow` / `LogSheetChanged` | Log row buttons, plus hand-edits. Print is one reprint and is not logged again. Edit, a typed cell, and a hand-added row update that day's CSV (append if the line is new). Remove drops the CSV line. The close wipe does not. |
+| `RowPrintExtra` | Gallery "Print extra (no log)": one spare label, no Log row, no print-count change. |
 | `PromptExpLotPair` / `PromptExpiration` / `IsBadExpFormat` | Per-med Exp+Lot prompt via `frmExpLot` (two input-box fallback), with a forgiving `MM/YYYY` format check. |
 | `ClearSessionSilent` | Silent "Start NEW Patient" (clear patient+meds+paste, keep Log). Called by the `Workbook_Open` / `Workbook_BeforeClose` auto-reset. |
 | `ResetSession` / `ClearPasteArea` | Full reset (incl. Log) / clear paste box. |
@@ -551,10 +505,7 @@ print (no blank follow-on label); logo/header layout on screen and print path
 
 ## 9. HIPAA / PHI
 
-Patient name/DOB/meds are PHI. Keep the `.xlsm` and the dispense Log **local** -
-never commit them to GitHub (the `.gitignore` excludes `*.xlsm`/`*.xlsx`/`*.csv`
-and `_backups/`) and never route PHI through an external AI/API without a signed
-BAA. The repo is code + docs + no-PHI samples only.
+Patient name/DOB/meds are PHI. `Workbook_BeforeClose` wipes the on-screen patient, meds, and Log before save, which is why a closed `MedicationDispensing.xlsm` is allowed in Git. Do not commit a workbook that still has a patient on screen, and never commit `dispense-log/`, `*.csv`, or `support/_backups/`. Do not paste real patient medication data into an external AI tool.
 
 ---
 
@@ -613,11 +564,4 @@ parsing, the printer-detection cache with self-heal, and `PrintLabelSurfaceSafe`
 
 ---
 
-**Bottom line:** parsing, validation, checkbox-driven selection/printing/removal,
-the dispense log, multi-patient flow, and the **redesigned DK-1202 label** (emblem,
-header typography, width, single-page print) are built and **verified on screen
-and print path** at end of the 2026-06-30 session. Everything lives in one
-folder; code is backed up to GitHub. Remaining: **Trusted Location**, optional
-**242 pt width re-test** on physical Brother, and optional cleanup of unused
-`LogoB64()`. Detail: `LABEL_REDESIGN.md`, `CHANGELOG.md`,
-`tools/BUILD_RELEASE_NOTES.md`.
+**Bottom line (2026-09-26):** v2.4 is what `master` and the GitHub v2.4 tag contain. Parse, review (no auto-check), checkbox printing, the Log (including per-row Print/Edit/Remove), Tebra-from-Log, and the DK-1202 label layout are in `MedParser.bas`. Remaining checks are the 242 pt width on the clinic Brother, the printer-not-found double print, and not running `Build-ScuEmblem.ps1`.

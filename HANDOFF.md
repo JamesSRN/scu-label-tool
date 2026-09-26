@@ -1,94 +1,52 @@
-# SCU Label Printing (Dispensary) — Session Handoff
+# SCU Dispensary Label Tool — current state
 
-_Last updated: 2026‑08‑23. This captures the current state, what changed, what's broken, and what to do next. The user‑facing walkthrough lives in [README.md](README.md); this is the maintainer's picture._
+_Last updated: 2026-09-26. App version **2.4**. GitHub `JamesSRN/scu-label-tool`, branch `master`. The long routine map is [support/docs/HANDOFF.md](support/docs/HANDOFF.md). Volunteer steps are [README.md](README.md)._
 
-> Sister tool: the **lab‑label‑printer** repo (small patient‑ID labels) is a separate, simpler app, released at **v1.0**. Its only pending change is the same launcher fix described below. Don't confuse the two — this tool is the medication dispensary tool (large DK‑1202 labels, full logging).
-
----
-
-## 1. How this app is built (the mental model)
-
-- **Source of truth is `MedParser.bas`** (~6,300 lines). The workbook `MedicationDispensing.xlsm` is **rebuilt from it on every launch** by `Build-Release.vbs`, which imports the `.bas`, injects the sheet event handlers + UserForms, runs `SetupWorkbook` (forces a full VBA **compile** + rebuilds the tabs/buttons), saves, and leaves it open.
-- **`*.xlsm` is git‑ignored** (it can hold PHI). So GitHub only ever gets the **source** (`MedParser.bas`, the `.vbs`, docs, emblem). Volunteers get a workbook by running the launcher, which rebuilds it locally. The dated CSVs in `dispense-log/` are also git‑ignored (PHI, local only).
-- **Launcher:** `OPEN LABEL TOOL (double-click me).cmd` → runs `Build-Release.vbs`.
-- **Requires once per PC:** Excel → Options → Trust Center → Trust Center Settings → Macro Settings → **"Trust access to the VBA project object model"** (the build injects code via the VBA project).
-
-### Key internals to know
-- **Sheets** (constants at top of `MedParser.bas`): `1. Patient & Input`, `2. Medications` (`SH_MEDS`), `3. Print Labels` (gallery, `SH_ALL`), `4. Log` (`SH_LOG`), `5. Tebra Notes` (`SH_TEBRA`), plus a hidden `EncounterData` snapshot sheet and a hidden label surface.
-- **Check state = a cell, not a control.** `C_SEL` (column 2 on the Medications sheet) holds a ✓ (`ChrW(10003)`) when a med is checked. `IsRowSelected()` just tests whether that cell is non‑empty. Both print paths (`PrintCheckedLabels`, `PrintEncounterLabelsNoLog`) filter on it.
-- **Log columns:** `LG_TIME, LG_ENC (Encounter #), LG_PT, LG_DOB, LG_NAME …` — every row carries its **Encounter #**, which drives the row shading and the Tebra grouping. Header is 2 rows (`LOG_HDR_ROWS`).
-- **Tebra is generated FROM the Log** (`FillTebraTemplate` reads Log rows, groups by patient). It does not use the in‑memory parse — so anything in the Log flows into Tebra.
-- **Events are injected into sheet modules at build time** (`InstallMedSheetEvents`, `InstallAutoRefresh`, and the new `InstallTebraAutoRefresh`) via `VBProject…CodeModule.AddFromString`.
+This is the medication-label tool (Brother QL-1100c, **Hermione**, USB, DK-1202). Lab labels are a different repo: [lab-label-printer](https://github.com/JamesSRN/lab-label-printer) (Brother QL-820NWB, **Harry**).
 
 ---
 
-## 2. Changes made this session
+## How a change has to land
 
-All in `MedParser.bas` unless noted. **Committed:** the "encounter logic" commit. **Uncommitted at handoff:** the resilience pass, launcher fixes, doc updates (see §5).
+- **Edit `MedParser.bas`.** It is the source of truth (about 7,600 lines). The workbook is rebuilt from it every launch.
+- **Keep `MedParser.bas` pure ASCII + Windows CRLF.** `tools/check-encoding.ps1` checks that file only, and `Build-Release.vbs` aborts the build if it fails. Typographic dashes and quotes break the VBA import.
+- **Leave `Build-Release.vbs` alone unless you must change the build.** It opens Excel and injects VBA. Windows Defender trusts the current file by reputation. Editing even one character makes a new hash that fresh downloads can flag as a virus.
+- **Open the tool with `OPEN LABEL TOOL (double-click me).cmd`**, which runs `Build-Release.vbs`. That imports `MedParser.bas`, rebuilds the four UserForms and the `ThisWorkbook` open/close handlers, runs `SetupWorkbook` (full compile), saves, and **leaves Excel open** on Start Here. On failure it quits Excel so no stray process locks the file.
+- **Close the workbook before a rebuild.** If it is already open, answer **No** to Excel's replace prompt, or the open copy overwrites the fresh build.
 
-1. **Log encounter colors + no residual highlighting.** `LogPrint` now shades each encounter's rows in a **light‑green → light‑blue → white** cycle (was 3 greens). `ClearLogSilent` now also clears **interior color + dividers**, so a blank Log opens with no leftover highlighting (it clears contents *and* formatting on close).
-2. **Tebra auto‑refresh from the Log.** New `InstallTebraAutoRefresh` injects a `Worksheet_Activate` on the Tebra tab that calls `FillTebraTemplate`. So a row **hand‑added to the Log** appears in Tebra just by clicking onto the Tebra tab — no print needed. Guarded with a re‑entrancy flag `gInTebraFill` (FillTebraTemplate's own `.Activate` can't loop it).
-3. **Review no longer auto‑checks.** Removed the "Check them ALL? Yes/No" prompt and all `autoCheck` logic from `ReviewMedications`. Review only validates now.
-4. **Header "check all" toggle.** New `CheckAllToggle` (wired to **double‑clicking the "Check Med" column header**): checks all if any are unchecked, otherwise unchecks all.
-5. **Edit‑encounter logic.** On **Save Edited Encounter**: **all** meds are re‑logged (full record, checked or not), then it **reprints only the CHECKED** meds — and the reprint prompt now **shows the checked count** ("Reprint the N CHECKED label(s)?") so it can never surprise‑print the whole list. (This addresses the "sometimes prints ALL when editing" report — see §3.)
-6. **Resilience / "hard to break."**
-   - `ToggleRowSelect` and `CheckAllToggle` now use `On Error GoTo restore` so `EnableEvents` is **always turned back on**, even on error (a stuck `EnableEvents = False` silently breaks the double‑click check/uncheck — the most likely root cause of "prints all").
-   - New `AppReady` self‑heal (re‑enables events, screen updating, status bar), called at the top of **7 main buttons** (Parse, Review, Print, Reset, New Patient, Preview, Edit Encounter) — one click un‑sticks the app.
-   - **Graceful error handlers** (`On Error GoTo Fail` → friendly "nothing was harmed, try again" message) added to the three highest‑risk routines: `ParseMedications` (parses arbitrary pasted text), `AddMedicationRow`, `EditEncounter`.
-7. **Launcher fix** (`OPEN LABEL TOOL (double-click me).cmd`): changed `start "" "Build-Release.vbs"` → `wscript "%~dp0Build-Release.vbs"`. The old form depended on the `.vbs` file association; if an editor grabs `.vbs`, the launcher "flashes and does nothing." `Build-Release.vbs` itself was always fine (running it directly rebuilds correctly).
-8. **Docs:** README updated for the check/Review change, the Log color cycle, and Tebra auto‑refresh.
+## What the current code does
 
----
+Five numbered tabs: **1. Patient & Input**, **2. Medications**, **3. Print Labels**, **4. Log**, **5. Tebra Notes**. Hidden sheets: **Label Preview** (print surface), **EncounterData** (snapshots). **Developer Test** and **Setup & Help** sit after the workflow.
 
-## 3. Known problems / open issues
+- Parse clears the previous medication list first (keeps name, DOB, and the Log) and asks before wiping a list that already has rows.
+- A check is a cell, not a control. Column 2 (`C_SEL`) holds a checkmark. `IsRowSelected` tests that the cell is non-empty.
+- **Review does not auto-check.** It validates rows to blue. The volunteer checks what prints (green). Double-click the Check Med header to check or uncheck all.
+- Missing Quantity, Expiration, Lot, and Source cells are **yellow**. A filled expiration in the wrong format is **amber**. There is no red missing-field highlight.
+- **Print Checked Labels** prints `LABEL_COPIES` (2) of each checked med, logs each row, and lands on the Log. Cancelling the initials prompt prints nothing and logs nothing.
+- Gallery cards have Check, Edit, Remove, and **Print extra (no log)** (1 copy, not logged).
+- Each Log row has **Print** (1 reprint, not logged again), **Edit** (writes the row and that day's CSV), **Add med** (inserts a new medication for that same patient on the next row and appends it to the CSV), and **Remove**. Those buttons stay on the Log. Typing in a Log cell, or adding a row by hand, writes that day's CSV as well. Closing the workbook does not erase the CSV. Use **Remove** to drop a row from the CSV; deleting the Excel row by hand does not.
+- Tebra notes are built from the Log when that tab is activated. Edit Encounter reloads from the Log.
+- Re-saving an edited encounter stamps Log rows `1`, `1 (v2)`, `1 (v3)`, …
+- On open, patient and meds clear and the Log is kept. On close, patient, meds, **and the Log** clear, then the workbook saves. The day's CSV in `dispense-log/` is the record that survives.
 
-- **#2 — per‑label gallery print buttons: NOT BUILT.** The one remaining feature. Goal: add a "Print this label" button to each card on the **3. Print Labels** gallery that prints that one label **without** auto‑logging, then prompts **"Log this dispense? Yes/No."** The gallery already builds per‑card **Check / Edit / Remove** buttons dynamically (`BuildAllLabelsPreview` → `AddRowButton` + `CallerRow`), and a per‑row `RowPrint`→`PrintLabel` path exists to borrow from — so this is "add a 4th button + a new handler," not a rewrite.
-- **"Edit encounter prints all" — root cause + status.** The reprint code always filtered to checked meds correctly; the bug was that **unchecks weren't reliably taking** (a stuck `EnableEvents` stops the double‑click handler from firing) and `LoadEncounter` **pre‑checks every row** on load. Mitigated three ways now: event‑safety on the toggles, the `AppReady` self‑heal, and the **checked‑count in the reprint prompt**. If it ever recurs, the deeper fix is already scoped (see §4).
-- **Graceful handlers are only on 3 routines.** Still lacking their own try/catch: `PreviewAllLabels`, `RowCheck`, `RowEdit`, `ClearPasteArea`, `ResetSession`, `StartNewPatient`, `RunValidation`, `SaveEncounterDraft`. `AppReady` already un‑sticks their state, but an unexpected error in them still shows the raw VBA debug dialog.
-- **Not yet compiled/tested in Excel at handoff.** The resilience/launcher/doc edits are on disk but hadn't been through a Build‑Release compile at the moment this was written. **A rebuild is the real test** (Build‑Release runs `SetupWorkbook`, which forces a full compile).
-- **Stray stub files in the folder:** `_MedParser.bas` (only ~4 KB — NOT the real 288 KB source), `_OPEN LABEL TOOL (double-click me)`, `_README`. They look like leftover duplicates; **delete them** so nobody double‑clicks the wrong launcher.
-- **`.gitignore`** shows as modified but it's only a cosmetic line‑ending/reorder (same rules, PHI guards intact).
+## What not to break
 
----
+- Logged printing goes through `PrintCheckedLabels` → `LogPrint`. `RowPrintExtra` and `PrintLogRow` must not call `LogPrint` or `MarkPrinted`.
+- `PrintLogRow` renders from the Log row (`RenderLabelSurfaceFromLog`), not from the patient currently on the Input sheet.
+- Edit and Remove on the Log update that row's line in `dispense-log/YYYY-MM-DD.csv`. A hand-edit or a hand-added row does the same (`LogSheetChanged`). The match is timestamp + encounter + medication + lot. If that line is not in the file yet, the row is appended. Do not rewrite the whole CSV. The on-close wipe does not delete the CSV.
+- Anything that writes a Medications cell and needs the result to stick (`ValidateMedications`, `ToggleRowSelect`, `ClearMedArea`) runs with `EnableEvents = False`. `AppReady` turns events back on at the start of the main buttons.
+- The custom `IIf` in this module returns a **String**. Use a real `If` for numbers and flags.
+- Do not set `PaperSize`. Fit-to-page (`FitToPagesWide/Tall = 1`) is what keeps Exp/Lot on the label.
+- Sheet event code is injected at **build** time (`InstallMedSheetEvents`, `InstallAutoRefresh`, `InstallTebraAutoRefresh`). Do not paste the old column-15/16 handlers from the setup docs.
 
-## 4. Plans / next steps (in order)
+## Still open in the code
 
-1. **Rebuild + test.** Double‑click the (now‑fixed) `OPEN LABEL TOOL` launcher — or run `Build-Release.vbs` directly. Click through: Parse → Review (confirm it no longer auto‑checks) → double‑click the **Check Med header** (check/uncheck all) → Print → check the **Log colors** (green/blue/white) → open **Tebra** (rebuilds from Log) → **Edit an encounter** and confirm reprint only does the checked ones. A rebuild also compiles, catching any VBA error.
-2. **Commit + push** (GitHub Desktop — the sandbox can't push): `MedParser.bas`, `OPEN LABEL TOOL (double-click me).cmd`, `README.md`, `HANDOFF.md`, `.gitignore`. Suggested message: *"Dispensary: encounter/check logic, resilience, launcher fix, docs."* Consider tagging **v2.2** (last release was v2.1).
-3. **Delete the `_`‑prefixed stub files.**
-4. **Build #2** (gallery print buttons) per the spec in §3.
-5. **Finish the graceful‑handler pass** on the remaining routines listed in §3 (same `On Error GoTo Fail` → `AppReady` + friendly MsgBox pattern already used in `ParseMedications`).
-6. **Deeper "prints all" fix (only if it recurs):** make `LoadEncounter` start with **nothing checked** (instead of pre‑checking all) so an edited‑encounter reprint is opt‑in, and update its instruction MsgBox. Left as‑is for now because the count‑in‑prompt + event‑safety already prevent the surprise.
+- If Hermione is not found, `RowPrintExtra` and `PrintLogRow` show the Windows print dialog and then still call `PrintLabelSurfaceSafe`. That can print twice. `PrintLabel` returns after the dialog.
+- `LABEL_WIDTH_PT = 242` has not been re-checked on the clinic Brother (228 was the earlier no-bleed width).
+- `tools/Build-ScuEmblem.ps1` blanks the emblem. Do not run it.
+- The published **v2.4** release page still tells people to download `SCU-Label-Printing-v2.3.zip`. The attached asset is `SCU-Label-Printing-v2.4.zip` (the full folder). `tools/make-release-zip.ps1` still builds an older slim zip (workbook + emblem + card + `INSTALL.txt`) and is not what that release shipped.
+- `support/_backups/` holds old `MedParser.bas` snapshots. They are not the current source.
 
----
+## Git and PHI
 
-## 5. Build / test / commit reference
-
-- **Rebuild the workbook:** `OPEN LABEL TOOL (double-click me).cmd` (now robust) → or `wscript Build-Release.vbs`. Close the workbook first.
-- **The `.xlsm` is disposable** — it's rebuilt from `MedParser.bas` each launch and is git‑ignored. Edits go in `MedParser.bas`.
-- **Compile check** happens automatically during a build (`SetupWorkbook` runs). If it fails, Build‑Release leaves Excel open and tells you to `Alt+F11` → Debug → Compile.
-- **What gets pushed:** source only (`.bas`, `.vbs`, `.cmd`, `.md`, emblem). Never the `.xlsm` or `dispense-log/`.
-- **Printer:** Brother QL-1100c (Hermione), DK‑1202 (62 × 100 mm) roll, 2 copies per label.
-
-
----
-
-## 11. Source encoding & antivirus reputation (read before touching the launcher)
-
-- **Only `MedParser.bas` must be pure ASCII + CRLF.** It is imported into the VBA project,
-  where non-ASCII mojibakes or fails the import. `tools\check-encoding.ps1` enforces this and
-  `Build-Release.vbs` aborts the build on failure. The checker defaults to `MedParser.bas`
-  only.
-- **Watch for typographic characters** (—, ’, “, ”, …, →, ×) sneaking into `MedParser.bas`
-  from word processors, browsers, or AI assistants. Run the checker before every release. (A
-  stray em-dash in the header comment is exactly what broke the v2.3 build pre-check.)
-- **Keep `Build-Release.vbs` byte-stable.** It is a Windows Script Host launcher, not imported
-  into VBA, so it does not need to be ASCII. More importantly it opens Excel and injects VBA
-  code - a pattern Defender/SmartScreen/Chrome flag. The long-standing file is a trusted hash;
-  editing it (even one character) makes a new unknown script that gets flagged as a
-  false-positive virus and blocked from download until it re-earns reputation. Do not churn it.
-  If you truly must change it, expect AV false positives on fresh downloads and report the new
-  hash to Microsoft.
-- **Release ZIP:** ship the full working folder, flat (files at the ZIP root) so Windows
-  "Extract All" yields one clean folder, not a double-nested one. Confirm `check-encoding.ps1`
-  passes before publishing.
+`MedicationDispensing.xlsm` **is tracked**. Close wipes patient data before the save, and the rule is to commit only that wiped workbook. `*.csv`, `dispense-log/`, and `support/_backups/` are git-ignored. `dist/` is git-ignored. Release ZIPs are attached to GitHub Releases.

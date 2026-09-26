@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+**Day's CSV stays current when the Log changes (2026-09-26)**
+- A print still appends to `dispense-log/YYYY-MM-DD.csv`. The file date comes from the row's timestamp.
+- Editing a Log row (the Edit button, or typing in a cell) replaces that line. If the line is not in the file yet, the row is appended. Adding a row by hand does the same (`LogSheetChanged`, installed by `InstallLogSheetEvents`).
+- **Add med** on a Log row inserts a new medication directly under that patient (same encounter, name, and DOB) and appends it to the day's CSV.
+- **Remove** still deletes the CSV line. Deleting the Excel row by hand does not.
+- Closing the workbook still wipes the on-screen Log and does not delete the CSV. Programmatic Log writes (`BeginLogWrite`) do not double-write the file.
+
 ## v2.4 - 2026-08-27
 
 Per-row action buttons on the Dispense Log, plus two print-flow safety/UX fixes. No change to the parse / validate / print-batch workflow.
@@ -18,6 +27,10 @@ Per-row action buttons on the Dispense Log, plus two print-flow safety/UX fixes.
 
 **Version (2026-08-27)**
 - In-app version stamp bumped to **2.4** (`APP_VERSION`) and the README badge updated; earlier releases had left it at 2.1.
+
+**Still true, and easy to miss in the older notes below**
+- **Review does not auto-check.** Entries under v2.1 that say Review asks "Check all passing meds?" or that passing rows auto-check were superseded before this release. Review turns complete rows blue. The volunteer checks what prints.
+- Missing Quantity, Expiration, Lot, and Source cells are **yellow**. A bad expiration format is **amber**. Older notes that say Exp/Lot highlights are red describe an earlier build.
 
 ## v2.3 - 2026-08-27
 

@@ -10,14 +10,17 @@ Set ws1 = ThisWorkbook.Sheets(SH_INPUT)
 
 Cause: the workbook does not contain a required sheet with the exact expected name.
 
-Required sheets:
+Required sheets (names after `SetupWorkbook` renames them):
 
 ```text
-Patient & Input
-Medications
-Label Preview
-Log
-Label Previews
+1. Patient & Input
+2. Medications
+3. Print Labels
+4. Log
+5. Tebra Notes
+Start Here
+Label Preview          (hidden print surface)
+EncounterData          (hidden snapshots)
 ```
 
 Fix:
@@ -126,25 +129,20 @@ of scanning the Name column for the last used row. The old scan skipped rows tha
 in other columns but a blank Name. If you still see leftovers on an old build, select the
 row numbers and Delete, then rebuild.
 
-## Double-click Print? does not toggle
+## Double-click Check Med does not toggle
 
-Check the `Medications` sheet module - it must include the `Worksheet_BeforeDoubleClick`
-handler. As of V2 the handler is **re-installed automatically at build time** by
-`SetupWorkbook` (`InstallMedSheetEvents`) using the column constants, so it stays correct
-after column reorders.
-
-Current column layout (after the V2 reorder):
+`SetupWorkbook` re-installs the Medications handlers at build time (`InstallMedSheetEvents`). Current columns:
 
 ```text
-P / 16 = # of Prints
-Q / 17 = Print?
+2  = Check Med     (double-click the cell, the medication name, or the header)
+14 = # of Prints   (blocked; the handler does not use column 16 or 17)
 ```
 
-The handler toggles the Print? column (17) and blocks editing # of Prints (16).
+Rebuild with the click-me file. Do not paste an older handler that toggles column 16 or 17.
 
-## Label Previews does not refresh
+## Print Labels gallery does not refresh
 
-Check the `Label Previews` sheet module. It must include:
+`SetupWorkbook` injects this on the **3. Print Labels** sheet (`InstallAutoRefresh`):
 
 ```vb
 Private Sub Worksheet_Activate()
@@ -152,10 +150,11 @@ Private Sub Worksheet_Activate()
     Application.EnableEvents = False
     PreviewAllLabels
     Application.EnableEvents = True
+    On Error GoTo 0
 End Sub
 ```
 
-Also make sure macros are enabled.
+The sheet is not named "Label Previews". Macros must be enabled, and the build needs Trust access to the VBA project.
 
 ## Git/OneDrive problems
 

@@ -197,14 +197,15 @@ Each print is one **encounter**: numbered, color-banded, and separated by a divi
 
 **The Log is the source of truth** for Tebra Notes and for **Edit Encounter**. If a row is wrong or missing, fix it here.
 
-**If a Log row needs a fix**, use the three buttons on the right of that row. Those buttons **keep you on the Log** — they do not jump to Tebra.
+**If a Log row needs a fix**, use the buttons on the right of that row. Those buttons **keep you on the Log** — they do not jump to Tebra.
 
 1. Find the row (wrong name, SIG, quantity, Exp/Lot, source, etc.).
 2. Click **Edit**. The same one-dialog editor as the Print Labels page opens, already filled from that row. Change what's wrong and click OK. The Log row updates, and so does that day's CSV backup.
-3. If you also need another physical sticker, click **Print** on that row. You get **one** copy. It is a reprint only — nothing is added to the Log again, and the print count does not change. You stay on the Log.
-4. If the row shouldn't be there at all, click **Remove**, confirm, and it is deleted from the Log and from the CSV backup.
+3. Click **Add med** to add another medication for that same patient. It opens the add dialog, then inserts the new row directly under the one you clicked. The new row keeps that encounter, patient, and DOB, and it is written to that day's CSV.
+4. If you also need another physical sticker, click **Print** on that row. You get **one** copy. It is a reprint only — nothing is added to the Log again, and the print count does not change. You stay on the Log.
+5. If the row shouldn't be there at all, click **Remove**, confirm, and it is deleted from the Log and from the CSV backup.
 
-You can still type in a Log cell directly if that's faster (name, drug, SIG, qty, source, etc.), or add / delete a row by hand.
+You can still type in a Log cell directly if that's faster (name, drug, SIG, qty, source, etc.), or add a row by hand. That day's CSV updates as you type, so closing the workbook does not drop the change. To take a row out of the CSV as well, use **Remove** (deleting the Excel row by hand leaves the CSV line).
 
 Then:
 
@@ -249,7 +250,7 @@ The notes are built **from the Log** (including any rows you typed or corrected 
 - **2 copies per label**, batch or single, with detailed confirmations and fit-to-page so the bottom row never clips.
 - **Print extra (no log)** per-card button for spare labels a patient needs — printed without touching the dispense Log or the print count.
 - **Complete dispense log** with numbered, color-banded **encounters** and a divider between each.
-- **Per-row Log buttons** — **Print** (single reprint, not logged again), **Edit** (same one-dialog editor, writes back to the Log **and** its CSV backup), and **Remove** (row + CSV backup) on every Log row.
+- **Per-row Log buttons** — **Print** (single reprint, not logged again), **Edit** (same one-dialog editor, writes back to the Log **and** its CSV backup), **Add med** (inserts a medication for that patient on the next row, and writes the CSV), and **Remove** (row + CSV backup) on every Log row. Typing in a Log cell, or adding a row by hand, updates that day's CSV too.
 - **Cancel-safe initials** — cancelling the initials prompt prints and logs nothing and returns you to the review page.
 - **Edit past encounters** — reopen any logged visit (the list is pulled live from the Log), fix it, and re-save as a new version; tolerant of pasted-in logs (auto-numbers blank encounters, warns on column mismatches).
 - **Tebra notes** sheet: paste-ready session notes grouped by source, one boxed note per patient, rebuilt from the Log whenever you open the tab (fix the Log by hand if needed, then copy).
@@ -259,7 +260,7 @@ The notes are built **from the Log** (including any rows you typed or corrected 
 
 ## Privacy
 
-**This repo holds code and docs only.** The working `.xlsm` contains patient information and is kept **local** — excluded via `.gitignore`, never committed (as is `support/_backups/`). All screenshots in this README use **randomly generated test patients**.
+**Patient data stays off GitHub.** Closing the workbook wipes the patient, the medication list, and the on-screen Log, then saves. The tracked `MedicationDispensing.xlsm` is that wiped copy. Dated CSVs in `dispense-log/` and anything in `support/_backups/` are git-ignored. Commit the workbook only after it has been closed. All screenshots in this README use **randomly generated test patients**.
 
 ---
 
@@ -290,7 +291,7 @@ Full notes: **[TROUBLESHOOTING.md](support/docs/TROUBLESHOOTING.md)**.
 |---|---|
 | `OPEN LABEL TOOL (double-click me).cmd` | **The everyday "click me" file** — rebuilds from `MedParser.bas` and opens the tool. |
 | `Build-Release.vbs` | Same rebuild, used if the click-me file doesn't run. Imports `MedParser.bas`, runs `SetupWorkbook`, saves + opens the `.xlsm`. |
-| `MedicationDispensing.xlsm` | The clinic workbook the click-me file / Build-Release builds + opens (local, git-ignored). Opening it directly skips the rebuild. |
+| `MedicationDispensing.xlsm` | The clinic workbook the click-me file / Build-Release builds + opens. It is tracked only because close wipes patient data. Opening it directly skips the rebuild. |
 | `MedParser.bas` | The VBA source of truth (parser, validation, label layout, printing, logging). |
 | `scu_emblem.png` | SC emblem for the label header (loaded at print time; must stay here). |
 | `README.md` | This file. |
@@ -313,7 +314,7 @@ There's no separate "apply updates" step. Every time you open the tool with the 
 - **Manual build (VBA editor):** remove the `MedParser` module, **Import** `MedParser.bas`, run `SetupWorkbook`, save.
 - **After changing the emblem crop:** run `tools/Build-ScuEmblem.ps1` first, then `Build-Release.vbs`.
 - The two worksheet event handlers are pasted once into the sheet modules — see `HANDOFF.md` §5.
-- Everything lives in **one folder** (outside OneDrive). Code + docs are version-controlled; the `.xlsm` and `support/_backups/` are git-ignored so patient data stays local.
+- Everything lives in **one folder** (outside OneDrive). Code, docs, and the wiped workbook are version-controlled. `dispense-log/` and `support/_backups/` are git-ignored so a clinic day's patient data stays local.
 
 | I want to… | Go to |
 |---|---|
@@ -328,5 +329,7 @@ There's no separate "apply updates" step. Every time you open the tool with the 
 - **Print width** — `LABEL_WIDTH_PT = 242` uses more of the 100 mm die-cut; re-test on the clinic Brother that labels still fit one die-cut (228 pt was the prior no-bleed value).
 - **Bold clinic title on thermal** — may still look subtle; `ShrinkToFit` can limit apparent size.
 - **Physical regression test** — spot-check the emblem and header on the Brother thermal (screen + print path verified).
+- **Printer-not-found fallback** — if Hermione is not detected, `RowPrintExtra` and `PrintLogRow` show the Windows print dialog and then still call `PrintLabelSurfaceSafe`, so one click can print twice. `PrintLabel` exits after that dialog.
+- **Do not run `tools/Build-ScuEmblem.ps1`** — it blanks `scu_emblem.png`. The emblem file in the repo is the good one.
 
 </details>

@@ -1,5 +1,9 @@
 # GitHub Issue Response Drafts
 
+> Archive from June 2026. Sheet names and the import path in these drafts are out of date. Current sheets are `1. Patient & Input` through `5. Tebra Notes`, and the source file is `MedParser.bas` at the repo root.
+
+
+
 ## Issue: Run-time error 9: Subscript out of range
 
 Suggested response:
